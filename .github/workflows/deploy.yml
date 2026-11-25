@@ -30,14 +30,14 @@ jobs:
         continue-on-error: true
         with:
           enablement: true
-        if: github.ref_name == github.event.repository.default_branch
+        if: github.ref_name == 'main'
       - uses: actions/upload-pages-artifact@v3
-        if: github.ref_name == github.event.repository.default_branch
+        if: github.ref_name == 'main'
         with:
           path: dist
 
   deploy:
-    if: github.ref_name == github.event.repository.default_branch
+    if: github.ref_name == 'main'
     needs: build
     runs-on: ubuntu-latest
     environment:
