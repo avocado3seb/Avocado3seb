@@ -72,6 +72,7 @@ export class UI {
       btn('★  Neues Spiel', () => this.startGame(true), has ? '' : 'primary'),
       has && btn('💾  Spiel laden', () => this.slotsModal('load')),
       btn('👥  Mehrspieler', () => G.mp.menu()),
+      btn('👤  Profil / Admin', () => G.adminPanel.profileModal()),
       btn('⚙  Einstellungen', () => this.settingsModal()),
       btn('🎮  Steuerung', () => this.helpModal()),
       btn('ℹ  Credits', () => this.creditsModal()), btn('⛶  Vollbild', () => G.touch?.fullscreen())),
@@ -153,7 +154,7 @@ export class UI {
   }
   renderPause() {
     const G = this.G;
-    const tabs = [['map', '🗺  Karte'], ['missions', '🎯  Missionen'], ['character', '👤  Charakter'], ['inventory', '🎒  Inventar'], ['vehicles', '🚗  Fahrzeuge'], ['props', '🏠  Immobilien'], ['packs', '📦  Content-Packs'], ['stats', '📊  Statistik'], ['phone', '📱  Handy'], ['mp', '👥  Mehrspieler'], ['settings', '⚙  Einstellungen'], ['saves', '💾  Speichern'], ['help', '🎮  Steuerung']];
+    const tabs = [['map', '🗺  Karte'], ['missions', '🎯  Missionen'], ['character', '👤  Charakter'], ['inventory', '🎒  Inventar'], ['vehicles', '🚗  Fahrzeuge'], ['props', '🏠  Immobilien'], ['packs', '📦  Content-Packs'], ['stats', '📊  Statistik'], ['phone', '📱  Handy'], ['mp', '👥  Mehrspieler'], ...(G.admin ? [['admin', '🔑  Admin']] : []), ['settings', '⚙  Einstellungen'], ['saves', '💾  Speichern'], ['help', '🎮  Steuerung']];
     const content = h('div', { class: 'content' });
     const tabEls = h('div', { class: 'tabs' }, h('h3', {}, 'PAUSE'), tabs.map(([k, l]) => h('button', { class: 'tab' + (k === this.tab ? ' on' : ''), onClick: () => { this.tab = k; G.audio?.click(); this.renderPause(); } }, l)), h('div', { class: 'sp' }),
       h('button', { class: 'tab', onClick: () => this.closePause() }, '▶  Weiter'), h('button', { class: 'tab', onClick: () => { if (confirm('Zum Hauptmenü? Nicht gespeicherter Fortschritt geht verloren.')) { G.eco.autosave(); location.reload(); } } }, '⏏  Hauptmenü'));
@@ -203,7 +204,7 @@ export class UI {
     const full = !!o.full, vis = (kind) => { if (!full) return true; const cat = ['food', 'clothes', 'guns', 'property', 'dealer', 'fuel', 'job', 'raceStart', 'atm'].includes(kind) ? kind : (kind === 'tune' ? 'fuel' : kind === 'barber' || kind === 'jewel' || kind === 'store' ? 'clothes' : 'special'); return !this.legendOff.has(cat); };
     const px = G.player.position.x, pz = G.player.position.z;
     for (const p of G.world.pois) {
-      if (p.disabled || (!full && Math.hypot(p.x - px, p.z - pz) > range)) continue;
+      if (p.disabled || p.hidden || (!full && Math.hypot(p.x - px, p.z - pz) > range)) continue;
       if (!vis(p.kind)) continue;
       const own = p.kind === 'property' && G.eco.owns(p.id);
       let ic = POI_ICONS[p.kind]; if (!ic) continue;
@@ -257,6 +258,7 @@ export class UI {
     c.append(h('h3', {}, 'Verbrauchsgüter'));
     const use = (id, name, fn) => P.inv[id] > 0 && c.append(h('div', { class: 'row' }, h('div', { class: 'grow' }, h('div', { class: 't' }, `${name} ×${P.inv[id]}`)), h('button', { class: 'btn small', onClick: () => { fn(); P.inv[id]--; this.renderPause(); } }, 'Benutzen')));
     use('medkit', 'Verbandskasten', () => { P.health = 100; this.toast('Gesundheit aufgefüllt'); }); use('armorkit', 'Schutzweste', () => { P.armor = 100; this.toast('Weste angelegt'); });
+    G.life?.inventoryExtras(this, c);
     c.append(h('div', { class: 'row' }, h('div', { class: 'grow' }, h('div', { class: 't' }, `Hunger: ${Math.round(P.hunger)} %`), h('div', { class: 'd' }, 'Essen in Restaurants und Imbissen. Gut gesättigt = schnellere Regeneration.'))));
     c.append(h('div', { class: 'row' }, h('div', { class: 'grow' }, h('div', { class: 't' }, `Versteckte Pakete: ${Object.keys(G.found.packages).length} / ${G.packagePts.length}`)), h('div', { class: 'price' }, fmtMoney(P.money))));
   }
@@ -299,6 +301,7 @@ export class UI {
     rows.forEach(([a, b]) => c.append(h('div', { class: 'row' }, h('div', { class: 'grow' }, a), h('div', { class: 'price' }, b))));
   }
   tab_mp(c) { this.G.mp.tab(c); }
+  tab_admin(c) { this.G.adminPanel.panel(c); }
   tab_phone(c) { import('./shops.js').then((m) => m.phoneTab(this, c)); }
   tab_settings(c) { c.replaceChildren(h('h2', {}, 'Einstellungen'), ...this.settingsFields()); }
   tab_help(c) { c.replaceChildren(h('h2', {}, 'Steuerung')); const w = h('div', { class: 'help' }); this.helpModalInto(w); c.append(w); }

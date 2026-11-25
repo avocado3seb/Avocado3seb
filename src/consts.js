@@ -1,6 +1,6 @@
 // Weltkonstanten
-export const HALF = 2400;           // halbe Weltgröße (m)
-export const CS = 300;              // Chunkgröße
+export const HALF = 3200;           // halbe Weltgröße (m)
+export const CS = 320;              // Chunkgröße
 export const NC = (HALF * 2) / CS;  // Chunks pro Achse
 export const SEA = -0.3;
 export const GX0 = -1400, GX1 = 1100, GZ0 = -1000, GZ1 = 1200, PITCH = 100;
@@ -18,7 +18,16 @@ export const ISLANDS = [
   { id: 'palmera', name: 'Isla Palmera', x: 1850, z: 700, r: 170, h: 12 },
   { id: 'azul', name: 'Isla Azul', x: 1750, z: -1500, r: 190, h: 18 },
   { id: 'sol', name: 'Isla del Sol', x: 1650, z: 1650, r: 150, h: 9 },
+  { id: 'alcatraz', name: 'Alcatraz (Gefängnisinsel)', x: 1000, z: 1250, r: 80, h: 13, flat: true, skip: true },
+  { id: 'terra', name: 'Terra Mundi – Weltreise-Insel', x: 2520, z: 650, r: 470, h: 7, flat: true, skip: true },
 ];
+export const PEAKS = [
+  { x: -1700, z: -2550, r: 620, h: 430 }, { x: -1000, z: -2750, r: 560, h: 380 }, { x: -2350, z: -2700, r: 560, h: 400 }, { x: -450, z: -2700, r: 520, h: 330 }, { x: -1500, z: -2950, r: 420, h: 330 },
+];
+export const SKI_VILLAGE = { x: -1500, z: -2060, r: 150, h: 70 };
+export const SAVANNA = { x0: -2800, x1: -250, z0: 2000, z1: 3100 };
+export const inSavanna = (x, z) => x > SAVANNA.x0 && x < SAVANNA.x1 && z > SAVANNA.z0 && z < SAVANNA.z1;
+export const SNOW_LINE = 150;
 export const coastX = (z) => 1235 + 35 * Math.sin(z / 260) + 15 * Math.sin(z / 70 + 1);
 
 export const inRect = (r, x, z, m = 0) => x > r.x0 + m && x < r.x1 - m && z > r.z0 + m && z < r.z1 - m;

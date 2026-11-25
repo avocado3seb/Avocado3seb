@@ -195,7 +195,7 @@ export class MissionSys {
       const done = this.done[d.id], av = this.available(d);
       if (!done && !av && !(d.pack && !this.G.eco.packs[d.pack])) continue;
       const locked = d.pack && !this.G.eco.packs[d.pack];
-      rows.push(h('div', { class: 'row' + (locked ? ' locked' : '') }, h('div', { class: 'grow' }, h('div', { class: 't' }, d.title, d.pack && h('span', { class: 'pill pack' }, PACKS[d.pack].name), done && h('span', { class: 'pill' }, '✓ abgeschlossen')), h('div', { class: 'd' }, `${d.hint} · Belohnung ${fmtMoney(d.reward)}`)), av && h('button', { class: 'btn small', onClick: () => { const p = L(d.at); this.G.waypoint = { x: p.x, z: p.z }; ui.toast('GPS gesetzt: ' + d.title); ui.routeT = 0; } }, 'GPS')));
+      rows.push(h('div', { class: 'row' + (locked ? ' locked' : '') }, h('div', { class: 'grow' }, h('div', { class: 't' }, d.title, d.pack && h('span', { class: 'pill pack' }, PACKS[d.pack].name), done && h('span', { class: 'pill' }, '✓ abgeschlossen')), h('div', { class: 'd' }, `${d.hint} · Belohnung ${fmtMoney(d.reward * (G.cfg?.reward ?? 1))}`)), av && h('button', { class: 'btn small', onClick: () => { const p = L(d.at); this.G.waypoint = { x: p.x, z: p.z }; ui.toast('GPS gesetzt: ' + d.title); ui.routeT = 0; } }, 'GPS')));
     }
     rows.push(h('h3', {}, 'Aktivitäten'), h('div', { class: 'row' }, h('div', { class: 'grow' }, h('div', { class: 't' }, 'Taxi, Kurier, Bürgerwehr, Straßenrennen'), h('div', { class: 'd' }, 'Symbole auf der Karte (💼 🏁). Stuntsprünge: ' + Object.keys(this.G.activities.stuntFound).length + ' · Pakete: ' + Object.keys(this.G.found.packages).length + '/' + this.G.packagePts.length))));
     return rows;
@@ -248,7 +248,7 @@ export class MissionSys {
     this.promptDef = this.promptList[0] || null;
     if (this.promptDef && G.input.hit('KeyE')) {
       if (this.promptList.length === 1) this.start(this.promptDef);
-      else { const body = h('div', { class: 'body' }, ...this.promptList.map((d) => h('div', { class: 'row' }, h('div', { class: 'grow' }, h('div', { class: 't' }, d.title, d.pack && h('span', { class: 'pill pack' }, PACKS[d.pack].name)), h('div', { class: 'd' }, `${d.hint} · Belohnung ${fmtMoney(d.reward)}`)), h('button', { class: 'btn small primary', onClick: () => { G.ui.closeModal(); this.start(d); } }, 'Starten')))); G.ui.modal('Missionen verfügbar', body, { cash: false }); }
+      else { const body = h('div', { class: 'body' }, ...this.promptList.map((d) => h('div', { class: 'row' }, h('div', { class: 'grow' }, h('div', { class: 't' }, d.title, d.pack && h('span', { class: 'pill pack' }, PACKS[d.pack].name)), h('div', { class: 'd' }, `${d.hint} · Belohnung ${fmtMoney(d.reward * (G.cfg?.reward ?? 1))}`)), h('button', { class: 'btn small primary', onClick: () => { G.ui.closeModal(); this.start(d); } }, 'Starten')))); G.ui.modal('Missionen verfügbar', body, { cash: false }); }
     }
     this.contactUpdate();
   }
@@ -279,7 +279,7 @@ export class MissionSys {
     const G = this.G, m = this.current, d = m.def;
     this.cleanup(); const done = () => {
       this.current = null; this.done[d.id] = true; G.player.addMoney(d.reward, 'Mission'); G.player.stats.missions++; G.police.suppress = false;
-      G.ui.banner('MISSION ERFOLGREICH', '#ffd54f'); G.ui.toast(`${d.title}: +${fmtMoney(d.reward)}`); G.audio?.missionPass(); setTimeout(() => G.ui.banner(null), 3000);
+      G.ui.banner('MISSION ERFOLGREICH', '#ffd54f'); G.ui.toast(`${d.title}: +${fmtMoney(d.reward * (G.cfg?.reward ?? 1))}`); G.audio?.missionPass(); setTimeout(() => G.ui.banner(null), 3000);
       G.ui.setObjective(null); this.refreshAvailable(); G.eco.save('auto');
       if (d.id === 'finale') setTimeout(() => G.ui.toast('🎉 Die Hauptgeschichte ist abgeschlossen! Erkunde weiter, kaufe Packs und Inseln.', 8000), 3500);
     };

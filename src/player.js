@@ -6,6 +6,7 @@ import { WEAPONS } from './data.js';
 import { SEA } from './world.js';
 
 const GRAV = 22;
+const EARN = new Set(['Mission', 'Taxi', 'Kurier', 'Bürgerwehr', 'Rennen', 'Stunt', 'Paket', 'Alle Pakete', 'Schatz', 'VIP', 'Dieb gestellt', 'Anhalter', 'Bargeld', 'Raub', 'Einnahmen', 'Job', 'YouTube', 'Verkauf Flohmarkt']);
 
 export class Player {
   constructor(G) {
@@ -21,7 +22,8 @@ export class Player {
     this.cd = 0; this.reloadT = 0; this.hurtT = 0; this.lastHurt = -99; this.aim = false;
     this.stun = 0; this.chute = false; this.chuteMesh = null; this.fall = 0; this.buff = {}; this.dead = false;
     this.stats = { distFoot: 0, distCar: 0, kills: 0, cars: 0, stunts: 0, money: 0, timePlayed: 0, wasted: 0, busted: 0, top: 0, packages: 0, missions: 0, races: 0, flights: 0 };
-    this.prestige = 0;
+    this.prestige = 0; this.maxHealth = 100; this.fly = false;
+    this.skills = { drive: 0, shoot: 0, cook: 0, it: 0, fit: 0 };
   }
   init() {
     const G = this.G;
@@ -51,6 +53,7 @@ export class Player {
     this.pos.set(x, y ?? this.G.world.groundY(x, z), z); this.vel.set(0, 0, 0); this.vy = 0;
   }
   addMoney(n, reason = '') {
+    if (n > 0 && EARN.has(reason)) n = Math.round(n * (this.G.cfg?.reward ?? 1));
     this.money = Math.max(0, this.money + n);
     if (n > 0) this.stats.money += n;
     this.G.emit('money', { n, reason });
@@ -76,6 +79,7 @@ export class Player {
   }
   // ---------- Waffen ----------
   selectWeapon(w) {
+    if (this.G.prison?.active && w !== 'fist') return;
     if (!this.weapons[w]?.owned || this.weapon === w) return;
     this.weapon = w; this.reloadT = 0; this.cd = 0.25; this.refreshWeaponModel(); this.G.emit('weaponChanged', w);
   }
@@ -106,7 +110,7 @@ export class Player {
     this.hunger = Math.max(0, this.hunger - dt * 0.028);
     if (this.alive) {
       if (this.hunger <= 0) this.health -= dt * 0.4;
-      else if (this.health < 100 && G.time - this.lastHurt > 6 && this.hunger > 20) this.health = Math.min(100, this.health + dt * (this.buff.regen ? 4 : 0.7));
+      else if (this.health < this.maxHealth && G.time - this.lastHurt > 6 && this.hunger > 20) this.health = Math.min(this.maxHealth, this.health + dt * (this.buff.regen ? 4 : 0.7) * (1 + this.skills.fit * 0.15));
       if (this.health <= 0) this.die(null);
     }
     for (const k of Object.keys(this.buff)) { this.buff[k] -= dt; if (this.buff[k] <= 0) delete this.buff[k]; }
@@ -115,6 +119,7 @@ export class Player {
     this.hurtT = Math.max(0, this.hurtT - dt);
     const inputOK = G.mode === 'play' && this.alive && this.enterT <= 0;
     if (this.vehicle) this.updateInVehicle(dt, inputOK);
+    else if (this.fly) this.updateFly(dt, inputOK);
     else this.updateOnFoot(dt, inputOK);
     // Charakter anzeigen
     this.updateCharacter(dt);
@@ -130,6 +135,21 @@ export class Player {
     }
   }
 
+  // ---------- Admin: Flugmodus ----------
+  updateFly(dt, inputOK) {
+    const G = this.G, I = G.input, rig = this.rig, st = this.char.state;
+    const sp = (I.down('ShiftLeft') ? 120 : 40);
+    let f = inputOK ? clamp(I.axis('KeyS', 'KeyW') + I.ay, -1, 1) : 0, r = inputOK ? clamp(I.axis('KeyA', 'KeyD') + I.ax, -1, 1) : 0, u = inputOK ? ((I.down('Space') ? 1 : 0) - (I.down('ControlLeft') ? 1 : 0)) : 0;
+    const cp = Math.cos(rig.pitch), sp2 = Math.sin(rig.pitch);
+    const fx = Math.sin(rig.yaw) * cp, fy = -sp2, fz = Math.cos(rig.yaw) * cp, rx = -Math.cos(rig.yaw), rz = Math.sin(rig.yaw);
+    const tx = (fx * f + rx * r) * sp, ty = (fy * f + u * 0.9) * sp, tz = (fz * f + rz * r) * sp;
+    this.vel.x = damp(this.vel.x, tx, 6, dt); this.vy = damp(this.vy, ty, 6, dt); this.vel.z = damp(this.vel.z, tz, 6, dt);
+    this.pos.x += this.vel.x * dt; this.pos.y += this.vy * dt; this.pos.z += this.vel.z * dt;
+    const gy = G.world.groundY(this.pos.x, this.pos.z); if (this.pos.y < gy + 0.1) this.pos.y = gy + 0.1;
+    if (Math.hypot(this.vel.x, this.vel.z) > 1) this.yaw = dampAngle(this.yaw, Math.atan2(this.vel.x, this.vel.z), 8, dt);
+    this.onGround = false; this.swimming = false; this.aim = false;
+    st.speed = 0; st.jump = true; st.sit = false; st.swim = false; st.dead = false; st.weapon = this.weapon; st.aiming = false;
+  }
   // ---------- zu Fuß ----------
   updateOnFoot(dt, inputOK) {
     const G = this.G, I = G.input, W = G.world, rig = this.rig;
@@ -149,8 +169,15 @@ export class Player {
     this.swimming = water && this.pos.y <= SEA + 0.1 && !this.chute;
     let speed = this.swimming ? 2.6 : this.aim ? 2.2 : sprint ? (this.buff.speed ? 8.2 : 6.6) : (this.buff.speed ? 4.6 : 3.7);
     if (mz < 0) speed *= 0.7;
+    let acc = this.onGround || this.swimming ? 11 : 2.5;
+    const onSki = this.skiT > 0 && this.onGround && W.snowAt?.(this.pos.x, this.pos.z);
+    if (this.skiT > 0) this.skiT -= dt;
+    if (onSki) {
+      speed = sprint ? 13 : 9; acc = 1.6;
+      const e = 1.5, gx = (W.groundY(this.pos.x + e, this.pos.z) - W.groundY(this.pos.x - e, this.pos.z)) / (2 * e), gz = (W.groundY(this.pos.x, this.pos.z + e) - W.groundY(this.pos.x, this.pos.z - e)) / (2 * e);
+      this.vel.x -= gx * 22 * dt; this.vel.z -= gz * 22 * dt;
+    }
     const tvx = dx * speed, tvz = dz * speed;
-    const acc = this.onGround || this.swimming ? 11 : 2.5;
     this.vel.x = damp(this.vel.x, tvx, acc, dt); this.vel.z = damp(this.vel.z, tvz, acc, dt);
     if (this.stun > 0) { this.vel.x *= Math.exp(-3 * dt); this.vel.z *= Math.exp(-3 * dt); }
     // Springen
@@ -167,6 +194,7 @@ export class Player {
     this.pos.x = nx; this.pos.z = nz; this.pos.y += this.vy * dt;
     const p = W.pushCircle(this.pos.x, this.pos.z, 0.38, this.pos.y + 0.3);
     if (p.hit) { this.pos.x += p.x; this.pos.z += p.z; const vn = this.vel.x * p.nx + this.vel.z * p.nz; if (vn < 0) { this.vel.x -= vn * p.nx; this.vel.z -= vn * p.nz; } }
+    G.backrooms?.collide?.(this);
     // Fahrzeuge schieben
     this.collideVehicles(dt);
     // Boden
@@ -281,6 +309,7 @@ export class Player {
 
   // ---------- Fahrzeug ----------
   tryEnter() {
+    if (this.G.prison?.active) return false;
     const G = this.G;
     const v = G.vehicles.nearest(this.pos.x, this.pos.z, 3.6, (q) => !q.remote);
     if (!v || this.swimming && v.kind !== 'boat') return false;

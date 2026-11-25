@@ -6,7 +6,7 @@ import { createMaterials, updateMaterialsForEnv } from './materials.js';
 import { makeTerrainDetail } from './textures.js';
 import { CityGen } from './city.js';
 
-import { HALF, CS, NC, SEA, GX0, GX1, GZ0, GZ1, PITCH, RECTS, ROAD_W, FLAT, ISLANDS, coastX, inRect } from './consts.js';
+import { HALF, CS, NC, SEA, GX0, GX1, GZ0, GZ1, PITCH, RECTS, ROAD_W, FLAT, ISLANDS, PEAKS, SKI_VILLAGE, SAVANNA, inSavanna, SNOW_LINE, coastX, inRect } from './consts.js';
 export * from './consts.js';
 const sdBox = (x, z, x0, x1, z0, z1) => {
   const dx = Math.max(x0 - x, 0, x - x1), dz = Math.max(z0 - z, 0, z - z1);
@@ -21,8 +21,12 @@ export function terrainH(x, z) {
   if (d > 0) {
     const w = smoothstep(0, 420, d);
     const hill = 2 + Math.max(0, fbm(x / 520 + 11, z / 520 + 5, 4, 3) - 0.24) * 175;
-    const mtn = smoothstep(-1350, -2050, z) * fbm(x / 420 + 3, z / 420 + 9, 4, 8) * 110;
-    h = lerp(-0.12, hill + mtn, w);
+    let mtn = smoothstep(-1350, -2000, z) * fbm(x / 420 + 3, z / 420 + 9, 4, 8) * 45;
+    for (const P of PEAKS) { const pd = Math.hypot(x - P.x, z - P.z); if (pd < P.r) { const k = Math.pow(smoothstep(P.r, 0, pd), 1.25); mtn += P.h * k * (0.82 + 0.4 * fbm(x / 140 + 7, z / 140 + 2, 3, 5)); } }
+    let hl = hill; if (inSavanna(x, z)) hl = 2 + (hill - 2) * 0.25;
+    h = lerp(-0.12, hl + mtn, w);
+    // Skidorf-Plateau
+    const vd = Math.hypot(x - SKI_VILLAGE.x, z - SKI_VILLAGE.z); if (vd < SKI_VILLAGE.r * 1.7) h = lerp(h, SKI_VILLAGE.h, smoothstep(SKI_VILLAGE.r * 1.7, SKI_VILLAGE.r, vd));
   }
   // Strand
   if (x > 1105) {
@@ -49,14 +53,15 @@ export function terrainH(x, z) {
   // Inseln (Privatinseln)
   for (const I of ISLANDS) {
     const id = Math.hypot(x - I.x, z - I.z);
-    if (id < I.r) h = Math.max(h, lerp(-4, I.h + vnoise(x / 40, z / 40) * 3, smoothstep(I.r, I.r * 0.45, id)));
+    if (id < I.r) h = Math.max(h, lerp(-4, I.h + (I.flat ? 0 : vnoise(x / 40, z / 40) * 3), smoothstep(I.r, I.r * (I.flat ? 0.8 : 0.45), id)));
   }
   // Inselrand der Welt
-  const e = smoothstep(2250, 2400, Math.max(Math.abs(x), Math.abs(z)));
+  const e = smoothstep(HALF - 170, HALF - 20, Math.max(Math.abs(x), Math.abs(z)));
   h = lerp(h, -30, e);
   return h;
 }
 export const isWaterAt = (x, z) => terrainH(x, z) < SEA - 0.35;
+export const snowAt = (x, z) => x < 100 && z < -1800 && terrainH(x, z) > SNOW_LINE - 30;
 
 export class SpatialHash {
   constructor(cell = 40) { this.cell = cell; this.m = new Map(); }
@@ -198,6 +203,7 @@ export class World {
     return r;
   }
   isWater(x, z) { return terrainH(x, z) < SEA - 0.35; }
+  snowAt(x, z) { return snowAt(x, z); }
   // ----- Distrikt -----
   districtAt(x, z) {
     for (const k of ['airport', 'stadium', 'park', 'golf']) if (inRect(RECTS[k], x, z)) return RECTS[k].name;
@@ -238,6 +244,8 @@ export class World {
     L.push({ horiz: false, c: -1900, a: -400, b: 400, kind: 'highway' });
     L.push({ horiz: true, c: -1900, a: -800, b: 800, kind: 'highway' });
     L.push({ horiz: true, c: 1900, a: -800, b: 400, kind: 'highway' });
+    L.push({ horiz: true, c: -1900, a: -1500, b: -800, kind: 'highway' }); L.push({ horiz: false, c: -1500, a: -2100, b: -1900, kind: 'highway' });
+    L.push({ horiz: true, c: 1900, a: -1500, b: -800, kind: 'highway' }); L.push({ horiz: false, c: -1500, a: 1900, b: 2300, kind: 'highway' });
     const key = (x, z) => x + '|' + z;
     const getNode = (x, z) => {
       const k = key(x, z); let n = this.nodes.get(k);
@@ -403,8 +411,11 @@ export class World {
       const n = fbm(x / 60, z / 60, 3, 4);
       if (h < SEA - 0.1) c.setRGB(0.42, 0.38, 0.3).lerp(new THREE.Color(0.55, 0.5, 0.38), smoothstep(-6, -0.3, h));
       else if (h < 0.9 && x > 1100 && x < 1500) c.setHex(0xe4d3a4).multiplyScalar(0.9 + n * 0.15);
-      else if (slope > 0.55 || h > 85) c.setRGB(0.42, 0.4, 0.37).multiplyScalar(0.8 + n * 0.5);
-      else if (h > 60) c.setHex(0x6c7a50).lerp(new THREE.Color(0x8a8a7e), smoothstep(60, 90, h));
+      else if (x < 100 && z < -1800 && h > SNOW_LINE - 30 && slope < 0.95) c.setRGB(0.94, 0.96, 1).multiplyScalar(0.9 + n * 0.1);
+      else if (slope > 0.55 || h > 160) c.setRGB(0.42, 0.4, 0.37).multiplyScalar(0.8 + n * 0.5);
+      else if (inSavanna(x, z)) c.setHex(0xb59a52).lerp(new THREE.Color(0x8a7a3c), smoothstep(0.4, 0.7, fbm(x / 90, z / 90, 3, 2)));
+      else if (x < 100 && z < -1800 && h > 90) c.setHex(0x6f7a5a).lerp(new THREE.Color(0x9aa08c), smoothstep(90, 140, h));
+      else if (h > 60 && !(z < -1800)) c.setHex(0x6c7a50).lerp(new THREE.Color(0x8a8a7e), smoothstep(60, 90, h));
       else {
         const f = fbm(x / 140 + 20, z / 140 - 5, 3, 12);
         c.setHex(0x587a36).lerp(new THREE.Color(0x3c5a2a), smoothstep(0.45, 0.65, f)).lerp(new THREE.Color(0x8a8a4a), smoothstep(0.5, 0.2, n) * 0.5);
@@ -442,7 +453,7 @@ export class World {
 
   // ----- Karte (Offscreen-Canvas, wird von Minimap und Vollkarte genutzt) -----
   buildMapCanvas() {
-    const S = 1536, c = document.createElement('canvas'); c.width = c.height = S;
+    const S = 1600, c = document.createElement('canvas'); c.width = c.height = S;
     const x = c.getContext('2d');
     const k = S / (HALF * 2);
     const px = (wx) => (wx + HALF) * k, pz = (wz) => (wz + HALF) * k;
@@ -455,8 +466,9 @@ export class World {
       else if (h < 0.9 && wx > 1100 && wx < 1500) { r = 214; g = 198; b = 150; }
       else {
         const s = 1 + (terrainH(wx + 8, wz + 8) - h) * 0.03;
-        const hh = clamp(h / 90, 0, 1);
+        const hh = clamp(h / 160, 0, 1);
         r = lerp(70, 128, hh) * s; g = lerp(100, 120, hh) * s; b = lerp(58, 100, hh) * s;
+        if (wx < 100 && wz < -1800 && h > SNOW_LINE - 30) { r = 236 * s; g = 242 * s; b = 250 * s; } else if (inSavanna(wx, wz)) { r = 178 * s; g = 150 * s; b = 84 * s; }
       }
       const o = (j * S + i) * 4; img.data[o] = r; img.data[o + 1] = g; img.data[o + 2] = b; img.data[o + 3] = 255;
     }

@@ -96,7 +96,7 @@ export class AudioSys {
     g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); o.connect(g); g.connect(dest || this.sfx); o.start(t); o.stop(t + dur + 0.05);
   }
   gun(w, pos) {
-    const big = w === 'shotgun' ? 1.4 : w === 'rifle' ? 1.1 : w === 'smg' ? 0.8 : 0.9;
+    const big = w === 'shotgun' ? 1.4 : w === 'rifle' ? 1.1 : w === 'smg' ? 0.8 : /raketen|ionen|avocado|kokos|railgun|minigun/.test(w) ? 1.7 : 0.9;
     this.burst(0.28 * big, 'lowpass', 5000, 200, 0.7 * big, pos); this.burst(0.1, 'highpass', 3000, 1200, 0.3, pos); if (pos) { const sp = this.spatial(pos); this.tone(110, 0.15, 'sine', 0.35 * sp.gain, 40); } else this.tone(110, 0.15, 'sine', 0.3, 40);
   }
   explosion(pos) { this.burst(1.6, 'lowpass', 1500, 60, 1.4, pos); this.burst(0.5, 'bandpass', 800, 100, 0.8, pos); this.tone(70, 1.2, 'sine', 0.8, 25); }

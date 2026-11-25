@@ -13,7 +13,7 @@ export class Economy {
   hasPack(id) { return !id || !!this.packs[id]; }
   owns(id) { return !!this.props[id]; }
   propDef(id) { return PROPERTIES.find((p) => p.id === id); }
-  slots() { let s = 0; for (const id of Object.keys(this.props)) s += this.propDef(id)?.slots || 0; return s; }
+  slots() { let s = 0; for (const id of Object.keys(this.props)) s += (this.propDef(id)?.slots || 0) + (this.G.life?.ugSlots(id) || 0); return s; }
   income() { let s = 0; for (const id of Object.keys(this.props)) s += this.propDef(id)?.income || 0; return s; }
   prestige() {
     const P = this.G.player; let pr = 0;
@@ -26,11 +26,12 @@ export class Economy {
   buyPack(id) {
     const P = this.G.player, pk = PACKS[id];
     if (this.packs[id]) return false;
+    if (pk.admin && !this.G.admin) { this.G.ui.toast('Das Avocado-Pack gehört nur Avocado3seb.'); return false; }
     if (P.money < pk.price) { this.G.ui.toast('Nicht genug Geld!'); return false; }
     P.addMoney(-pk.price, 'Pack'); this.packs[id] = true;
     this.G.ui.toast(`${pk.name} freigeschaltet!`); this.G.audio?.cash?.();
     this.G.mission?.refreshAvailable?.(); this.G.activities?.refreshChests?.();
-    this.applyToWorld();
+    this.applyToWorld(); this.G.life?.grantPack(id);
     return true;
   }
   buyProperty(p) {
@@ -121,7 +122,7 @@ export class Economy {
       inVehicle: P.vehicle && P.vehicle.entry ? P.vehicle.entry.id : null,
       env: { time: G.env.time, weather: G.env.target },
       eco: { props: this.props, packs: this.packs, garage: this.garage.map((e) => ({ ...e })), nextId: this.nextId, outside },
-      mission: G.mission?.serialize?.() || null, found: G.found, day: G.day, activities: G.activities?.serialize?.() || null,
+      life: G.life?.serialize?.() || null, mission: G.mission?.serialize?.() || null, found: G.found, day: G.day, activities: G.activities?.serialize?.() || null,
     };
   }
   deserialize(d) {
@@ -139,17 +140,17 @@ export class Economy {
     for (const e of this.garage) e.inWorld = false;
     for (const o of d.eco.outside || []) { const e = this.garage.find((q) => q.id === o.id); if (e) this.takeOut(e, { x: o.x, z: o.z, yaw: o.yaw }); }
     G.found = d.found || { packages: {} }; G.refreshPackages?.(); G.day = d.day || 1;
-    G.mission?.deserialize?.(d.mission); G.activities?.deserialize?.(d.activities);
+    G.life?.deserialize?.(d.life); G.mission?.deserialize?.(d.mission); G.activities?.deserialize?.(d.activities);
     G.police.reset(); P.rig.snap(P);
     if (d.inVehicle) { const v = G.vehicles.list.find((q) => q.entry && q.entry.id === d.inVehicle); if (v) { v.place(p.x, p.z, p.yaw); P.enterVehicle(v); } }
     this.applyToWorld();
     return true;
   }
   slotKey(i) { return i === 'auto' ? 'vc_save_auto' : 'vc_save_' + i; }
-  save(slot = 0) { try { localStorage.setItem(this.slotKey(slot), JSON.stringify(this.serialize())); return true; } catch (e) { console.warn('save failed', e); return false; } }
+  save(slot = 0) { if (this.G?.prison?.active || this.G?.life?.world?.backrooms?.active) return false; try { localStorage.setItem(this.slotKey(slot), JSON.stringify(this.serialize())); return true; } catch (e) { console.warn('save failed', e); return false; } }
   load(slot = 0) { try { const raw = localStorage.getItem(this.slotKey(slot)); if (!raw) return false; return this.deserialize(JSON.parse(raw)); } catch (e) { console.warn('load failed', e); return false; } }
   info(slot) { try { const raw = localStorage.getItem(this.slotKey(slot)); if (!raw) return null; const d = JSON.parse(raw); return { ts: d.ts, money: d.player.money, time: d.env.time, missions: d.mission?.done?.length || 0, props: Object.keys(d.eco.props || {}).length }; } catch (e) { return null; } }
-  autosave() { if (this.G.mp?.active) return; if (this._as && Date.now() - this._as < 4000) return; this._as = Date.now(); this.save('auto'); }
+  autosave() { if (this._as && Date.now() - this._as < 4000) return; this._as = Date.now(); this.save('auto'); }
   hasAnySave() { return [0, 1, 2, 'auto'].some((s) => this.info(s)); }
   latestSlot() { let b = null, bt = 0; for (const s of [0, 1, 2, 'auto']) { const i = this.info(s); if (i && i.ts > bt) { bt = i.ts; b = s; } } return b; }
   deleteSlot(s) { try { localStorage.removeItem(this.slotKey(s)); } catch (e) { /* ignore */ } }

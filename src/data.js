@@ -1,3 +1,5 @@
+import { EXTRA_PACKS, EXTRA_WEAPONS, SHOP_TYPES } from './packdefs.js';
+
 // Statische Spielinhalte: Orte, Immobilien, Essen, Kleidung, Uhren, Packs …
 // Koordinaten: Gitterindex (i,j) = Knoten (i*100, j*100); c = Ecke (ne/nw/se/sw)
 
@@ -123,11 +125,11 @@ export const WEAPON_SKINS = [
 
 export const WEAPONS = {
   fist: { name: 'Fäuste', dmg: 14, rate: 2.2, range: 1.7, mag: 0, auto: false, melee: true },
-  pistol: { name: 'Pistole', dmg: 24, rate: 4.5, range: 90, mag: 12, auto: false, spread: 0.012, price: 400, ammoPrice: 20, ammoPack: 24 },
-  smg: { name: 'Maschinenpistole', dmg: 15, rate: 11, range: 70, mag: 30, auto: true, spread: 0.03, price: 1800, ammoPrice: 60, ammoPack: 60 },
-  shotgun: { name: 'Schrotflinte', dmg: 12, rate: 1.1, range: 35, mag: 6, auto: false, spread: 0.06, pellets: 8, price: 2400, ammoPrice: 50, ammoPack: 18 },
-  rifle: { name: 'Sturmgewehr', dmg: 28, rate: 9, range: 140, mag: 30, auto: true, spread: 0.015, price: 5500, ammoPrice: 90, ammoPack: 60 },
-  grenade: { name: 'Granate', dmg: 120, rate: 0.7, range: 30, mag: 1, auto: false, throw: true, price: 300, ammoPrice: 300, ammoPack: 3 },
+  pistol: { name: 'Pistole', dmg: 24, rate: 4.5, range: 90, mag: 12, auto: false, spread: 0.012, price: 150, ammoPrice: 8, ammoPack: 24 },
+  smg: { name: 'Maschinenpistole', dmg: 15, rate: 11, range: 70, mag: 30, auto: true, spread: 0.03, price: 600, ammoPrice: 20, ammoPack: 60 },
+  shotgun: { name: 'Schrotflinte', dmg: 12, rate: 1.1, range: 35, mag: 6, auto: false, spread: 0.06, pellets: 8, price: 800, ammoPrice: 18, ammoPack: 18 },
+  rifle: { name: 'Sturmgewehr', dmg: 28, rate: 9, range: 140, mag: 30, auto: true, spread: 0.015, price: 1800, ammoPrice: 30, ammoPack: 60 },
+  grenade: { name: 'Granate', dmg: 120, rate: 0.7, range: 30, mag: 1, auto: false, throw: true, price: 120, ammoPrice: 100, ammoPack: 3 },
 };
 
 // Content-Packs
@@ -146,3 +148,41 @@ export const VIP_EVENTS = [
   { id: 'gala', name: 'Charity Gala', pack: 'luxus', minPrestige: 14, fee: 20000, reward: 90000, x: 50, z: -50, desc: 'Gala in der Federal Bank – Smoking Pflicht.' },
   { id: 'islandparty', name: 'Inselparty Esmeralda', pack: 'insel', minPrestige: 6, fee: 8000, reward: 38000, x: 1950, z: -500, desc: 'Private Party auf deiner Insel.' },
 ];
+
+// ---------- Erweiterungen ----------
+Object.assign(PACKS, EXTRA_PACKS);
+Object.assign(WEAPONS, EXTRA_WEAPONS);
+
+// freie Kioskecken deterministisch verteilen
+(function extendCity() {
+  const used = new Set(), blk = new Set();
+  const cornerBlock = (i, j, c) => `${c.includes('e') ? i : i - 1},${c.includes('n') ? j - 1 : j}`;
+  for (const s of SPECIALS) blk.add(`${s.i},${s.j}`);
+  for (const k of [...KIOSKS, ...PROPERTIES]) if (k.i !== undefined) { used.add(`${k.i},${k.j},${k.c}`); blk.add(cornerBlock(k.i, k.j, k.c)); }
+  const cand = [];
+  for (let i = -9; i <= 9; i++) for (let j = -7; j <= 7; j++) for (const c of ['ne', 'nw', 'se', 'sw']) cand.push([i, j, c, ((i * 73856093) ^ (j * 19349663) ^ c.charCodeAt(0) * 83492791) >>> 0]);
+  cand.sort((a, b) => a[3] - b[3]);
+  const take = () => { for (const [i, j, c] of cand) { const bk = cornerBlock(i, j, c); if (used.has(`${i},${j},${c}`) || blk.has(bk)) continue; used.add(`${i},${j},${c}`); blk.add(bk); return { i, j, c }; } return null; };
+  for (const [kind, name, color, n] of SHOP_TYPES) for (let q = 0; q < n; q++) {
+    const pos = take(); if (!pos) break;
+    const menu = kind === 'mcd' ? 'burger' : kind === 'restaurant' ? 'fine' : kind === 'bistro' ? 'cafe' : kind === 'bakery' ? 'cafe' : undefined;
+    KIOSKS.push({ id: `${kind}${q + 1}`, kind: ['mcd', 'restaurant', 'bistro', 'bakery'].includes(kind) ? 'food' : kind, shop: kind, menu, name: n > 1 ? `${name}` : name, ...pos, color });
+  }
+  // Geschäfte zum Besitzen & selbst betreiben
+  const biz = [
+    ['mcd_biz', "Mc Donny's Franchise (selbst betreiben)", 400000, 6500, 'mcd', 'Dein eigenes Fast-Food-Restaurant – bediene Kunden selbst oder lass es laufen.'],
+    ['resto_biz', 'Restaurant „Zur Goldenen Gabel“', 350000, 5200, 'restaurant', 'Gehobenes Restaurant. Koch-Minispiel und Tageseinnahmen.'],
+    ['super_biz', 'Supermarkt-Kette Vice Fresh', 700000, 10000, null, 'Großer Supermarkt mit zuverlässigem Tageseinkommen.'],
+    ['gamecafe_biz', 'Gaming-Café Lag-Frei', 250000, 3600, null, 'LAN-Café mit Highspeed-WLAN.'],
+    ['fuel_biz', 'Tankstellen-Imperium', 950000, 14000, null, 'Drei Tankstellen in bester Lage.'],
+    ['hotel_biz', 'Vice Grand Hotel', 3200000, 42000, null, 'Fünf-Sterne-Hotel am Ocean Drive.'],
+    ['mall_biz', 'Einkaufszentrum-Anteile', 8000000, 120000, null, 'Beteiligung an der Vice Galleria.'],
+  ];
+  for (const [id, name, price, income, work, desc] of biz) { const pos = take(); if (pos) PROPERTIES.push({ id, name, price, type: 'business', slots: 2, ...pos, desc, income, work }); }
+  const gar = take(); if (gar) PROPERTIES.push({ id: 'tiefgarage', name: 'Tiefgarage Downtown', price: 250000, type: 'garage', slots: 20, ...gar, desc: 'Riesige Tiefgarage mit 20 Stellplätzen.', income: 0 });
+  PROPERTIES.push(
+    { id: 'chalet_alps', name: 'Ski-Chalet Alpendorf', price: 1800000, type: 'house', slots: 4, x: -1500, z: -2030, desc: 'Gemütliches Chalet direkt an der Piste.', income: 0 },
+    { id: 'terra_villa', name: 'Weltvilla Terra Mundi', price: 4500000, type: 'villa', slots: 10, x: 2560, z: 700, desc: 'Prachtvolle Villa auf der Weltreise-Insel.', income: 0 },
+    { id: 'safari_house', name: 'Safari-Villa', price: 1200000, type: 'house', slots: 4, x: -1400, z: 2335, desc: 'Villa am Rand der Savanne.', income: 0 },
+  );
+})();

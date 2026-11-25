@@ -11,6 +11,7 @@ const owned = (arr, i) => arr.includes(i);
 export function openPOI(ui, poi) {
   const P = G.player, eco = G.eco;
   G.audio?.click();
+  if (G.life?.open(ui, poi)) return;
   switch (poi.kind) {
     case 'food': return foodShop(ui, poi.name, MENUS[poi.menu] || MENUS.burger);
     case 'store': return storeShop(ui, poi);
@@ -117,7 +118,7 @@ function gunShop(ui, poi) {
   const render = () => {
     const rows = [];
     rows.push(h('h3', {}, 'Waffen'));
-    for (const [k, w] of Object.entries(WEAPONS)) { if (w.melee) continue; const e = P.weapons[k]; const has = e?.owned;
+    for (const [k, w] of Object.entries(WEAPONS)) { if (w.melee) continue; const e = P.weapons[k]; const has = e?.owned; if (!w.price && !has) continue;
       rows.push(h('div', { class: 'row' }, h('div', { class: 'grow' }, h('div', { class: 't' }, w.name, has && h('span', { class: 'pill' }, `Munition ${e.loaded ?? 0}/${e.ammo ?? 0}`)), h('div', { class: 'd' }, `Schaden ${w.dmg} · ${w.auto ? 'Automatik' : 'Halbautomatik'} · Mag ${w.mag || 1}`)),
         !has && h('div', { class: 'price' }, fmtMoney(w.price)), !has && h('button', { class: 'btn small primary', onClick: () => { if (P.money < w.price) return ui.toast('Nicht genug Geld!'); P.addMoney(-w.price); P.addWeapon(k, w.ammoPack); P.selectWeapon(k); G.audio?.cash(); ui.refreshCash(); render(); } }, 'Kaufen'),
         has && h('div', { class: 'price' }, `${fmtMoney(w.ammoPrice)} / ${w.ammoPack} Schuss`), has && h('button', { class: 'btn small', onClick: () => { if (P.money < w.ammoPrice) return ui.toast('Nicht genug Geld!'); P.addMoney(-w.ammoPrice); e.ammo = (e.ammo || 0) + w.ammoPack; if (k === 'grenade') { e.loaded = 1; } G.audio?.cash(); ui.refreshCash(); render(); } }, 'Munition')));
@@ -198,6 +199,7 @@ function property(ui, poi) {
     const own = eco.owns(p.id);
     body.replaceChildren(h('p', {}, p.desc), h('div', { class: 'row' }, h('div', { class: 'grow' }, h('div', { class: 't' }, `${p.slots} Garagenstellplätze`), h('div', { class: 'd' }, p.income ? `Einkommen: ${fmtMoney(p.income)} pro Tag` : 'Kein Einkommen')), !own && h('div', { class: 'price' }, fmtMoney(p.price)), !own && h('button', { class: 'btn primary small', onClick: () => { if (eco.buyProperty(p)) { ui.refreshCash(); render(); } } }, 'Kaufen')));
     if (own) {
+      G.life?.homeExtras(ui, p, body, render);
       body.append(
         h('div', { class: 'row' }, h('div', { class: 'grow t' }, '💾 Spiel speichern'), h('button', { class: 'btn small', onClick: () => { ui.closeModal(true); ui.slotsModal('both'); } }, 'Speichern')),
         h('div', { class: 'row' }, h('div', { class: 'grow t' }, '🛏 Schlafen (bis 08:00, Gesundheit)'), h('button', { class: 'btn small', onClick: () => { ui.fadeTo(1, 500); setTimeout(() => { G.env.time = 8; P.health = 100; ui.fadeTo(0, 800); eco.save('auto'); ui.toast('Gut geschlafen. Autosave erstellt.'); }, 700); ui.closeModal(); } }, 'Schlafen')),
@@ -267,16 +269,6 @@ export function phoneTab(ui, c) {
   // VIP-Events
   c.append(h('h3', {}, 'VIP-Events'));
   for (const e of VIP_EVENTS) c.append(h('div', { class: 'row' + (eco.packs[e.pack] ? '' : ' locked') }, h('div', { class: 'grow' }, h('div', { class: 't' }, e.name, h('span', { class: 'pill pack' }, PACKS[e.pack].name)), h('div', { class: 'd' }, `${e.desc} · Prestige ${e.minPrestige} (du: ${eco.prestige()}) · Eintritt ${fmtMoney(e.fee)} → ${fmtMoney(e.reward)}`)), h('button', { class: 'btn small', onClick: () => { G.waypoint = { x: e.x, z: e.z }; ui.toast('GPS-Ziel gesetzt'); } }, 'GPS'), h('button', { class: 'btn small gold', onClick: () => { ui.closePause(); G.activities?.vip(e.id); } }, 'Start')));
-  // Entwickleroptionen
-  c.append(h('h3', {}, 'Entwickler-Optionen (Cheats)'));
-  const btn = (l, fn) => h('button', { class: 'btn small', onClick: () => { fn(); G.audio?.click(); } }, l);
-  c.append(h('div', { class: 'sel' }, btn('+ $100.000', () => P.addMoney(100000, 'Cheat')), btn('Gesundheit/Weste', () => { P.health = 100; P.armor = 100; }), btn('Fahndung 0', () => G.police.clear()), btn('Fahndung +1', () => G.police.addHeat(1, 'cheat')), btn('Fahndung 5★', () => G.police.setWanted(5)), btn(`Gottmodus: ${G.cheat.god ? 'AN' : 'AUS'}`, () => { G.cheat.god = !G.cheat.god; ui.renderPause(); }), btn('Alle Waffen', () => { for (const k of ['smg', 'shotgun', 'rifle', 'grenade']) P.addWeapon(k, 120); }), btn('Alle Packs', () => { for (const k of Object.keys(PACKS)) eco.packs[k] = true; eco.applyToWorld(); ui.toast('Alle Packs freigeschaltet'); })));
-  c.append(h('h3', {}, 'Zeit & Wetter'));
-  c.append(h('div', { class: 'sel' }, ...[['Morgen 07:00', 7], ['Mittag 12:30', 12.5], ['Sonnenuntergang 18:30', 18.5], ['Mitternacht', 0.2]].map(([l, t]) => btn(l, () => { G.env.time = t; })), ...Object.entries(WEATHER).map(([k, w]) => btn(w.label, () => { G.env.setWeather(k); G.env.lockWeather = true; setTimeout(() => (G.env.lockWeather = false), 120000); }))));
-  c.append(h('h3', {}, 'Fahrzeug spawnen'));
-  const sel = h('select', { style: { background: '#1a1030', color: '#fff', border: '1px solid rgba(255,255,255,.2)', padding: '6px', borderRadius: '6px', maxWidth: '260px' } }, CATALOG.map((s) => h('option', { value: s.key }, `${s.name} (${s.label})${s.pack ? ' ★' : ''}`)));
-  c.append(h('div', { class: 'field' }, sel, btn('Spawnen', () => { const spec = byKey.get(sel.value); const pt = eco.spawnPoint(spec); const pos = P.position; const v = G.vehicles.spawn(spec, spec.kind === 'car' || spec.kind === 'bike' ? pos.x + Math.sin(P.yaw) * 6 : pt.x, spec.kind === 'car' || spec.kind === 'bike' ? pos.z + Math.cos(P.yaw) * 6 : pt.z, P.yaw, { sleep: false }); v.tag = 'abandoned'; ui.toast(`${spec.name} gespawnt${spec.kind === 'plane' || spec.kind === 'heli' || spec.kind === 'boat' ? ' (Flughafen / Hafen)' : ''}`); })));
-  c.append(h('h3', {}, 'Teleport'));
-  const places = [['Ocean Drive', 940, 110], ['Zentrum', 150, -60], ['Flughafen', -900, 700], ['Hafen', 700, 880], ['Sunset Hills', 400, -850], ['Stadion', 200, 520], ['Strand-Pier', 1160, 100], ['Isla Esmeralda', 1950, -440], ['Berge', 300, -1700]];
-  c.append(h('div', { class: 'sel' }, ...places.map(([l, x, z]) => btn(l, () => { ui.closePause(); const n = G.world.nearestNode(x, z, 400); if (P.vehicle && P.vehicle.kind === 'car') { P.vehicle.place(x, z, P.vehicle.yaw); P.vehicle.wake(); } else P.teleport(x, z, G.world.groundY(x, z) + (l.includes('Insel') ? 2 : 0)); }))));
+  G.life?.phoneApps(ui, c);
+  if (G.admin) c.append(h('h3', {}, 'Admin'), h('div', { class: 'row' }, h('div', { class: 'grow t' }, '🔑 Admin-Panel'), h('button', { class: 'btn small gold', onClick: () => { ui.tab = 'admin'; ui.renderPause(); } }, 'Öffnen')));
 }

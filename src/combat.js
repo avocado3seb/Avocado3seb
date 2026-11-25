@@ -71,6 +71,7 @@ export class Combat {
       else if (hit.kind === 'player') { hit.obj.hurt(w.dmg * dm * (hit.head ? 1.8 : 1) * 0.55, shooter); }
       else if (hit.kind === 'vehicle') { hit.obj.wake(); hit.obj.damage(w.dmg * dm * 2.2, 'bullet', shooter); G.fx?.sparks(px, py, pz, 0.4); G.audio?.ricochet?.(px, py, pz); G.emit('vehicleShot', { v: hit.obj, by: shooter }); }
       else if (hit.kind === 'world') { G.fx?.puff(px, py, pz, 0xb8b0a0, 3); G.fx?.sparks(px, py, pz, 0.2); }
+      if (w.explosive && i === 0) this.explode(px, py, pz, w.explosive, w.dmg / 120, shooter);
     }
     return true;
   }

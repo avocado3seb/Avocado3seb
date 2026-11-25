@@ -139,6 +139,9 @@ export async function initGame(canvas, progress) {
   spawnPackages();
   // Ereignisse
   wireEvents();
+  const saveNow = () => { if (G.eco && G.player && (G.mode === 'play' || G.mode === 'pause') && G.player.alive) { try { G.eco.save('auto'); } catch (e) { /* ignore */ } } };
+  addEventListener('pagehide', saveNow); addEventListener('beforeunload', saveNow); document.addEventListener('visibilitychange', () => { if (document.hidden) saveNow(); });
+  G.cfg = { reward: 3 };
   return G;
 }
 
@@ -200,6 +203,7 @@ function wireEvents() {
       if (e.code === 'KeyI') G.ui?.openPause?.('inventory');
       if (e.code === 'KeyP') G.ui?.openPause?.('phone');
       if (e.code === 'KeyO') G.ui?.openPause?.('character');
+      if (e.code === 'F2' && G.admin) G.ui?.openPause?.('admin');
       if (e.code === 'F3') G.settings.fps = !G.settings.fps;
     }
   });
@@ -210,6 +214,7 @@ G.respawn = (why) => {
   G.timeScale = 1;
   G.mission?.onPlayerFail?.(why);
   G.police.reset();
+  if (why === 'busted' && G.prison) { G.prison.jail(); return; }
   const kind = why === 'busted' ? 'police' : 'hospital';
   const poi = W.pois.find((p) => p.kind === kind) || W.pois[0];
   const fee = why === 'busted' ? Math.round(P.money * 0.1) : Math.min(1500, Math.round(P.money * 0.05) + 100);
@@ -225,7 +230,7 @@ G.respawn = (why) => {
 };
 
 // ---------------- Hauptschleife ----------------
-let lastT = 0, acc = 0, frames = 0, fpsT = 0, lowT = 0, playT = 0, qCool = 0;
+let autoT = 0, lastT = 0, acc = 0, frames = 0, fpsT = 0, lowT = 0, playT = 0, qCool = 0;
 let signalT = 0; const sigCache = new Map();
 export function startLoop() {
   lastT = performance.now();
@@ -233,6 +238,7 @@ export function startLoop() {
     requestAnimationFrame(loop);
     const raw = Math.min(G.maxDt || 0.05, (now - lastT) / 1000); lastT = now;
     frames++; fpsT += raw; if (fpsT > 0.5) { G.fps = Math.round(frames / fpsT); frames = 0; fpsT = 0; }
+    autoT += raw; if (autoT > 40 && G.mode === 'play' && G.player.alive && !G.police?.units?.length) { autoT = 0; G.eco?.save('auto'); }
     // Automatische Qualitätsanpassung
     if (G.mode === 'play' && !G.noAuto) {
       playT += raw; qCool -= raw;
@@ -262,14 +268,14 @@ function frame(raw) {
     G.vehicles.update(dt, W, env); t0 = tm('vehicles', t0);
     G.peds.update(dt); t0 = tm('peds', t0);
     G.traffic.update(dt); t0 = tm('traffic', t0);
-    G.police.update(dt);
+    G.police.update(dt); G.prison?.update(dt);
     G.mission?.update(dt);
     G.activities?.update?.(dt);
     G.eco?.update?.(dt); t0 = tm('misc', t0);
     updateProjectiles(dt);
     G.pickups.update(dt);
     updatePOI(dt);
-    for (const a of W.animated) { if (a.type === 'spin') a.obj.rotation.y += a.speed * dt; else if (a.type === 'wheel') a.obj.rotation.z += a.speed * dt; else if (a.type === 'spinz') a.obj.rotation.z += a.speed * dt; }
+    for (const a of W.animated) { if (a.type === 'spin') a.obj.rotation.y += a.speed * dt; else if (a.type === 'wheel') a.obj.rotation.z += a.speed * dt; else if (a.type === 'spinz') a.obj.rotation.z += a.speed * dt; else if (a.type === 'gondola') { a.t += a.dir * a.speed * dt; if (a.t > 1) { a.t = 1; a.dir = -1; } if (a.t < 0) { a.t = 0; a.dir = 1; } const n = a.pts.length - 1, f = a.t * n, i = Math.min(n - 1, Math.floor(f)), k = f - i, p0 = a.pts[i], p1 = a.pts[i + 1]; a.obj.position.set(p0[0] + (p1[0] - p0[0]) * k, p0[1] + (p1[1] - p0[1]) * k, p0[2] + (p1[2] - p0[2]) * k); } }
     signalT -= dt; if (signalT <= 0) { signalT = 0.2; updateSignals(); }
     t0 = tm('poi', t0);
   }
@@ -280,7 +286,7 @@ function frame(raw) {
   G.markers.update(dt, P.position.x, P.position.z, G.time);
   t0 = tm('vis', t0);
   G.fx.update(dt, G.camera, innerHeight * (G.env.q?.pr || 1)); t0 = tm('fx', t0);
-  G.mp?.update(dt);
+  G.mp?.update(dt); G.life?.update(dt);
   G.audio?.update(dt); t0 = tm('audio', t0);
   G.ui?.update(dt); t0 = tm('ui', t0);
   env.render(); t0 = tm('render', t0);

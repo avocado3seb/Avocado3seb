@@ -1,3 +1,6 @@
+import { Prison } from './prison.js';
+import { Life } from './life.js';
+import { LifeWorld } from './lifeworld.js';
 import './style.css';
 import { G } from './state.js';
 import { UI } from './ui.js';
@@ -10,6 +13,7 @@ import { DEFAULT_OUTFIT } from './character.js';
 import { PACKS } from './data.js';
 import { TouchControls } from './touch.js';
 import { Multiplayer } from './multiplayer.js';
+import { Admin } from './admin.js';
 import { byKey, CATALOG } from './vehicledata.js';
 window.__byKey = (k) => byKey.get(k); window.__catalog = CATALOG;
 
@@ -21,7 +25,7 @@ G.talkLines = (ped) => { const e = G.env; const arr = [...TALK.tips]; if (e.w.ra
 
 G.newGame = () => {
   const P = G.player;
-  P.alive = true; P.health = 100; P.armor = 0; P.hunger = 85; P.money = 5000; P.stun = 0; P.weapons = { fist: { owned: true }, pistol: { owned: true, ammo: 48, loaded: 12 } }; P.weapon = 'pistol';
+  P.alive = true; P.health = 100; P.armor = 0; P.hunger = 85; P.money = 25000; P.maxHealth = 100; P.skills = { drive: 0, shoot: 0, cook: 0, it: 0, fit: 0 }; P.stun = 0; P.weapons = { fist: { owned: true }, pistol: { owned: true, ammo: 48, loaded: 12 } }; P.weapon = 'pistol';
   P.outfit = { ...DEFAULT_OUTFIT, topColor: 0x1e88e5, bottomColor: 0x2d3a4a }; P.watch = 0; P.owned = { tops: [0], bottoms: [0], shoes: [0], hats: [0], glasses: [0], watches: [0], skins: ['default'], hair: [1] }; P.inv = { medkit: 1, armorkit: 0 }; P.skins = {}; P.skinSel = 'default'; P.skinSelColor = 0;
   Object.assign(P.stats, { distFoot: 0, distCar: 0, kills: 0, cars: 0, stunts: 0, money: 0, timePlayed: 0, wasted: 0, busted: 0, top: 0, packages: 0, missions: 0, races: 0, flights: 0 });
   P.refreshOutfit(); P.selectWeapon('pistol');
@@ -29,7 +33,8 @@ G.newGame = () => {
   for (const v of [...G.vehicles.list]) if (v.owned) G.vehicles.despawn(v);
   G.found = { packages: {}, chests: {} }; G.refreshPackages(); G.day = 1;
   G.mission.done = {}; G.mission.current && G.mission.abort(); G.mission.refreshAvailable(); G.activities.stuntFound = {}; G.activities.refreshChests();
-  G.police.reset(); G.eco.applyToWorld();
+  G.police.reset(); G.life?.reset(); G.eco.applyToWorld();
+  if (G.admin) { G.eco.packs.avocado = true; G.life?.unlockPackItems(); }
   const cafe = G.world.pois.find((p) => p.id === 'cafe1');
   P.teleport(cafe.x - 4, cafe.z + 3); P.yaw = Math.PI / 2; P.rig.snap(P); P.rig.yaw = Math.PI / 2; P.rig.pitch = 0.22;
   G.env.time = 18.4; G.env.setWeather('clear', true); G.env.lockWeather = false;
@@ -45,7 +50,9 @@ async function boot() {
     await initGame(canvas, (p, t) => G.ui.setProgress(p, t));
     G.audio = new AudioSys(G); G.eco = new Economy(G); G.mission = new MissionSys(G); G.activities = new Activities(G);
     G.activities.init(); G.mission.init(); G.eco.applyToWorld();
-    G.touch = new TouchControls(G); G.mp = new Multiplayer(G);
+    G.touch = new TouchControls(G); G.mp = new Multiplayer(G); G.adminPanel = new Admin(G); G.prison = new Prison(G);
+    G.life = new Life(); G.life.world = new LifeWorld(G.life); G.life.world.init();
+    if (G.admin) { G.eco.packs.avocado = true; G.life.unlockPackItems(); }
     G.ui.setProgress(1, 'Bereit');
     G.ui.hideLoading();
     startLoop();

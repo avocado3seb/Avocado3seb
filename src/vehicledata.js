@@ -1,5 +1,6 @@
 // Fahrzeugkatalog: 130+ Typen, prozedural aus Klassen + Namen erzeugt
 import { strHash, RNG } from './util.js';
+import { PACK_VEHICLES } from './packdefs.js';
 
 // Klassen-Basiswerte: len/wid/hgt (m), mass (kg), top (km/h), t100 (s 0-100), grip (Reibung), price
 export const CLASSES = {
@@ -52,8 +53,10 @@ const LIST = [
   ['Quad ATV', 'quad', { pack: 'insel' }], ['Beach Buggy Q', 'quad', { pack: 'insel' }],
   ['Jetski Splash', 'boat', { sub: 'jetski', pack: 'insel' }], ['Dinghy', 'boat', { sub: 'dinghy' }], ['Speedster 30', 'boat', { sub: 'speed' }], ['Marlin Fishing', 'boat', { sub: 'fish' }], ['Cruiser 45', 'boat', { sub: 'cruiser', pack: 'yacht' }], ['Racer Cigar', 'boat', { sub: 'cigar', pack: 'yacht' }], ['Yacht Serenity', 'boat', { sub: 'yacht', pack: 'yacht' }], ['Mega Yacht Opulence', 'boat', { sub: 'mega', pack: 'yacht' }], ['Sailing Breeze', 'boat', { sub: 'sail', pack: 'yacht' }],
   ['Skyhawk', 'plane', { sub: 'prop' }], ['Cargo Dash', 'plane', { sub: 'cargo' }], ['Lear Jet LJ', 'plane', { sub: 'jet', pack: 'flug' }], ['Stunt Falcon', 'plane', { sub: 'stunt', pack: 'flug' }], ['Seaplane Albatross', 'plane', { sub: 'sea', pack: 'flug' }], ['Bush Pilot', 'plane', { sub: 'prop' }],
-  ['Ranger Heli', 'heli', { sub: 'light' }], ['Police Hawk', 'heli', { sub: 'police', cop: 6, npc: true }], ['News Chopper', 'heli', { sub: 'news', pack: 'flug' }], ['Sky Crane Military', 'heli', { sub: 'military', pack: 'flug' }],
+  ['Avocado Flugyacht', 'heli', { sub: 'sky', pack: 'avocado', body: 'skyyacht', color: 0x4caf50 }], ['Ranger Heli', 'heli', { sub: 'light' }], ['Police Hawk', 'heli', { sub: 'police', cop: 6, npc: true }], ['News Chopper', 'heli', { sub: 'news', pack: 'flug' }], ['Sky Crane Military', 'heli', { sub: 'military', pack: 'flug' }],
 ];
+
+LIST.push(...PACK_VEHICLES);
 
 const CAR_COLORS = [0xf5f5f5, 0x1b1b1f, 0x8a8f98, 0xb71c1c, 0x1565c0, 0x2e7d32, 0xf9a825, 0xe65100, 0x4e342e, 0x6a1b9a, 0x00838f, 0xc0c4c8, 0x0d47a1, 0xd81b60, 0x263238];
 export const PALETTE_CARS = CAR_COLORS;
@@ -75,13 +78,13 @@ export const CATALOG = LIST.map(([name, cls, o = {}], idx) => {
   if (cls === 'super') spec.price = Math.round(C.price * v(0.7, 2.6) / 1000) * 1000;
   if (o.sub === 'mega') spec.price = 8500000; else if (o.sub === 'yacht') spec.price = 2400000; else if (o.sub === 'cruiser') spec.price = 480000; else if (o.sub === 'cigar') spec.price = 360000; else if (o.sub === 'sail') spec.price = 650000; else if (o.sub === 'jetski') spec.price = 18000; else if (o.sub === 'dinghy') spec.price = 8000; else if (o.sub === 'speed') spec.price = 95000; else if (o.sub === 'fish') spec.price = 70000;
   if (o.sub === 'jet') spec.price = 4800000; else if (o.sub === 'prop') spec.price = 180000; else if (o.sub === 'cargo') spec.price = 420000; else if (o.sub === 'stunt') spec.price = 650000; else if (o.sub === 'sea') spec.price = 900000;
-  if (o.sub === 'light') spec.price = 480000; else if (o.sub === 'news') spec.price = 1200000; else if (o.sub === 'military') spec.price = 3200000;
+  if (o.sub === 'light') spec.price = 480000; else if (o.sub === 'news') spec.price = 1200000; else if (o.sub === 'military') spec.price = 3200000; else if (o.sub === 'sky') spec.price = 0;
   // Boote / Flugzeuge: Maße je Unterklasse
   const SUB = {
     jetski: { len: 3.0, wid: 1.2, hgt: 1.0, top: 110, mass: 400 }, dinghy: { len: 4.0, wid: 1.8, hgt: 0.8, top: 60, mass: 400 }, speed: { len: 7.5, wid: 2.5, hgt: 1.5, top: 130, mass: 1400 }, fish: { len: 8.5, wid: 2.9, hgt: 2.6, top: 75, mass: 2400 },
     cruiser: { len: 13, wid: 4, hgt: 3.6, top: 85, mass: 8000 }, cigar: { len: 10, wid: 2.3, hgt: 1.3, top: 190, mass: 2200 }, yacht: { len: 24, wid: 6, hgt: 6.5, top: 55, mass: 40000 }, mega: { len: 42, wid: 9, hgt: 10, top: 45, mass: 150000 }, sail: { len: 14, wid: 4, hgt: 3, top: 55, mass: 9000 },
     prop: { len: 8.3, wid: 11, hgt: 2.8, top: 260, mass: 1100 }, cargo: { len: 11, wid: 16, hgt: 3.6, top: 300, mass: 4500 }, jet: { len: 14, wid: 13, hgt: 4.2, top: 780, mass: 6500 }, stunt: { len: 6.5, wid: 7.8, hgt: 2.4, top: 330, mass: 800 }, sea: { len: 9.4, wid: 12.5, hgt: 3.6, top: 220, mass: 1500 },
-    light: { len: 9, wid: 2.4, hgt: 3.3, top: 250, mass: 1400 }, police: { len: 10, wid: 2.4, hgt: 3.4, top: 270, mass: 1800 }, news: { len: 10, wid: 2.5, hgt: 3.4, top: 260, mass: 1900 }, military: { len: 14, wid: 3, hgt: 4.2, top: 300, mass: 5500 },
+    sky: { len: 44, wid: 10, hgt: 12, top: 330, mass: 160000 }, light: { len: 9, wid: 2.4, hgt: 3.3, top: 250, mass: 1400 }, police: { len: 10, wid: 2.4, hgt: 3.4, top: 270, mass: 1800 }, news: { len: 10, wid: 2.5, hgt: 3.4, top: 260, mass: 1900 }, military: { len: 14, wid: 3, hgt: 4.2, top: 300, mass: 5500 },
   };
   if (o.sub && SUB[o.sub]) Object.assign(spec, SUB[o.sub], { wb: SUB[o.sub].len * 0.6 });
   if (cls === 'moto' && o.style === 'scooter') { spec.top = 80; spec.mass = 120; spec.len = 1.8; }
@@ -92,6 +95,7 @@ export const CATALOG = LIST.map(([name, cls, o = {}], idx) => {
   spec.hp = Math.round(spec.mass * 27.8 * 27.8 / Math.max(2.2, spec.t100 || 10) / 745.7);
   spec.traffic = !o.pack && !o.npc && ['compact', 'sedan', 'coupe', 'suv', 'pickup', 'van', 'muscle', 'classic', 'truck', 'bus', 'taxi', 'moto', 'sport'].includes(cls) && !/School|Garbage|Dump|Tanker|Semi/.test(name) || /Garbage|School/.test(name);
   spec.buyable = !o.npc && spec.price > 0;
+  if (o.sub === 'sky' || o.pack === 'avocado') { spec.buyable = false; spec.admin = true; }
   return spec;
 });
 export const byKey = new Map(CATALOG.map((c) => [c.key, c]));

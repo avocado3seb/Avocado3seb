@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import { RNG, hash2, clamp, lerp, smoothstep, fbm } from './util.js';
 import { colorOf } from './builder.js';
 import { terrainH, SpatialHash } from './world.js';
-import { HALF, SEA, PITCH, RECTS, ISLANDS, coastX } from './consts.js';
+import { HALF, SEA, PITCH, RECTS, ISLANDS, coastX, inSavanna } from './consts.js';
+import { Landmarks2 } from './landmarks2.js';
 
 const BOX = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 
@@ -18,6 +19,7 @@ export class Landmarks {
     this.golfAndPark();
     this.islands();
     this.viceSign();
+    new Landmarks2(this).all();
   }
 
   // ---------- Flughafen ----------
@@ -247,6 +249,7 @@ export class Landmarks {
   islands() {
     const W = this.W, c = this.c, rng = this.rng;
     for (const I of ISLANDS) {
+      if (I.skip) continue;
       // Palmen & Büsche
       for (let k = 0; k < 90; k++) {
         const a = rng.range(0, 6.283), r = Math.sqrt(rng.next()) * I.r * 0.8;
@@ -328,17 +331,19 @@ export class Landmarks {
       return false;
     };
     const FLATR = { x0: -1470, x1: 1170, z0: -1070, z1: 1270 };
-    for (let cz = -2300; cz < 2300; cz += 36) for (let cx = -2300; cx < 2300; cx += 36) {
+    for (let cz = -3100; cz < 3100; cz += 38) for (let cx = -3100; cx < 3100; cx += 38) {
       const x = cx + rng.range(0, 30), z = cz + rng.range(0, 30);
       if (x > FLATR.x0 && x < FLATR.x1 && z > FLATR.z0 && z < FLATR.z1) continue;
       const h = terrainH(x, z);
-      if (h < 1.2 || h > 78) continue;
+      if (h < 1.2 || h > (z < -1800 ? 130 : 78)) continue;
+      if (inSavanna(x, z)) continue;
+      if (Math.hypot(x - 2520, z - 650) < 480) continue;
       const f = fbm(x / 160 + 7, z / 160 + 3, 3, 21);
       if (f < 0.46 && rng.next() < 0.82) continue;
       if (isNearRoad(x, z)) continue;
       const swamp = x < -1500 && z > 400 && x > -2200;
       const rain = (x < -1480 && z > -300) || z > 1300;
-      const conifer = z < -1300;
+      const conifer = z < -1300 || h > 60;
       const mb = W.mb(x, z, 'leaf');
       const s = rng.range(0.9, 1.7);
       if (conifer) {

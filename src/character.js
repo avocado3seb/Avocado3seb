@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { MB, colorOf } from './builder.js';
 import { clamp, lerp, damp, dampAngle, TAU } from './util.js';
+import { WEAPONS } from './data.js';
 
 const M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler(), V = new THREE.Vector3(), S = new THREE.Vector3();
 const gcache = new Map();
@@ -247,6 +248,16 @@ function makeHeld(name) {
   else if (name === 'umbrella') {
     const c = new THREE.Mesh(new THREE.ConeGeometry(0.5, 0.2, 12), new THREE.MeshStandardMaterial({ color: 0x8e24aa, roughness: 0.6, side: THREE.DoubleSide }));
     c.position.set(0, 0.55, 0.05); g.add(c); bx(0.015, 0.7, 0.015, 0, 0.25, 0.05);
+  }
+  else if (WEAPONS[name]?.model) {
+    const d = WEAPONS[name], tint = new THREE.MeshStandardMaterial({ color: d.tint || 0x888888, roughness: 0.3, metalness: 0.85, emissive: d.tint || 0, emissiveIntensity: 0.25 });
+    const glow = new THREE.MeshBasicMaterial({ color: d.tint || 0xffffff });
+    const m = d.model;
+    if (m === 'pistol') { bx(0.04, 0.06, 0.24, 0, 0.03, 0.12, tint); bx(0.034, 0.12, 0.05, 0, -0.04, 0.03); bx(0.02, 0.02, 0.05, 0, 0.07, 0.2, glow); }
+    else if (m === 'smg') { bx(0.05, 0.08, 0.4, 0, 0.03, 0.16, tint); bx(0.03, 0.16, 0.05, 0, -0.08, 0.1); bx(0.03, 0.12, 0.04, 0, -0.02, 0.22); bx(0.02, 0.02, 0.3, 0, 0.08, 0.2, glow); }
+    else if (m === 'shotgun') { bx(0.05, 0.06, 0.8, 0, 0.04, 0.3, tint); bx(0.055, 0.09, 0.28, 0, 0.0, 0.0, wood); bx(0.02, 0.02, 0.5, 0, 0.09, 0.4, glow); }
+    else if (m === 'cannon') { bx(0.12, 0.12, 0.7, 0, 0.05, 0.3, tint); bx(0.06, 0.14, 0.1, 0, -0.08, 0.1); bx(0.1, 0.1, 0.06, 0, 0.05, 0.68, glow); }
+    else { bx(0.05, 0.08, 0.9, 0, 0.04, 0.34, tint); bx(0.055, 0.11, 0.24, 0, 0.0, -0.06, wood); bx(0.03, 0.14, 0.05, 0, -0.08, 0.2); bx(0.02, 0.03, 0.4, 0, 0.1, 0.34, glow); }
   }
   g.rotation.x = Math.PI / 2 * 0; 
   return g;

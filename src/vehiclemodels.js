@@ -399,12 +399,24 @@ function buildHeli(spec) {
   return { spec, kind: 'heli', dims: { L, W: 2.4, H: spec.hgt }, wheels: [], seat: { x: 0.4, y: cy - 0.2, z: 1.5 * big }, doorX: 1.7, cl: 0, layers: { paint, trim, glass, head, tail, barR, barB, neon, signLit }, exhaust: { x: 0, y: cy, z: -L / 2 }, tailY: cy, extra, cy };
 }
 
+function buildSkyYacht(spec) {
+  const m = buildBoat({ ...spec, kind: 'boat', sub: 'mega', body: 'boat', key: spec.key + '_hull' });
+  // Rotoren an den vier Ecken (spezielles Avocado-Design)
+  const extra = [], L = spec.len, W = spec.wid, y = (m.deckY || 3) + 6.5;
+  for (const [x, z] of [[-W * 0.9, L * 0.32], [W * 0.9, L * 0.32], [-W * 0.9, -L * 0.28], [W * 0.9, -L * 0.28]]) extra.push({ type: 'rotor', pos: [x, y, z], r: 7.5, blades: 3 });
+  // Tragarme + grüne Avocado-Zierstreifen
+  const trim = m.layers.trim, paint = m.layers.paint;
+  for (const [x, z] of [[-W * 0.9, L * 0.32], [W * 0.9, L * 0.32], [-W * 0.9, -L * 0.28], [W * 0.9, -L * 0.28]]) { trim.box(x * 0.55, y - 3, z, Math.abs(x) * 1.1, 0.5, 0.7, { col: [0.1, 0.12, 0.1], uvs: 1 }); trim.box(x, y - 6, z, 0.9, 6, 0.9, { col: [0.1, 0.12, 0.1], uvs: 1 }); }
+  m.layers.neon.box(0, 1.2, 0, W * 0.95, 0.1, L * 0.95, { col: [0.2, 1, 0.4], uvs: 1 });
+  return { ...m, spec, kind: 'heli', extra, seat: { x: 0.8, y: (m.deckY || 3) + 4.2, z: L * 0.12 }, doorX: W / 2 + 1.2, cl: 0 };
+}
+
 const cache = new Map();
 export function getModel(spec) {
   let m = cache.get(spec.key);
   if (m) return m;
   const k = spec.kind;
-  m = k === 'car' ? buildCar(spec) : k === 'bike' ? buildBike(spec) : k === 'boat' ? buildBoat(spec) : k === 'plane' ? buildPlane(spec) : buildHeli(spec);
+  m = spec.body === 'skyyacht' ? buildSkyYacht(spec) : k === 'car' ? buildCar(spec) : k === 'bike' ? buildBike(spec) : k === 'boat' ? buildBoat(spec) : k === 'plane' ? buildPlane(spec) : buildHeli(spec);
   m.geos = {};
   for (const [name, mb] of Object.entries(m.layers)) if (mb.count) m.geos[name] = mb.build();
   m.layers = null;

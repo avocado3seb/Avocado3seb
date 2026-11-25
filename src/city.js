@@ -653,6 +653,7 @@ export class CityGen {
     const hv = hwV(k.i), hh = hwH(k.j);
     const kx = nx + sx * (hv + 6.4), kz = nz + sz * (hh + 6.4);
     const mx = nx + sx * (hv + 2.2), mz = nz + sz * (hh + 2.2);
+    if (terrainH(kx, kz) < -0.5) return;
     const sets = W.sets[W.chunkIdx(kx, kz)], pm = sets.get('plain');
     const col = k.color || 0xffffff;
     pm.box(kx, 0.17, kz, 5.6, 3.4, 5.6, { col: 0xf2efe8, uvs: 3 });
@@ -664,7 +665,7 @@ export class CityGen {
     const short = k.name.split('(')[0].trim().slice(0, 20);
     const yaw = Math.atan2(-sx, -sz);
     this.addSign(short.toUpperCase(), kx - sx * 1.2, 4.7, kz - sz * 1.2, yaw, 5.6, 1.6, '#' + (col).toString(16).padStart(6, '0'));
-    this.poi({ id: k.id, kind: k.kind, name: k.name, x: mx, z: mz, menu: k.menu, job: k.job, race: k.race, luxe: k.luxe, color: col });
+    this.poi({ id: k.id, kind: k.kind, name: k.name, x: mx, z: mz, menu: k.menu, job: k.job, race: k.race, luxe: k.luxe, color: col, shop: k.shop });
   }
   propertyGate(p) {
     const W = this.W;

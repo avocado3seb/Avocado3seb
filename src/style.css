@@ -194,3 +194,8 @@ body.touch .tsys{top:6px}
 .mpcode{width:140px;letter-spacing:.3em;text-align:center;font-weight:700}
 .mptag{font-size:12px!important;padding:2px 8px!important;transform:translate(-50%,-100%)}
 body.touch .mpchat{left:12px;bottom:auto;top:140px;width:44vw}
+
+#prison{position:absolute;top:70px;left:50%;transform:translateX(-50%);flex-direction:column;align-items:center;padding:10px 26px;background:rgba(10,12,20,.75);border:2px solid #ff5252;border-radius:12px;pointer-events:none;text-align:center}
+#prison .pt{font-weight:800;letter-spacing:.12em;color:#ff8a80}
+#prison .pn{font-size:54px;font-weight:900;line-height:1;color:#fff;text-shadow:0 0 18px #ff5252}
+#prison .ps{font-size:12px;opacity:.8}
