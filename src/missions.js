@@ -94,7 +94,7 @@ export class Cutscene {
 
 // ------------------- Hilfen -------------------
 const L = (s) => {
-  if (typeof s === 'function') return s();
+  if (typeof s === 'function') { const r = s(); return Array.isArray(r) ? { x: r[0], z: r[1], y: r[2] } : r; }
   if (typeof s === 'string') { if (s.startsWith('poi:')) { const p = G.world.pois.find((q) => q.id === s.slice(4)); return p ? { x: p.x, z: p.z } : { x: 0, z: 0 }; } return { x: 0, z: 0 }; }
   if (Array.isArray(s)) return { x: s[0], z: s[1], y: s[2] };
   return s;
@@ -163,7 +163,7 @@ export const MISSIONS = [
 // ------------------- Missionssystem -------------------
 export class MissionSys {
   constructor(G) {
-    this.G = G; this.done = {}; this.current = null; this.cut = new Cutscene(G); this.markers = new Map(); this.contacts = new Map(); this.defs = MISSIONS; this.promptDef = null; this._blips = [];
+    this.G = G; this.done = {}; this.current = null; this.cut = new Cutscene(G); this.markers = new Map(); this.contacts = new Map(); this.defs = MISSIONS; this.promptDef = null; this.promptList = []; this._blips = [];
   }
   init() { this.refreshAvailable(); }
   def(id) { return this.defs.find((d) => d.id === id); }
@@ -184,7 +184,7 @@ export class MissionSys {
     if (this.current) for (const b of this.current.blips) out.push({ x: b.x, z: b.z, icon: '◎', color: '#ffc107' });
     return out;
   }
-  prompt() { return this.promptDef ? `<kbd>E</kbd> Mission starten: ${this.promptDef.title}` : ''; }
+  prompt() { return this.promptDef ? `<kbd>E</kbd> ${this.promptList.length > 1 ? 'Missionen (' + this.promptList.length + ')' : 'Mission starten: ' + this.promptDef.title}` : ''; }
   serialize() { return { done: this.done }; }
   deserialize(d) { this.done = d?.done || {}; if (this.current) this.abort(true); this.refreshAvailable(); }
   logRows(ui) {
@@ -243,8 +243,13 @@ export class MissionSys {
   proximity(dt) {
     const G = this.G, P = G.player; this.promptDef = null;
     if (G.mode !== 'play' || !P.alive || P.vehicle || G.activities.race || G.activities.job || G.ui.blocking) { this.contactUpdate(); return; }
-    for (const d of this.defs) { if (!this.available(d)) continue; const p = L(d.at); if (Math.hypot(p.x - P.pos.x, p.z - P.pos.z) < 3.4) { this.promptDef = d; break; } }
-    if (this.promptDef && G.input.hit('KeyE')) this.start(this.promptDef);
+    this.promptList = [];
+    for (const d of this.defs) { if (!this.available(d)) continue; const p = L(d.at); if (Math.hypot(p.x - P.pos.x, p.z - P.pos.z) < 3.4) this.promptList.push(d); }
+    this.promptDef = this.promptList[0] || null;
+    if (this.promptDef && G.input.hit('KeyE')) {
+      if (this.promptList.length === 1) this.start(this.promptDef);
+      else { const body = h('div', { class: 'body' }, ...this.promptList.map((d) => h('div', { class: 'row' }, h('div', { class: 'grow' }, h('div', { class: 't' }, d.title, d.pack && h('span', { class: 'pill pack' }, PACKS[d.pack].name)), h('div', { class: 'd' }, `${d.hint} · Belohnung ${fmtMoney(d.reward)}`)), h('button', { class: 'btn small primary', onClick: () => { G.ui.closeModal(); this.start(d); } }, 'Starten')))); G.ui.modal('Missionen verfügbar', body, { cash: false }); }
+    }
     this.contactUpdate();
   }
   contactUpdate() {

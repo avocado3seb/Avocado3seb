@@ -29,13 +29,13 @@ const srgb = (r, g, b) => new THREE.Color().setRGB(r, g, b, THREE.SRGBColorSpace
 
 const CLOUD_VERT = `varying vec3 vDir; void main(){ vDir = position; vec4 p = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix * p; gl_Position.z = gl_Position.w * 0.99999; }`;
 const CLOUD_FRAG = `
-varying vec3 vDir; uniform float uTime, uCover, uDark, uFlash; uniform vec3 uSunDir, uSunColor, uAmbient;
+varying vec3 vDir; uniform float uTime, uCover, uDark, uFlash, uNight; uniform vec3 uSunDir, uSunColor, uAmbient;
 float h(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
 float n(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h(i),h(i+vec2(1,0)),f.x), mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x), f.y); }
 float fbm(vec2 p){ float s=0.0,a=0.5; for(int i=0;i<5;i++){ s+=a*n(p); p=p*2.03+vec2(7.1,3.3); a*=0.5; } return s; }
 void main(){
   vec3 d = normalize(vDir);
-  if (d.y < 0.015) discard;
+  if (d.y < 0.015 && uNight < 0.02) discard;
   vec2 uv = d.xz / (d.y + 0.12) * 1.25 + uTime * vec2(0.006, 0.003);
   float base = fbm(uv);
   float detail = fbm(uv * 3.1 + 11.0);
@@ -50,7 +50,10 @@ void main(){
   col = mix(col, col * vec3(0.4, 0.42, 0.47), uDark * 0.7);
   col += vec3(uFlash) * 1.2;
   float fade = smoothstep(0.015, 0.22, d.y);
-  gl_FragColor = vec4(col, c * fade * (0.96));
+  float ca = c * fade * 0.96;
+  vec3 nightCol = mix(vec3(0.006, 0.01, 0.03), vec3(0.012, 0.025, 0.07), pow(1.0 - clamp(d.y, 0.0, 1.0), 2.5));
+  nightCol += vec3(uFlash) * 0.6;
+  gl_FragColor = vec4(mix(nightCol, col, ca), max(ca, uNight * 0.93));
 }`;
 
 export class Environment {
@@ -84,7 +87,7 @@ export class Environment {
     const cg = new THREE.SphereGeometry(8000, 32, 16);
     this.cloudMat = new THREE.ShaderMaterial({
       vertexShader: CLOUD_VERT, fragmentShader: CLOUD_FRAG, transparent: true, depthWrite: false, side: THREE.BackSide, fog: false,
-      uniforms: { uTime: { value: 0 }, uCover: { value: 0.3 }, uDark: { value: 0 }, uFlash: { value: 0 }, uSunDir: { value: new THREE.Vector3() }, uSunColor: { value: new THREE.Color() }, uAmbient: { value: new THREE.Color() } },
+      uniforms: { uTime: { value: 0 }, uCover: { value: 0.3 }, uDark: { value: 0 }, uFlash: { value: 0 }, uNight: { value: 0 }, uSunDir: { value: new THREE.Vector3() }, uSunColor: { value: new THREE.Color() }, uAmbient: { value: new THREE.Color() } },
     });
     this.clouds = new THREE.Mesh(cg, this.cloudMat); this.clouds.renderOrder = -1; this.clouds.frustumCulled = false;
     scene.add(this.clouds);
@@ -113,7 +116,7 @@ export class Environment {
     const nm = makeWaterNormal(); nm.repeat.set(400, 400);
     const nm2 = nm.clone(); nm2.repeat.set(130, 130); nm2.needsUpdate = true;
     this.waterNormal = nm; this.waterNormal2 = nm2;
-    this.waterMat = new THREE.MeshPhysicalMaterial({ color: 0x0a5878, roughness: 0.06, metalness: 0.0, normalMap: nm, normalScale: new THREE.Vector2(0.7, 0.7), transparent: true, opacity: 0.86, envMapIntensity: 1.6, clearcoat: 0.6, clearcoatRoughness: 0.2, depthWrite: false });
+    this.waterMat = new THREE.MeshPhysicalMaterial({ color: 0x0a5878, roughness: 0.1, metalness: 0.0, normalMap: nm, normalScale: new THREE.Vector2(0.7, 0.7), transparent: true, opacity: 0.9, specularIntensity: 0.55, clearcoat: 0.3, clearcoatRoughness: 0.25, depthWrite: false });
     this.waterMat.onBeforeCompile = (sh) => {
       sh.uniforms.uNorm2 = { value: nm2 }; sh.uniforms.uT = this._waterT = { value: 0 };
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D uNorm2; uniform float uT;')
@@ -278,7 +281,7 @@ export class Environment {
     this.renderer.toneMappingExposure = lerp(1.15, 0.7, dayF) + dusk * 0.1;
     // Wolken
     const cu = this.cloudMat.uniforms;
-    cu.uTime.value = G.time; cu.uCover.value = this.w.cover; cu.uDark.value = dark; cu.uFlash.value = fl * 0.6;
+    cu.uTime.value = G.time; cu.uNight.value = clamp(this.night * 1.05 - 0.04, 0, 1); cu.uCover.value = this.w.cover; cu.uDark.value = dark; cu.uFlash.value = fl * 0.6;
     cu.uSunDir.value.copy(this.sunDir);
     cu.uSunColor.value.copy(sunCol).multiplyScalar(lerp(0.0, 1.5, dayF) + 0.04);
     cu.uAmbient.value.copy(this.hemi.color).multiplyScalar(lerp(0.12, 0.9, dayF) + 0.02).lerp(srgb(0.9, 0.5, 0.4), dusk * 0.3);
@@ -296,7 +299,7 @@ export class Environment {
     this.waterNormal.offset.set((G.time * 0.012) % 1, (G.time * 0.007) % 1);
     if (this._waterT) this._waterT.value = G.time;
     const ws = 0.45 + this.w.wind * 0.9; this.waterMat.normalScale.set(ws, ws);
-    this.waterMat.color.setRGB(0.012, 0.3, 0.42).multiplyScalar(lerp(0.04, 1, dayF) * (1 - dark * 0.5) + 0.01).lerp(new THREE.Color(0.025, 0.085, 0.1), 0);
+    this.waterMat.color.setRGB(0.0, 0.16, 0.3).multiplyScalar(lerp(0.04, 1, dayF) * (1 - dark * 0.5) + 0.01);
     // Materialien
     if (G.world) updateMaterialsForEnv(G.world.M, this.night, this.wet);
     // Umgebungskarte alle paar Sekunden

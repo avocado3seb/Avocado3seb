@@ -20,7 +20,7 @@ export function terrainH(x, z) {
   let h = -0.12;
   if (d > 0) {
     const w = smoothstep(0, 420, d);
-    const hill = 2 + Math.max(0, fbm(x / 650 + 11, z / 650 + 5, 4, 3) - 0.28) * 95;
+    const hill = 2 + Math.max(0, fbm(x / 520 + 11, z / 520 + 5, 4, 3) - 0.24) * 175;
     const mtn = smoothstep(-1350, -2050, z) * fbm(x / 420 + 3, z / 420 + 9, 4, 8) * 110;
     h = lerp(-0.12, hill + mtn, w);
   }
@@ -41,6 +41,8 @@ export function terrainH(x, z) {
   const b = RECTS.bay;
   const bd = -sdBox(x, z, b.x0, b.x1, b.z0, b.z1);
   if (bd > 0) h = lerp(h, -14, smoothstep(0, 28, bd));
+  // Sumpfteiche im Südwesten
+  for (const [px, pz, pr] of [[-1800, 900, 110], [-1950, 1150, 90], [-1700, 1350, 100], [-2000, 800, 70]]) { const pd = Math.hypot(x - px, z - pz); if (pd < pr) h = lerp(h, -2.2, smoothstep(pr, pr * 0.55, pd)); }
   // See im Nordwesten
   const ld = Math.hypot(x + 1650, z + 850);
   if (ld < 260) h = lerp(h, -9, smoothstep(260, 170, ld));

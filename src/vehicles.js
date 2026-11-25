@@ -349,7 +349,7 @@ export class Vehicle {
     this.onGround = agl < 0.12 && !(this.sea && false);
     const auth = smoothstep(sp.topMS * 0.04, this.vlift * 0.9, Math.abs(Vf));
     // Steuerung
-    const pr = I.pitch * 0.9 * auth, rr = I.roll * 1.9 * auth, yr = I.yaw * 0.6 * auth;
+    const pr = I.pitch * 0.62 * auth, rr = I.roll * 1.9 * auth, yr = I.yaw * 0.6 * auth;
     if (!this.onGround || Vf > this.vlift * 0.7) {
       this.pitch = clamp(this.pitch + pr * dt, -1.35, 1.35);
       this.roll += rr * dt;

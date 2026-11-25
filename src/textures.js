@@ -44,11 +44,11 @@ function vnoiseTile(x, y, period, seed) {
 
 export function makeAsphalt() {
   const c = canvas(512), x = c.getContext('2d');
-  noiseFill(x, 512, 512, [58, 58, 62], 46, 1, 3);
+  noiseFill(x, 512, 512, [74, 74, 80], 30, 2, 3);
   const r = new RNG(7);
   for (let i = 0; i < 2600; i++) { x.fillStyle = `rgba(${r.int(90, 160)},${r.int(90, 160)},${r.int(90, 160)},${r.range(0.1, 0.35)})`; x.fillRect(r.range(0, 512), r.range(0, 512), r.range(1, 2.2), r.range(1, 2.2)); }
-  x.strokeStyle = 'rgba(20,20,22,0.5)'; x.lineWidth = 1;
-  for (let i = 0; i < 6; i++) { x.beginPath(); let px = r.range(0, 512), py = r.range(0, 512); x.moveTo(px, py); for (let k = 0; k < 8; k++) { px += r.range(-30, 30); py += r.range(-30, 30); x.lineTo(px, py); } x.stroke(); }
+  x.strokeStyle = 'rgba(30,30,32,0.28)'; x.lineWidth = 1;
+  for (let i = 0; i < 3; i++) { x.beginPath(); let px = r.range(0, 512), py = r.range(0, 512); x.moveTo(px, py); for (let k = 0; k < 8; k++) { px += r.range(-30, 30); py += r.range(-30, 30); x.lineTo(px, py); } x.stroke(); }
   return tex(c);
 }
 export function makeSidewalk() {

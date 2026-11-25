@@ -225,7 +225,7 @@ G.respawn = (why) => {
 };
 
 // ---------------- Hauptschleife ----------------
-let lastT = 0, acc = 0, frames = 0, fpsT = 0;
+let lastT = 0, acc = 0, frames = 0, fpsT = 0, lowT = 0, playT = 0, qCool = 0;
 let signalT = 0; const sigCache = new Map();
 export function startLoop() {
   lastT = performance.now();
@@ -233,6 +233,11 @@ export function startLoop() {
     requestAnimationFrame(loop);
     const raw = Math.min(G.maxDt || 0.05, (now - lastT) / 1000); lastT = now;
     frames++; fpsT += raw; if (fpsT > 0.5) { G.fps = Math.round(frames / fpsT); frames = 0; fpsT = 0; }
+    // Automatische Qualitätsanpassung
+    if (G.mode === 'play' && !G.noAuto) {
+      playT += raw; qCool -= raw;
+      if (playT > 12 && G.fps && G.fps < 27 && !G.maxDt) { lowT += raw; if (lowT > 5 && qCool <= 0) { const order = ['ultra', 'high', 'medium', 'low']; const i = order.indexOf(G.settings.quality); if (i >= 0 && i < 3) { G.settings.quality = order[i + 1]; G.applySettings(); G.ui?.toast('Grafik automatisch auf „' + order[i + 1] + '“ gesenkt (zu niedrige Bildrate).'); } lowT = 0; qCool = 15; } } else lowT = Math.max(0, lowT - raw);
+    }
     try { frame(raw); } catch (e) { console.error('frame error', e); G.lastError = String(e && e.stack || e); }
   };
   requestAnimationFrame(loop);
@@ -328,6 +333,7 @@ function updatePOI(dt) {
     const rr = (p.r || 3) + (inV ? 2 : 0.7);
     if (d < rr && d < bd) { if (inV && !VEHICLE_POI.has(p.kind)) continue; if (!inV && VEHICLE_POI.has(p.kind) && p.vehicle) continue; bd = d; best = p; }
   }
+  if (best && !inV && G.mission?.promptDef) best = null;
   G.poiNear = best;
   if (G.mode === 'play' && best && P.alive && G.ui && !G.ui.blocking) {
     const key = inV ? 'ENTER' : 'E';

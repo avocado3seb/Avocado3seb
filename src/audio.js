@@ -192,7 +192,7 @@ export class AudioSys {
     if (ctx.state === 'suspended' && G.mode === 'play') ctx.resume();
     const paused = G.mode === 'pause';
     const env = G.env;
-    const set = (param, val, k = 0.1) => param.setTargetAtTime(val, t, k);
+    const set = (param, val, k = 0.1) => { if (Number.isFinite(val)) param.setTargetAtTime(val, t, k); };
     // Wetter
     set(this.rainBed.gn.gain, paused ? 0 : env.w.rain * 0.28 * (v && v.kind === 'car' ? 0.55 : 1)); set(this.rainBed2.gn.gain, paused ? 0 : env.w.rain * 0.22);
     const sp = v ? v.speed : Math.hypot(P.vel.x, P.vel.z);

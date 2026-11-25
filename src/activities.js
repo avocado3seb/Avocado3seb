@@ -17,7 +17,7 @@ const CP = (i, j) => ({ x: i * 100 + (i % 4 === 0 ? 0 : 0), z: j * 100 });
 export class Activities {
   constructor(G) {
     this.G = G; this.race = null; this.job = null; this.vipRun = null; this.stuntFound = {}; this.stuntState = null; this.chests = []; this.timeTrial = null;
-    this.helpers = [];
+    this.helpers = []; this.ev = null; this.evT = 80;
   }
   init() {
     const G = this.G, W = G.world;
@@ -226,6 +226,7 @@ export class Activities {
     this.job?.update(dt);
     this.updateVip(dt);
     this.updateStunts(dt);
+    this.updateEvents(dt);
   }
   updateStunts(dt) {
     const G = this.G, v = G.player.vehicle; if (!v || v.kind === 'plane' || v.kind === 'heli' || v.kind === 'boat') { this.stuntState = null; return; }
@@ -309,4 +310,67 @@ class VigilanteJob extends JobBase {
     if (!this.targets.length) this.spawn();
   }
   cleanup() { for (const t of this.targets) { this.G.markers.remove(t.m); t.v.keep = false; t.v.tag = 'abandoned'; } this.targets = []; }
+}
+
+// =================== Zufällige Ereignisse ===================
+Activities.prototype.updateEvents = function (dt) {
+  const G = this.G, P = G.player;
+  if (this.ev) { const r = this.ev.update(dt); if (r) { this.ev.cleanup(); this.ev = null; this.evT = 100 + Math.random() * 120; } return; }
+  if (G.mode !== 'play' || !P.alive || G.mission?.current || this.race || this.job || this.vipRun || G.police.stars > 0 || G.ui.blocking) { this.evT = Math.max(this.evT, 20); return; }
+  this.evT -= dt;
+  if (this.evT <= 0) { const k = Math.random() < 0.55 ? Mugging : Hitchhiker; this.ev = new k(G); if (!this.ev.start()) { this.ev = null; this.evT = 25; } }
+};
+class RandomEv {
+  constructor(G) { this.G = G; this.t = 0; this.mk = []; this.peds = []; }
+  cleanup() { for (const m of this.mk) this.G.markers.remove(m); for (const p of this.peds) { p.persist = false; p.brain = null; } this.G.ui.setObjective(null); this.G.waypoint = null; }
+  spot(minD, maxD) {
+    const G = this.G, W = G.world, pp = G.player.position;
+    for (let i = 0; i < 50; i++) { const n = W.nodeList[Math.floor(Math.random() * W.nodeList.length)]; if (!n.city || n.hwH <= 0 || n.hwV <= 0) continue; const d = Math.hypot(n.x - pp.x, n.z - pp.z); if (d < minD || d > maxD) continue; return { x: n.x + (Math.random() < 0.5 ? 1 : -1) * (n.hwV + 3), z: n.z + (Math.random() < 0.5 ? 1 : -1) * (n.hwH + 3), n }; }
+    return null;
+  }
+}
+class Mugging extends RandomEv {
+  start() {
+    const G = this.G, s = this.spot(60, 160); if (!s) return false;
+    const victim = G.peds.spawnAt(s.x, s.z, 'civ'); victim.persist = true; victim.state = 'cower'; victim.t = 30; victim.noDrop = true;
+    const thief = G.peds.spawnAt(s.x + 2, s.z + 1, 'civ', { ...G.peds.randomOutfit(), top: 4, topColor: 0x111111, hat: 2, hatColor: 0x111111 }); thief.persist = true; thief.noDrop = true; thief.cash = 700; thief.health = 60;
+    thief.state = 'brain'; const tgt = { x: s.x + (Math.random() - 0.5) * 400, z: s.z + (Math.random() - 0.5) * 400 };
+    thief.brain = (dt, p) => { let dx = tgt.x - p.pos.x, dz = tgt.z - p.pos.z; const d = Math.hypot(dx, dz); if (d < 6) { tgt.x = p.pos.x + (Math.random() - 0.5) * 500; tgt.z = p.pos.z + (Math.random() - 0.5) * 500; } const w = G.world.pushCircle(p.pos.x + dx / (d || 1) * 1.5, p.pos.z + dz / (d || 1) * 1.5, 0.4, p.pos.y + 0.3); if (w.hit) { tgt.x = p.pos.x + w.nx * 60 + (Math.random() - 0.5) * 60; tgt.z = p.pos.z + w.nz * 60 + (Math.random() - 0.5) * 60; } return { vx: dx / (d || 1) * 5.6, vz: dz / (d || 1) * 5.6, spd: 5.6 }; };
+    this.victim = victim; this.thief = thief; this.peds = [victim, thief];
+    this.mk.push(G.markers.add({ x: thief.pos.x, z: thief.pos.z, color: 0xff5252, r: 2, far: 400, big: true })); this.m = this.mk[0];
+    G.ui.say(victim, 'Hilfe! Mein Geld! Haltet den Dieb!', 5); G.ui.toast('⚠ Raubüberfall in der Nähe – schnapp dir den Dieb!');
+    return true;
+  }
+  update(dt) {
+    const G = this.G, t = this.thief; this.t += dt; this.m.x = t.pos.x; this.m.z = t.pos.z; this.m.group.position.set(t.pos.x, t.pos.y, t.pos.z);
+    G.ui.setObjective('ZUFALLSEREIGNIS', 'Fange den Dieb (Taschendieb flüchtet)', Math.max(0, 90 - this.t)); G.waypoint = { x: t.pos.x, z: t.pos.z };
+    if (!t.alive) { G.player.addMoney(500, 'Dieb gestellt'); G.ui.toast('Dieb erledigt! Beute zurückgegeben +$500'); G.audio?.cash(); return true; }
+    const d = Math.hypot(t.pos.x - G.player.position.x, t.pos.z - G.player.position.z);
+    if (this.t > 90 || d > 260) { G.ui.toast('Der Dieb ist entkommen.'); return true; }
+    return false;
+  }
+}
+class Hitchhiker extends RandomEv {
+  start() {
+    const G = this.G, s = this.spot(60, 140); if (!s) return false;
+    const ped = G.peds.spawnAt(s.x, s.z, 'civ'); ped.persist = true; ped.noDrop = true; ped.state = 'brain'; ped.brain = () => ({ vx: 0, vz: 0, spd: 0 }); ped.faceTarget = true; ped.lookAt = G.player.position;
+    this.ped = ped; this.peds = [ped]; this.phase = 'wait';
+    this.mk.push(G.markers.add({ x: s.x, z: s.z, color: 0x69f0ae, r: 3, far: 500 })); this.m = this.mk[0];
+    G.ui.say(ped, 'Hey! Kannst du mich mitnehmen?!', 5); G.ui.toast('🚗 Ein Anhalter wartet – fahre hin und halte an.');
+    return true;
+  }
+  update(dt) {
+    const G = this.G, P = G.player; this.t += dt;
+    if (this.phase === 'wait') {
+      G.ui.setObjective('ZUFALLSEREIGNIS', 'Hole den Anhalter ab', Math.max(0, 80 - this.t)); G.waypoint = { x: this.m.x, z: this.m.z };
+      const v = P.vehicle; const d = Math.hypot(this.m.x - P.position.x, this.m.z - P.position.z);
+      if (v && v.kind === 'car' && d < 9 && v.speed < 6) { this.phase = 'ride'; this.t = 0; this.ped.char.root.visible = false; this.ped.state = 'inside'; this.ped.t = 9999; const dest = this.spot(350, 900); this.dest = dest || { x: this.m.x + 400, z: this.m.z }; G.markers.remove(this.m); this.m = G.markers.add({ x: this.dest.x, z: this.dest.z, color: 0xffd54f, r: 5, far: 1500, big: true }); this.mk.push(this.m); this.from = { x: P.position.x, z: P.position.z }; G.ui.toast('Anhalter an Bord – bringe ihn zum Ziel.'); }
+      if (this.t > 80 || d > 300) { G.ui.toast('Der Anhalter ist weitergegangen.'); return true; }
+    } else {
+      G.ui.setObjective('ZUFALLSEREIGNIS', 'Bringe den Anhalter ans Ziel', null); G.waypoint = { x: this.dest.x, z: this.dest.z };
+      if (!P.vehicle) { this.leave = (this.leave || 0) + dt; if (this.leave > 12) { G.ui.toast('Der Anhalter ist ausgestiegen.'); return true; } } else this.leave = 0;
+      if (P.vehicle && Math.hypot(this.dest.x - P.position.x, this.dest.z - P.position.z) < 10) { const pay = Math.round(80 + Math.hypot(this.dest.x - this.from.x, this.dest.z - this.from.z) * 0.5); P.addMoney(pay, 'Anhalter'); G.ui.toast(`Anhalter abgesetzt: ${fmtMoney(pay)}`); G.audio?.cash(); this.ped.pos.set(this.dest.x + 3, G.world.groundY(this.dest.x, this.dest.z), this.dest.z); this.ped.char.root.visible = true; this.ped.state = 'idle'; this.ped.brain = null; this.ped.t = 2; return true; }
+    }
+    return false;
+  }
 }
