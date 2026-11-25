@@ -33,8 +33,15 @@ export class Combat {
       if (t === null) t = raySphere(ox, oy, oz, dx, dy, dz, b.x, b.y + 0.4, b.z, 0.3);
       if (t !== null && t < best.t && t > 0) best = { t, kind: 'player', obj: G.player, head };
     }
+    for (const r of G.mp?.remotes?.values() || []) {
+      if (!r.alive) continue; const b = r.veh ? r.veh.pos : r.pos;
+      let t, head = false;
+      if (r.veh) t = raySphere(ox, oy, oz, dx, dy, dz, b.x, b.y + 0.9, b.z, 1.4);
+      else { t = raySphere(ox, oy, oz, dx, dy, dz, b.x, b.y + 1.68, b.z, 0.15); head = t !== null; if (t === null) t = raySphere(ox, oy, oz, dx, dy, dz, b.x, b.y + 1.1, b.z, 0.32); if (t === null) t = raySphere(ox, oy, oz, dx, dy, dz, b.x, b.y + 0.45, b.z, 0.3); }
+      if (t !== null && t < best.t && t > 0) best = { t, kind: 'remote', obj: r, head };
+    }
     for (const v of G.vehicles?.list || []) {
-      if (v === ignore?.vehicle) continue;
+      if (v === ignore?.vehicle || v.remote) continue;
       const rx = v.pos.x - ox, rz = v.pos.z - oz; if (rx * rx + rz * rz > (maxT + 15) ** 2) continue;
       const sy = Math.sin(v.yaw), cy = Math.cos(v.yaw);
       for (const c of v.circles) {
@@ -51,6 +58,7 @@ export class Combat {
     const dm = opts.dmgMul ?? 1;
     G.fx?.muzzle(origin.x + dir.x * 0.4, origin.y + dir.y * 0.4, origin.z + dir.z * 0.4);
     G.audio?.gun(wk, origin);
+    if (isP && G.mp?.active) G.mp.announceShot(origin, dir, wk, 60);
     G.emit('gunshot', { x: origin.x, z: origin.z, by: shooter, loud: wk !== 'pistol' ? 1 : 0.7 });
     for (let i = 0; i < n; i++) {
       const sp = w.spread * (opts.spreadMul ?? 1);
@@ -59,6 +67,7 @@ export class Combat {
       const px = origin.x + d.x * hit.t, py = origin.y + d.y * hit.t, pz = origin.z + d.z * hit.t;
       G.fx?.tracer(origin.x + d.x * 1.2, origin.y + d.y * 1.2 - 0.05, origin.z + d.z * 1.2, px, py, pz);
       if (hit.kind === 'ped') { hit.obj.hurt(w.dmg * dm * (hit.head ? 2.4 : 1), shooter, hit.head); G.fx?.puff(px, py, pz, 0x8a1010, 2); }
+      else if (hit.kind === 'remote') { G.mp.sendHit(hit.obj.id, w.dmg * dm * (hit.head ? 2 : 1) * 0.8); G.fx?.puff(px, py, pz, 0x8a1010, 2); }
       else if (hit.kind === 'player') { hit.obj.hurt(w.dmg * dm * (hit.head ? 1.8 : 1) * 0.55, shooter); }
       else if (hit.kind === 'vehicle') { hit.obj.wake(); hit.obj.damage(w.dmg * dm * 2.2, 'bullet', shooter); G.fx?.sparks(px, py, pz, 0.4); G.audio?.ricochet?.(px, py, pz); G.emit('vehicleShot', { v: hit.obj, by: shooter }); }
       else if (hit.kind === 'world') { G.fx?.puff(px, py, pz, 0xb8b0a0, 3); G.fx?.sparks(px, py, pz, 0.2); }
@@ -75,6 +84,7 @@ export class Combat {
       const dx = p.pos.x - pos.x, dz = p.pos.z - pos.z, d = Math.hypot(dx, dz);
       if (d < 1.9 && (dx * fx + dz * fz) / (d || 1) > 0.35) { p.hurt(dmg, shooter, false, true); hitAny = true; G.fx?.puff(p.pos.x, p.pos.y + 1.3, p.pos.z, 0xaaaaaa, 2); G.audio?.punch?.(); }
     }
+    if (shooter === G.player && G.mp?.active) for (const r of G.mp.remotes.values()) { if (!r.alive || r.veh) continue; const dx = r.pos.x - pos.x, dz = r.pos.z - pos.z, d = Math.hypot(dx, dz); if (d < 1.9 && (dx * fx + dz * fz) / (d || 1) > 0.35) { G.mp.sendHit(r.id, dmg * 0.8); hitAny = true; } }
     if (shooter !== G.player && G.player.alive && !G.player.vehicle) {
       const dx = G.player.pos.x - pos.x, dz = G.player.pos.z - pos.z, d = Math.hypot(dx, dz);
       if (d < 1.9 && (dx * fx + dz * fz) / (d || 1) > 0.35) { G.player.hurt(dmg, shooter); hitAny = true; }
@@ -90,7 +100,9 @@ export class Combat {
       const d = Math.hypot(p.pos.x - x, p.pos.z - z); if (d < radius) { p.hurt(power * 220 * (1 - d / radius) + 20, source, false); p.knock?.(p.pos.x - x, p.pos.z - z, 8 * (1 - d / radius)); }
     }
     if (G.player.alive) { const d = Math.hypot(G.player.pos.x - x, G.player.pos.z - z); if (d < radius) G.player.hurt(power * 150 * (1 - d / radius), source); }
+    if (source === G.player && G.mp?.active) for (const r of G.mp.remotes.values()) { const d = Math.hypot(r.pos.x - x, r.pos.z - z); if (d < radius && r.alive) G.mp.sendHit(r.id, power * 120 * (1 - d / radius)); }
     for (const v of G.vehicles.list) {
+      if (v.remote) continue;
       const d = Math.hypot(v.pos.x - x, v.pos.z - z); if (d < radius + v.spec.len / 2 && !v.exploded) { v.wake(); v.damage(power * 600 * (1 - d / (radius + 4)), 'explosion', source); const a = Math.atan2(v.pos.x - x, v.pos.z - z); v.setWorldVel(v.vx + Math.sin(a) * 8 * (1 - d / radius), v.vz + Math.cos(a) * 8 * (1 - d / radius)); }
     }
   }

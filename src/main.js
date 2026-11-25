@@ -8,6 +8,8 @@ import { MissionSys } from './missions.js';
 import { Activities } from './activities.js';
 import { DEFAULT_OUTFIT } from './character.js';
 import { PACKS } from './data.js';
+import { TouchControls } from './touch.js';
+import { Multiplayer } from './multiplayer.js';
 import { byKey, CATALOG } from './vehicledata.js';
 window.__byKey = (k) => byKey.get(k); window.__catalog = CATALOG;
 
@@ -43,6 +45,7 @@ async function boot() {
     await initGame(canvas, (p, t) => G.ui.setProgress(p, t));
     G.audio = new AudioSys(G); G.eco = new Economy(G); G.mission = new MissionSys(G); G.activities = new Activities(G);
     G.activities.init(); G.mission.init(); G.eco.applyToWorld();
+    G.touch = new TouchControls(G); G.mp = new Multiplayer(G);
     G.ui.setProgress(1, 'Bereit');
     G.ui.hideLoading();
     startLoop();

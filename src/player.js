@@ -135,9 +135,9 @@ export class Player {
     const G = this.G, I = G.input, W = G.world, rig = this.rig;
     const st = this.char.state;
     let mx = 0, mz = 0;
-    if (inputOK && this.stun <= 0) { mx = I.axis('KeyA', 'KeyD'); mz = I.axis('KeyS', 'KeyW'); }
+    if (inputOK && this.stun <= 0) { mx = clamp(I.axis('KeyA', 'KeyD') + I.ax, -1, 1); mz = clamp(I.axis('KeyS', 'KeyW') + I.ay, -1, 1); }
     this.stun = Math.max(0, this.stun - dt);
-    const sprint = inputOK && I.down('ShiftLeft') && mz >= 0 && !this.aim;
+    const sprint = inputOK && (I.down('ShiftLeft') || (I.touch && Math.hypot(I.ax, I.ay) > 0.93)) && mz >= 0 && !this.aim;
     this.aim = inputOK && I.mdown(2) && this.weapon !== 'fist' && !this.swimming;
     // Bewegungsrichtung relativ zur Kamera
     const sy = Math.sin(rig.yaw), cy = Math.cos(rig.yaw);
@@ -282,7 +282,7 @@ export class Player {
   // ---------- Fahrzeug ----------
   tryEnter() {
     const G = this.G;
-    const v = G.vehicles.nearest(this.pos.x, this.pos.z, 3.6, (q) => !q.locked || true);
+    const v = G.vehicles.nearest(this.pos.x, this.pos.z, 3.6, (q) => !q.remote);
     if (!v || this.swimming && v.kind !== 'boat') return false;
     if (v.exploded) return false;
     if (v.kind === 'plane' || v.kind === 'heli') { if (v.pos.y - v.gnd > 3) return false; }
@@ -343,11 +343,11 @@ export class Player {
     if (inputOK) {
       const k = (n) => (I.down(n) ? 1 : 0);
       if (v.kind === 'plane') {
-        c.pitch = k('KeyS') - k('KeyW'); c.roll = k('KeyD') - k('KeyA'); c.yaw = k('KeyQ') - k('KeyE'); c.thr = k('ShiftLeft') - k('ControlLeft'); c.brake = k('Space'); c.throttle = 0;
+        c.pitch = clamp(k('KeyS') - k('KeyW') - I.ay, -1, 1); c.roll = clamp(k('KeyD') - k('KeyA') + I.ax, -1, 1); c.yaw = k('KeyQ') - k('KeyE'); c.thr = k('ShiftLeft') - k('ControlLeft'); c.brake = k('Space'); c.throttle = 0;
       } else if (v.kind === 'heli') {
-        c.pitch = k('KeyW') - k('KeyS'); c.roll = k('KeyD') - k('KeyA'); c.yaw = k('KeyQ') - k('KeyE'); c.collective = k('Space') - k('ControlLeft'); c.throttle = 0;
+        c.pitch = clamp(k('KeyW') - k('KeyS') + I.ay, -1, 1); c.roll = clamp(k('KeyD') - k('KeyA') + I.ax, -1, 1); c.yaw = k('KeyQ') - k('KeyE'); c.collective = k('Space') - k('ControlLeft'); c.throttle = 0;
       } else {
-        c.throttle = k('KeyW') - k('KeyS'); c.steer = k('KeyA') - k('KeyD'); c.hand = I.down('Space'); c.brake = 0;
+        c.throttle = clamp(k('KeyW') - k('KeyS') + I.ay, -1, 1); c.steer = clamp(k('KeyA') - k('KeyD') - I.ax, -1, 1); c.hand = I.down('Space'); c.brake = 0;
         if (I.hit('KeyQ')) G.audio?.radioPrev(); if (I.hit('KeyE')) G.audio?.radioNext();
       }
       v.horn = I.down('KeyH');

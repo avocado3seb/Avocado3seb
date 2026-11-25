@@ -143,6 +143,7 @@ export class Vehicle {
 
   // ---- Schaden ----
   damage(amount, kind = 'crash', source = null) {
+    if (this.remote) return;
     if (this.exploded || amount <= 0) return;
     amount *= this.armorF || 1;
     this.health -= amount;

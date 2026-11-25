@@ -30,6 +30,19 @@ Empfohlen: aktueller Chrome/Edge/Firefox mit Hardware-Beschleunigung. Grafikqual
 | `Enter` | Interagieren im Fahrzeug (Tankstelle, Pay 'n' Spray …) |
 | `M`, `I`, `O`, `P` | Karte, Inventar, Charakter, Handy |
 | `ESC` | Pausemenü |
+| `T` / `Tab` | Mehrspieler: Chat / Rangliste |
+
+## Touch-Steuerung (Handy/Tablet)
+
+Auf Touch-Geräten erscheint automatisch eine Bildschirmsteuerung: Joystick links (Gehen/Lenken/Gas), Blickfläche rechts, kontextabhängige Tasten (Schießen, Zielen, Springen, Einsteigen, Gas/Bremse, Handbremse, Schub, Steigen/Sinken …) sowie ☰ Pause, 🗺 Karte, 📱 Handy, 💬 Chat und ⛶ Vollbild. Unter Einstellungen lässt sich die Touch-Steuerung auch erzwingen oder abschalten. Querformat und Vollbild empfohlen.
+
+## Mehrspieler
+
+Menü → **Mehrspieler**: Raum erstellen (Freies Spiel kooperativ, Freies Spiel mit PvP oder Deathmatch bis 20 Kills) oder mit einem 5-stelligen **Raum-Code** beitreten. Bis zu 8 Spieler.
+
+- Synchronisiert werden Spieler (Namen, Outfits, Animationen), Fahrzeuge (Autos, Boote, Flugzeuge, Helikopter), Schüsse, Treffer, Chat (`T` bzw. 💬), Uhrzeit und Wetter. `Tab` zeigt die Rangliste.
+- Verkehr, Passanten, Polizei und Missionen laufen lokal bei jedem Spieler.
+- Technik: direkte Browser-zu-Browser-Verbindung (WebRTC) über [PeerJS](https://peerjs.com). Für den Verbindungsaufbau wird der kostenlose öffentliche PeerJS-Vermittlungsserver genutzt; Spieldaten laufen direkt zwischen den Spielern. Eigener Server: URL-Parameter `?peerhost=HOST&peerport=9000&peerpath=/` (z. B. mit dem npm-Paket `peer`).
 
 ## Inhalt
 
@@ -76,5 +89,7 @@ src/
   activities.js    Rennen, Jobs, Stunts, VIP-Events
   eco.js           Wirtschaft, Packs, Garage, Speichern
   ui.js / shops.js HUD, Menüs, Läden
+  touch.js         Touch-Steuerung
+  multiplayer.js   Mehrspieler (PeerJS)
   audio.js         Synthese-Audio & Radio
 ```

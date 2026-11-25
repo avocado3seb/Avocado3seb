@@ -149,7 +149,7 @@ export class Economy {
   save(slot = 0) { try { localStorage.setItem(this.slotKey(slot), JSON.stringify(this.serialize())); return true; } catch (e) { console.warn('save failed', e); return false; } }
   load(slot = 0) { try { const raw = localStorage.getItem(this.slotKey(slot)); if (!raw) return false; return this.deserialize(JSON.parse(raw)); } catch (e) { console.warn('load failed', e); return false; } }
   info(slot) { try { const raw = localStorage.getItem(this.slotKey(slot)); if (!raw) return null; const d = JSON.parse(raw); return { ts: d.ts, money: d.player.money, time: d.env.time, missions: d.mission?.done?.length || 0, props: Object.keys(d.eco.props || {}).length }; } catch (e) { return null; } }
-  autosave() { if (this._as && Date.now() - this._as < 4000) return; this._as = Date.now(); this.save('auto'); }
+  autosave() { if (this.G.mp?.active) return; if (this._as && Date.now() - this._as < 4000) return; this._as = Date.now(); this.save('auto'); }
   hasAnySave() { return [0, 1, 2, 'auto'].some((s) => this.info(s)); }
   latestSlot() { let b = null, bt = 0; for (const s of [0, 1, 2, 'auto']) { const i = this.info(s); if (i && i.ts > bt) { bt = i.ts; b = s; } } return b; }
   deleteSlot(s) { try { localStorage.removeItem(this.slotKey(s)); } catch (e) { /* ignore */ } }

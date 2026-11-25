@@ -71,9 +71,10 @@ export class UI {
       has && btn('▶  Fortsetzen', () => this.startGame(false), 'primary'),
       btn('★  Neues Spiel', () => this.startGame(true), has ? '' : 'primary'),
       has && btn('💾  Spiel laden', () => this.slotsModal('load')),
+      btn('👥  Mehrspieler', () => G.mp.menu()),
       btn('⚙  Einstellungen', () => this.settingsModal()),
       btn('🎮  Steuerung', () => this.helpModal()),
-      btn('ℹ  Credits', () => this.creditsModal())),
+      btn('ℹ  Credits', () => this.creditsModal()), btn('⛶  Vollbild', () => G.touch?.fullscreen())),
       h('div', { class: 'foot' }, 'Alle Marken und Figuren sind fiktiv. Läuft komplett im Browser (WebGL).'));
     this.root.append(this.menu);
     G.env.time = 18.3; G.env.setWeather('clear', true); G.env.lockWeather = true;
@@ -152,7 +153,7 @@ export class UI {
   }
   renderPause() {
     const G = this.G;
-    const tabs = [['map', '🗺  Karte'], ['missions', '🎯  Missionen'], ['character', '👤  Charakter'], ['inventory', '🎒  Inventar'], ['vehicles', '🚗  Fahrzeuge'], ['props', '🏠  Immobilien'], ['packs', '📦  Content-Packs'], ['stats', '📊  Statistik'], ['phone', '📱  Handy'], ['settings', '⚙  Einstellungen'], ['saves', '💾  Speichern'], ['help', '🎮  Steuerung']];
+    const tabs = [['map', '🗺  Karte'], ['missions', '🎯  Missionen'], ['character', '👤  Charakter'], ['inventory', '🎒  Inventar'], ['vehicles', '🚗  Fahrzeuge'], ['props', '🏠  Immobilien'], ['packs', '📦  Content-Packs'], ['stats', '📊  Statistik'], ['phone', '📱  Handy'], ['mp', '👥  Mehrspieler'], ['settings', '⚙  Einstellungen'], ['saves', '💾  Speichern'], ['help', '🎮  Steuerung']];
     const content = h('div', { class: 'content' });
     const tabEls = h('div', { class: 'tabs' }, h('h3', {}, 'PAUSE'), tabs.map(([k, l]) => h('button', { class: 'tab' + (k === this.tab ? ' on' : ''), onClick: () => { this.tab = k; G.audio?.click(); this.renderPause(); } }, l)), h('div', { class: 'sp' }),
       h('button', { class: 'tab', onClick: () => this.closePause() }, '▶  Weiter'), h('button', { class: 'tab', onClick: () => { if (confirm('Zum Hauptmenü? Nicht gespeicherter Fortschritt geht verloren.')) { G.eco.autosave(); location.reload(); } } }, '⏏  Hauptmenü'));
@@ -215,6 +216,7 @@ export class UI {
     // Polizei
     if (G.police.stars > 0) for (const u of G.police.units) { const f = Math.floor(G.time * 4) % 2; ctx.fillStyle = f ? '#ff3030' : '#3060ff'; ctx.beginPath(); ctx.arc(u.v.pos.x, u.v.pos.z, 5 / s, 0, 7); ctx.fill(); }
     if (G.police.stars > 0) for (const c of G.police.footCops) if (c.alive) { ctx.fillStyle = '#4a8bff'; ctx.beginPath(); ctx.arc(c.pos.x, c.pos.z, 3 / s, 0, 7); ctx.fill(); }
+    if (G.mp?.active) for (const r of G.mp.remotes.values()) icon(r.pos.x, r.pos.z, '●', 16, r.color);
     // Waypoint
     if (G.waypoint) icon(G.waypoint.x, G.waypoint.z, '🚩', 18);
     // Spieler
@@ -296,6 +298,7 @@ export class UI {
     const rows = [['Spielzeit', `${Math.floor(s.timePlayed / 3600)} h ${Math.floor(s.timePlayed / 60) % 60} min`], ['Strecke zu Fuß', (s.distFoot / 1000).toFixed(1) + ' km'], ['Strecke im Fahrzeug', (s.distCar / 1000).toFixed(1) + ' km'], ['Höchstgeschwindigkeit', Math.round(s.top) + ' km/h'], ['Gestohlene Fahrzeuge', s.cars], ['Besiegte Gegner', s.kills], ['Verdientes Geld', fmtMoney(s.money)], ['Missionen', G.mission?.doneCount?.() || 0], ['Rennen gewonnen', s.races], ['Pakete', `${Object.keys(G.found.packages).length}/${G.packagePts.length}`], ['Stunts', s.stunts], ['Festnahmen', s.busted], ['Tode', s.wasted], ['Prestige', G.eco.prestige()], ['Tag', G.day]];
     rows.forEach(([a, b]) => c.append(h('div', { class: 'row' }, h('div', { class: 'grow' }, a), h('div', { class: 'price' }, b))));
   }
+  tab_mp(c) { this.G.mp.tab(c); }
   tab_phone(c) { import('./shops.js').then((m) => m.phoneTab(this, c)); }
   tab_settings(c) { c.replaceChildren(h('h2', {}, 'Einstellungen'), ...this.settingsFields()); }
   tab_help(c) { c.replaceChildren(h('h2', {}, 'Steuerung')); const w = h('div', { class: 'help' }); this.helpModalInto(w); c.append(w); }
@@ -323,7 +326,7 @@ export class UI {
     const slider = (label, key, min, max, step, fmt = (v) => v) => { const val = h('span', { class: 'val' }, fmt(S[key])); return h('div', { class: 'field' }, h('label', {}, label), h('input', { type: 'range', min, max, step, value: S[key], onInput: (e) => { S[key] = +e.target.value; val.textContent = fmt(S[key]); G.applySettings(); } }), val); };
     const select = (label, key, opts) => h('div', { class: 'field' }, h('label', {}, label), h('select', { onChange: (e) => { S[key] = e.target.value; G.applySettings(); } }, opts.map(([v, l]) => h('option', { value: v, selected: S[key] === v }, l))));
     const check = (label, key) => h('div', { class: 'field' }, h('label', {}, label), h('input', { type: 'checkbox', checked: !!S[key], onChange: (e) => { S[key] = e.target.checked; G.applySettings(); } }));
-    return [h('h3', {}, 'Grafik'), select('Grafikqualität', 'quality', [['low', 'Niedrig'], ['medium', 'Mittel'], ['high', 'Hoch (Bloom)'], ['ultra', 'Ultra (Schatten 4K, Bloom)']]), slider('Sichtfeld (FOV)', 'fov', 50, 100, 1, (v) => v + '°'), check('FPS anzeigen', 'fps'), check('Kamerawackeln', 'shake'),
+    return [h('h3', {}, 'Grafik'), select('Grafikqualität', 'quality', [['low', 'Niedrig'], ['medium', 'Mittel'], ['high', 'Hoch (Bloom)'], ['ultra', 'Ultra (Schatten 4K, Bloom)']]), slider('Sichtfeld (FOV)', 'fov', 50, 100, 1, (v) => v + '°'), check('FPS anzeigen', 'fps'), check('Kamerawackeln', 'shake'), select('Touch-Steuerung', 'touch', [['auto', 'Automatisch'], ['on', 'Immer an'], ['off', 'Aus']]),
       h('h3', {}, 'Steuerung'), slider('Mausempfindlichkeit', 'sens', 0.3, 2.5, 0.05, (v) => (+v).toFixed(2)), check('Y-Achse invertieren', 'invertY'),
       h('h3', {}, 'Audio'), slider('Gesamtlautstärke', 'master', 0, 1, 0.05, (v) => Math.round(v * 100) + '%'), slider('Effekte', 'sfx', 0, 1, 0.05, (v) => Math.round(v * 100) + '%'), slider('Musik / Radio', 'music', 0, 1, 0.05, (v) => Math.round(v * 100) + '%'),
       h('h3', {}, 'Welt'), slider('Tageslänge (Minuten)', 'dayLen', 4, 90, 1, (v) => v + ' min'), slider('Verkehrsdichte', 'traffic', 0.2, 1.6, 0.1, (v) => Math.round(v * 100) + '%'), slider('Passantendichte', 'peds', 0.2, 1.6, 0.1, (v) => Math.round(v * 100) + '%'),
@@ -363,7 +366,7 @@ export class UI {
   // ---------- pro Frame ----------
   update(dt) {
     const G = this.G, P = G.player, mode = G.mode;
-    this.thumbs?.pump();
+    this.thumbs?.pump(); G.touch?.update();
     if (this.pauseEl && this.tab === 'map') this.drawFullMap();
     if (mode === 'menu' || !this.hud) { return; }
     this.fpsEl.textContent = G.settings.fps ? `${G.fps || 0} FPS` : '';

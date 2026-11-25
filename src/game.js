@@ -123,7 +123,7 @@ export async function initGame(canvas, progress) {
     camera.fov = G.settings.fov; camera.updateProjectionMatrix();
     G.env.dayLen = G.settings.dayLen;
     G.env.applyQuality(G.settings.quality);
-    G.audio?.setVolumes?.();
+    G.audio?.setVolumes?.(); G.touch?.apply();
   };
   // Marker für alle POIs
   G.poiMarkers = [];
@@ -280,6 +280,7 @@ function frame(raw) {
   G.markers.update(dt, P.position.x, P.position.z, G.time);
   t0 = tm('vis', t0);
   G.fx.update(dt, G.camera, innerHeight * (G.env.q?.pr || 1)); t0 = tm('fx', t0);
+  G.mp?.update(dt);
   G.audio?.update(dt); t0 = tm('audio', t0);
   G.ui?.update(dt); t0 = tm('ui', t0);
   env.render(); t0 = tm('render', t0);
