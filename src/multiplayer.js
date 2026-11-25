@@ -8,7 +8,9 @@ import { byKey } from './vehicledata.js';
 import { clamp, damp, dampAngle, fmtMoney } from './util.js';
 
 const SEND_HZ = 12;
-const MAX_PLAYERS = 8;
+const MAX_PLAYERS = 24;
+const EMOTES = ['👋', '😂', '👍', '💃', '🔥', '🥑', '😎', '🙏'];
+const HILL = { x: -300, z: 60, r: 22, win: 120 };
 const WIN_KILLS = 20;
 const ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randCode = () => Array.from({ length: 5 }, () => ALPHA[Math.floor(Math.random() * ALPHA.length)]).join('');
@@ -124,7 +126,9 @@ export class Multiplayer {
     this.onData(m, from);
     // weiterleiten
     if (m.t === 'hit') { const c = this.conns.get(m.to); if (c) c.send(m); }
-    else if (['s', 'chat', 'shot', 'kill'].includes(m.t)) this.broadcast(m, from);
+    else if (m.t === 'adm' || m.t === 'gift') { const c = this.conns.get(m.to); if (c) c.send(m); }
+    else if (m.t === 's') { const sp = m.p, pl = G.player.position; for (const [id, c] of this.conns) { if (id === from || !c.open) continue; const r = this.remotes.get(id); const rp = r ? r.tp : pl; if ((rp.x - sp[0]) ** 2 + (rp.z - sp[2]) ** 2 < 1100 * 1100 || this.conns.size < 8) c.send(m); } }
+    else if (['chat', 'shot', 'kill', 'emote', 'announce'].includes(m.t)) this.broadcast(m, from);
     if (m.t === 'kill') this.scoreKill(m);
   }
   broadcast(m, except = null) { for (const [id, c] of this.conns) if (id !== except && c.open) c.send(m); }
@@ -156,11 +160,14 @@ export class Multiplayer {
     for (const c of this.conns.values()) { try { c.close(); } catch (e) { /* */ } } this.conns.clear();
     try { this.hostConn?.close(); } catch (e) { /* */ } this.hostConn = null;
     try { this.peer?.destroy(); } catch (e) { /* */ } this.peer = null;
+    if (this.hillMarker) { G.markers.remove(this.hillMarker); this.hillMarker = null; }
     const was = this.mode !== 'off'; this.mode = 'off'; this.code = ''; this.chatEl.replaceChildren(); this.board.style.display = 'none';
     if (G.env) G.env.lockWeather = false;
     if (was && !silent) G.ui.toast('Mehrspieler beendet');
   }
   onStart() {
+    if (this.hillMarker) { G.markers.remove(this.hillMarker); this.hillMarker = null; }
+    if (this.game === 'koth') this.hillMarker = G.markers.add({ x: HILL.x, z: HILL.z, color: 0xffd54f, r: HILL.r, far: 700, y: G.world.groundY(HILL.x, HILL.z) });
     G.env.lockWeather = this.mode === 'client';
     G.ui.toast(this.mode === 'host' ? `Raum-Code: ${this.code} – Mitspieler können jetzt beitreten` : `Verbunden mit Raum ${this.code}`, 6000);
     this.chatLine(this.mode === 'host' ? `Raum ${this.code} geöffnet · ${this.game === 'deathmatch' ? 'Deathmatch (PvP)' : this.pvp ? 'Freies Spiel (PvP an)' : 'Freies Spiel (kooperativ)'} · Chat mit T` : 'Verbunden – Chat mit T (Touch: 💬)', '#ffd54f');
@@ -181,8 +188,33 @@ export class Multiplayer {
       case 'kill': this.scoreKill(m, true); break;
       case 'env': this.applyEnv(m); break;
       case 'win': this.onWin(m); break;
+      case 'emote': { const r = this.remotes.get(m.id); if (r) this.showEmote(r, m.e); break; }
+      case 'announce': G.ui.banner(m.text, '#ffd54f'); G.ui.toast('📢 ' + m.text, 6000); this.chatLine('📢 ' + m.text, '#ffd54f'); setTimeout(() => G.ui.banner(null), 4000); break;
+      case 'gift': if (m.to === this.me.id) { G.player.addMoney(Math.min(500e9, Math.max(0, +m.amt || 0)), 'Geschenk'); G.ui.toast(`🎁 ${this.nameOf(m.by)} schenkt dir ${fmtMoney(+m.amt || 0)}!`, 6000); } break;
+      case 'adm': if (m.to === this.me.id) this.applyAdmin(m); break;
+      case 'hill': this.hill = m.sc; break;
     }
   }
+  sendTo(id, m) { if (this.mode === 'host') { const c = this.conns.get(id); if (c?.open) c.send(m); } else this.send(m); }
+  gift(id, amt) {
+    amt = Math.floor(+amt); if (!(amt > 0)) return; const P = G.player;
+    if (!G.admin) { if (P.money < amt) return G.ui.toast('Nicht genug Geld!'); P.addMoney(-amt); } else amt = Math.min(500e9, amt);
+    this.sendTo(id, { t: 'gift', to: id, by: this.me.id, amt }); G.ui.toast(`Geschenk an ${this.nameOf(id)}: ${fmtMoney(amt)}`);
+  }
+  sendAdmin(id, o) { if (!G.admin) return; this.sendTo(id, { t: 'adm', to: id, by: this.me.id, ...o }); G.ui.toast('Aktion gesendet'); }
+  announce(text) { if (!G.admin) return; this.send({ t: 'announce', text: String(text).slice(0, 80) }); G.ui.banner(text, '#ffd54f'); setTimeout(() => G.ui.banner(null), 4000); }
+  kick(id) { if (!G.admin || this.mode !== 'host') return; const c = this.conns.get(id); if (c) { try { c.send({ t: 'chat', id: 0, text: 'Du wurdest vom Host entfernt.' }); c.close(); } catch (e) { /* */ } } }
+  applyAdmin(m) {
+    const P = G.player; if (!P.alive) return;
+    if (m.weapons) { for (const k of ['smg', 'shotgun', 'rifle', 'grenade']) P.addWeapon(k, 200); G.ui.toast('🎁 Admin schenkt dir Waffen!'); }
+    if (m.heal) { P.health = P.maxHealth; P.armor = 100; G.ui.toast('❤ Admin heilt dich'); }
+    if (m.vehicle) { const spec = byKey.get(m.vehicle); if (spec) { G.adminPanel.spawnVehicle(m.vehicle, 8); G.ui.toast('🚗 Admin schenkt dir ein Fahrzeug'); } }
+    if (m.money) P.addMoney(Math.min(500e9, +m.money || 0), 'Geschenk');
+  }
+  showEmote(r, e) { r.tag.dataset.emote = e; setTimeout(() => { delete r.tag.dataset.emote; }, 3500); }
+  emote(i) { const e = EMOTES[i % EMOTES.length]; this.send({ t: 'emote', id: this.me.id, e }); G.ui.toast(e); }
+  joinLink() { return `${location.origin}${location.pathname}?join=${this.code}`; }
+  teleportTo(id) { const r = this.remotes.get(id); if (!r || G.prison?.active) return; const P = G.player; if (P.vehicle) P.exitVehicle(true); P.teleport(r.pos.x + 2, r.pos.z + 2); P.rig.snap?.(P); G.ui.toast(`Teleport zu ${r.name}`); }
   applyEnv(e) { if (!e || this.mode === 'host') return; const d = Math.abs(((e.time - G.env.time + 36) % 24) - 12) - 12; if (Math.abs(d) > 0.05) G.env.time = e.time; if (e.weather && G.env.target !== e.weather) G.env.setWeather(e.weather); }
   sendHit(id, dmg) {
     if (!this.pvp) return; const m = { t: 'hit', to: id, dmg, by: this.me.id };
@@ -228,6 +260,7 @@ export class Multiplayer {
     if (!this.active) return;
     this.t += dt;
     if (this.t > 1 / SEND_HZ) { this.t = 0; this.send(this.stateMsg()); }
+    if (this.mode === 'host' && this.game === 'koth') this.kothTick(dt);
     if (this.mode === 'host') { this.envT += dt; if (this.envT > 4) { this.envT = 0; this.broadcast({ t: 'env', ...this.envState() }); } }
     const cam = G.camera, v = new THREE.Vector3();
     for (const r of this.remotes.values()) {
@@ -236,7 +269,7 @@ export class Multiplayer {
       v.set(r.pos.x, r.pos.y + (r.veh ? r.veh.spec.hgt + 0.7 : 2.15), r.pos.z); if (r.veh) v.copy(r.veh.pos).y += r.veh.spec.hgt + 0.7; v.project(cam);
       const d = Math.hypot(r.pos.x - G.player.position.x, r.pos.z - G.player.position.z);
       if (v.z > 1 || Math.abs(v.x) > 1.2 || d > 400 || G.mode === 'cutscene') { r.tag.style.display = 'none'; continue; }
-      r.tag.style.display = ''; r.tag.style.left = ((v.x * 0.5 + 0.5) * innerWidth) + 'px'; r.tag.style.top = ((-v.y * 0.5 + 0.5) * innerHeight) + 'px'; r.tag.textContent = `${r.name} · ${Math.round(d)} m`;
+      r.tag.style.display = ''; r.tag.style.left = ((v.x * 0.5 + 0.5) * innerWidth) + 'px'; r.tag.style.top = ((-v.y * 0.5 + 0.5) * innerHeight) + 'px'; r.tag.textContent = `${r.tag.dataset.emote ? r.tag.dataset.emote + ' ' : ''}${r.name} · ${Math.round(d)} m`;
     }
     // Rangliste (Tab)
     const show = G.input.down('Tab') && G.mode === 'play';
@@ -247,13 +280,23 @@ export class Multiplayer {
     }
   }
 
+  kothTick(dt) {
+    this.hill = this.hill || {}; this._ht = (this._ht || 0) + dt; this._hb = (this._hb || 0) + dt;
+    if (this._ht >= 1) {
+      this._ht = 0; const ins = (x, z) => Math.hypot(x - HILL.x, z - HILL.z) < HILL.r; const P = G.player;
+      if (P.alive && ins(P.position.x, P.position.z)) this.hill[0] = (this.hill[0] || 0) + 1;
+      for (const r of this.remotes.values()) if (r.alive && ins(r.pos.x, r.pos.z)) this.hill[r.id] = (this.hill[r.id] || 0) + 1;
+      this.broadcast({ t: 'hill', sc: this.hill });
+      for (const [id, v] of Object.entries(this.hill)) if (v >= HILL.win) { this.hill = {}; const m = { t: 'win', id: +id }; this.broadcast(m); this.onWin(m); break; }
+    }
+  }
   // ---------- Oberfläche ----------
   menu() {
     const ui = G.ui, S = G.settings;
     const name = h('input', { type: 'text', maxlength: 14, placeholder: 'Dein Name', value: S.name || '', class: 'mpfield' });
     const code = h('input', { type: 'text', maxlength: 5, placeholder: 'CODE', class: 'mpfield mpcode', style: { textTransform: 'uppercase' } });
-    const mode = h('select', { class: 'mpfield' }, h('option', { value: 'freeroam' }, 'Freies Spiel (kooperativ)'), h('option', { value: 'freepvp' }, 'Freies Spiel (PvP an)'), h('option', { value: 'deathmatch' }, 'Deathmatch (PvP, erster mit 20 Kills)'));
-    const msg = h('div', { class: 'd', style: { minHeight: '20px', margin: '8px 0' } }, 'Bis zu 8 Spieler · direkte Verbindung (WebRTC) über einen kostenlosen Vermittlungsserver (PeerJS).');
+    const mode = h('select', { class: 'mpfield' }, h('option', { value: 'freeroam' }, 'Freies Spiel (kooperativ)'), h('option', { value: 'freepvp' }, 'Freies Spiel (PvP an)'), h('option', { value: 'deathmatch' }, 'Deathmatch (PvP, erster mit 20 Kills)'), h('option', { value: 'koth' }, 'King of the Hill (Hügel im Central Park halten)'));
+    const msg = h('div', { class: 'd', style: { minHeight: '20px', margin: '8px 0' } }, 'Bis zu 24 Spieler · direkte Verbindung (WebRTC) über einen kostenlosen Vermittlungsserver (PeerJS).');
     const begin = (fn) => async () => {
       const nm = (name.value || '').trim() || this.name(); S.name = nm; G.applySettings(); msg.textContent = 'Verbinde …';
       try {
@@ -268,7 +311,7 @@ export class Multiplayer {
     const body = h('div', { class: 'body' },
       h('h3', {}, 'Name'), name,
       h('h3', {}, 'Raum erstellen'), mode,
-      h('div', { style: { marginTop: '10px' } }, h('button', { class: 'btn primary', onClick: begin((nm) => this.host({ name: nm, pvp: mode.value !== 'freeroam', game: mode.value === 'deathmatch' ? 'deathmatch' : 'freeroam' })) }, '🏠 Raum erstellen')),
+      h('div', { style: { marginTop: '10px' } }, h('button', { class: 'btn primary', onClick: begin((nm) => this.host({ name: nm, pvp: mode.value === 'freepvp' || mode.value === 'deathmatch', game: mode.value === 'deathmatch' ? 'deathmatch' : mode.value === 'koth' ? 'koth' : 'freeroam' })) }, '🏠 Raum erstellen')),
       h('h3', {}, 'Raum beitreten'), h('div', { style: { display: 'flex', gap: '8px' } }, code, h('button', { class: 'btn primary', onClick: begin((nm) => this.join(code.value, nm)) }, '➜ Beitreten')),
       msg,
       h('div', { class: 'd' }, 'Hinweis: Jeder spielt in seiner eigenen Stadt-Simulation (Verkehr/Passanten sind lokal). Spieler, Fahrzeuge, Schüsse, Uhrzeit und Wetter werden synchronisiert.'));
@@ -277,8 +320,16 @@ export class Multiplayer {
   tab(c) {
     c.replaceChildren(h('h2', {}, 'Mehrspieler'));
     if (!this.active) { c.append(h('p', { class: 'd' }, 'Du bist in keinem Raum.'), h('button', { class: 'btn primary', onClick: () => this.menu() }, 'Raum erstellen / beitreten')); return; }
-    c.append(h('div', { class: 'row' }, h('div', { class: 'grow' }, h('div', { class: 't' }, `Raum-Code: ${this.code}`), h('div', { class: 'd' }, `${this.mode === 'host' ? 'Du bist Host' : 'Du bist Mitspieler'} · ${this.game === 'deathmatch' ? 'Deathmatch' : this.pvp ? 'PvP an' : 'kooperativ'}`)), h('button', { class: 'btn small', onClick: () => { navigator.clipboard?.writeText(this.code); G.ui.toast('Code kopiert'); } }, 'Kopieren')));
-    c.append(h('h3', {}, 'Spieler'), ...this.playerList.map((p) => h('div', { class: 'row' }, h('div', { class: 'grow t', style: { color: p.color } }, p.name + (p.local ? ' (Du)' : '')), h('div', { class: 'd' }, `Kills ${this.kills[p.id] || 0} · Tode ${this.deaths[p.id] || 0}`), !p.local && h('button', { class: 'btn small', onClick: () => { const r = this.remotes.get(p.id); if (r) { G.waypoint = { x: r.pos.x, z: r.pos.z }; G.ui.toast('GPS auf ' + r.name); } } }, 'GPS'))));
+    const gname = this.game === 'deathmatch' ? 'Deathmatch' : this.game === 'koth' ? 'King of the Hill' : this.pvp ? 'PvP an' : 'kooperativ';
+    c.append(h('div', { class: 'row' }, h('div', { class: 'grow' }, h('div', { class: 't' }, `Raum-Code: ${this.code}`), h('div', { class: 'd' }, `${this.mode === 'host' ? 'Du bist Host' : 'Du bist Mitspieler'} · ${gname} · ${this.playerList.length}/${MAX_PLAYERS} Spieler`)), h('button', { class: 'btn small', onClick: () => { navigator.clipboard?.writeText(this.code); G.ui.toast('Code kopiert'); } }, 'Code'), h('button', { class: 'btn small', onClick: () => { navigator.clipboard?.writeText(this.joinLink()); G.ui.toast('Einladungs-Link kopiert'); } }, '🔗 Link')));
+    if (this.game === 'koth') c.append(h('div', { class: 'row' }, h('div', { class: 'grow' }, h('div', { class: 't' }, '👑 Hügel im Central Park halten'), h('div', { class: 'd' }, `Erster mit ${HILL.win} Punkten gewinnt.`)), h('button', { class: 'btn small', onClick: () => { G.waypoint = { x: HILL.x, z: HILL.z }; } }, 'GPS')));
+    c.append(h('h3', {}, 'Emotes'), h('div', { class: 'sel' }, ...EMOTES.map((e, i) => h('button', { class: 'btn small', onClick: () => this.emote(i) }, e))));
+    const gamt = h('input', { type: 'number', class: 'mpfield', min: 0, value: 1000, style: { width: '140px' } });
+    c.append(h('h3', {}, 'Spieler'), h('div', { class: 'field' }, h('label', {}, 'Geschenk-Betrag'), gamt));
+    for (const p of this.playerList) c.append(h('div', { class: 'row' }, h('div', { class: 'grow t', style: { color: p.color } }, p.name + (p.local ? ' (Du)' : '')), h('div', { class: 'd' }, `Kills ${this.kills[p.id] || 0} · Tode ${this.deaths[p.id] || 0}${this.hill?.[p.id] ? ' · 👑 ' + this.hill[p.id] : ''}`),
+      !p.local && h('button', { class: 'btn small', onClick: () => { const r = this.remotes.get(p.id); if (r) { G.waypoint = { x: r.pos.x, z: r.pos.z }; G.ui.toast('GPS auf ' + r.name); } } }, 'GPS'),
+      !p.local && h('button', { class: 'btn small', onClick: () => { this.teleportTo(p.id); G.ui.closePause?.(); } }, 'Teleport'),
+      !p.local && h('button', { class: 'btn small', onClick: () => this.gift(p.id, +gamt.value) }, '🎁 Geld')));
     c.append(h('div', { style: { marginTop: '14px' } }, h('button', { class: 'btn', onClick: () => { this.leave(); G.ui.renderPause(); } }, 'Raum verlassen')));
   }
 }

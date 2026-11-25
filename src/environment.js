@@ -5,6 +5,8 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { clamp, lerp, smoothstep, damp, RNG } from './util.js';
 import { makeWaterNormal, makeMoon } from './textures.js';
 import { updateMaterialsForEnv } from './materials.js';
@@ -18,10 +20,10 @@ export const WEATHER = {
   fog: { label: 'Nebel', cover: 0.75, rain: 0, fog: 1.0, dark: 0.35, lightning: 0, wind: 0.1, turb: 6 },
 };
 const QUALITY = {
-  low: { pr: 0.75, shadow: 1024, bloom: false, view: 650, samples: 0, lamps: 2 },
-  medium: { pr: 1, shadow: 2048, bloom: false, view: 950, samples: 2, lamps: 4 },
-  high: { pr: 1.25, shadow: 3072, bloom: true, view: 1300, samples: 4, lamps: 6 },
-  ultra: { pr: 1.75, shadow: 4096, bloom: true, view: 1700, samples: 4, lamps: 8 },
+  low: { pr: 0.75, shadow: 1024, bloom: false, view: 650, samples: 0, lamps: 2, peds: 40, cars: 26, grade: false, ao: false },
+  medium: { pr: 1, shadow: 2048, bloom: false, view: 950, samples: 2, lamps: 4, peds: 64, cars: 38, grade: true, ao: false },
+  high: { pr: 1.25, shadow: 3072, bloom: true, view: 1300, samples: 4, lamps: 6, peds: 90, cars: 52, grade: true, ao: false },
+  ultra: { pr: 1.75, shadow: 4096, bloom: true, view: 1700, samples: 4, lamps: 8, peds: 120, cars: 68, grade: true, ao: true },
 };
 export { QUALITY };
 
@@ -142,6 +144,22 @@ export class Environment {
     this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.28, 0.6, 0.96);
     this.bloom.enabled = q.bloom;
     this.composer.addPass(this.bloom);
+    this.gtao = new GTAOPass(scene, camera, size.x, size.y); this.gtao.output = GTAOPass.OUTPUT.Default; this.gtao.enabled = false; this.gtao.updateGtaoMaterial({ radius: 0.6, distanceExponent: 1.4, thickness: 1.2, scale: 1.1, samples: 12 });
+    this.composer.insertPass(this.gtao, 1);
+    this.grade = new ShaderPass({
+      uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uNight: { value: 0 } },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+      fragmentShader: `uniform sampler2D tDiffuse; uniform float uTime; uniform float uNight; varying vec2 vUv;
+        float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453); }
+        void main(){ vec4 c = texture2D(tDiffuse, vUv); vec2 d = vUv-0.5; float v = smoothstep(0.85, 0.25, length(d*vec2(1.0,0.85)));
+          c.rgb *= mix(0.78, 1.0, v);
+          float l = dot(c.rgb, vec3(0.2126,0.7152,0.0722));
+          c.rgb = mix(vec3(l), c.rgb, 1.12);
+          c.rgb = mix(c.rgb, c.rgb*vec3(1.04,1.0,0.94), 0.5);
+          c.rgb += (h(vUv*vec2(1920.0,1080.0)+uTime)-0.5)*0.018;
+          gl_FragColor = c; }`,
+    });
+    this.composer.addPass(this.grade);
     this.composer.addPass(new OutputPass());
     this.applyQuality(quality);
     this.update(0, new THREE.Vector3(), true);
@@ -154,7 +172,7 @@ export class Environment {
     this.resize(window.innerWidth, window.innerHeight);
     this.sun.shadow.mapSize.set(q.shadow, q.shadow);
     if (this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; }
-    this.bloom.enabled = q.bloom;
+    this.bloom.enabled = q.bloom; this.gtao.enabled = !!q.ao; this.grade.enabled = !!q.grade;
     this.viewDist = q.view;
     this.composer.renderTarget1.samples = q.samples; this.composer.renderTarget2.samples = q.samples;
     this.composer.renderTarget1.dispose(); this.composer.renderTarget2.dispose();
@@ -366,5 +384,5 @@ export class Environment {
     this.G.emit?.('lightning', { x, z, dist });
   }
 
-  render() { this.composer.render(); }
+  render() { this.grade.uniforms.uTime.value = (performance.now() * 0.001) % 100; this.composer.render(); }
 }

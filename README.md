@@ -44,9 +44,24 @@ Menü → **Mehrspieler**: Raum erstellen (Freies Spiel kooperativ, Freies Spiel
 - Verkehr, Passanten, Polizei und Missionen laufen lokal bei jedem Spieler.
 - Technik: direkte Browser-zu-Browser-Verbindung (WebRTC) über [PeerJS](https://peerjs.com). Für den Verbindungsaufbau wird der kostenlose öffentliche PeerJS-Vermittlungsserver genutzt; Spieldaten laufen direkt zwischen den Spielern. Eigener Server: URL-Parameter `?peerhost=HOST&peerport=9000&peerpath=/` (z. B. mit dem npm-Paket `peer`).
 
+## Neu: Leben, Welt & Admin
+
+- **Speichern:** Autosave alle 40 s, beim Schließen/Tab-Wechsel und an Immobilien (3 Slots + Auto). Fähigkeiten, YouTube-Kanal, Möbel, Bauprojekte, Secrets usw. werden mitgespeichert.
+- **Leichteres Geld:** Belohnungen ×3, günstigere Waffen/Munition, Start mit 25 000 $.
+- **Gefängnis:** Wirst du festgenommen, kommst du für **130 Sekunden nach Alcatraz** (Waffen gesperrt, Hantelbank verkürzt die Haft).
+- **Riesige Welt (6,4 × 6,4 km):** Alpen mit Skidorf (Bergbahn, Skiverleih, Skirennen, 430-m-Gipfel), **Terra Mundi** (Weltreise-Insel: Eiffelturm, Kolosseum, Big Ben, Pyramiden & Sphinx, Taj Mahal, Pagode, Fuji, Freiheitsstatue, Sydney-Oper, Mauer), Afrika-Savanne mit Fotosafari & Tieren, Regenwald, Sumpf, Inseln. Reisebüro und Handy-App („Heimreise“) zum Reisen.
+- **Läden & echtes Leben:** Supermarkt, Apotheke, Elektronik/Handy/WLAN, Möbelhaus (Schrank, Kühlschrank, Tresor …), Baumarkt, Fitness, Kino, Schule/Fahrschule (Fähigkeiten), Flohmarkt (Tagesangebote, Kisten), Tattoo, Tiere, Gamer's Paradise (**eigenes Gaming-Setup bauen**), Mall-Hub, Restaurants, Bäckerei und **„Mc Donny's“** (selbst bedienen, Franchise besitzen).
+- **YouTube-Karriere:** Videos aufnehmen, Abos/Views/Meilensteine – abhängig von Handy, WLAN, Informatik und Gaming-Setup.
+- **Häuser bauen:** Bauunternehmen (Billig/Standard/Express), 6 Grundstücke in Palm Estates, Upgrades (Tiefgarage, Hangar-Anbau, Pool, Heimkino, Gaming-Zimmer, Solar, Weinkeller), Geschäfte mit Tageseinnahmen.
+- **Packs:** 19 Packs – jedes mit **1 Waffe, 1 Yacht, 1 Auto, 1 Flugzeug und 1 Skin** (u. a. Wüste, Arktis, Dschungel, Cyber, Retro, Militär, Piraten, Weltraum, Samurai, Royal, Gangster, Tropen, Drachen). Das **Avocado-Pack** ist exklusiv für den Admin.
+- **Secrets:** 8 Verstecke mit Geheimwaffen (Railgun, Minigun …) und die **Backrooms** (flackernde Wand im Central Park).
+- **Admin-Panel (F2 / Menü → Profil):** nur für den Spielernamen **Avocado3seb** mit Admin-Code – Flugmodus, Flugyacht, Geld bis 500 Mrd., Spielern Geld/Waffen/Fahrzeuge geben, Teleport, Ansagen. *Hinweis: Die Prüfung läuft im Browser und ist daher kein Schutz gegen gezielte Manipulation.*
+- **Mehrspieler:** bis zu 24 Spieler, Relevanz-Filter, Emotes, Geldgeschenke, Teleport zu Freunden, Einladungs-Link (`?join=CODE`), neuer Modus *King of the Hill*.
+- **Grafik:** Qualitätsstufen mit mehr Passanten/Verkehr, Filmlook (Vignette, Farbgebung, Korn) und GTAO-Ambient-Occlusion auf Ultra.
+
 ## Inhalt
 
-- **Welt:** ~5 × 5 km. Downtown mit Wolkenkratzern, Ocean Drive (Art-déco, Strand, Pier mit Riesenrad), Sunset Hills (Villen), Westside, Hafen & Industrie, Flughafen, Stadion, Central Park, Golfclub, Umland mit Wäldern, Regenwald, Sumpf, Bergen, Windrädern, Bauernhöfen, Highways und **vier Privatinseln**.
+- **Welt:** ~6,4 × 6,4 km. Downtown mit Wolkenkratzern, Ocean Drive (Art-déco, Strand, Pier mit Riesenrad), Sunset Hills (Villen), Westside, Hafen & Industrie, Flughafen, Stadion, Central Park, Golfclub, Umland mit Wäldern, Regenwald, Sumpf, Bergen, Windrädern, Bauernhöfen, Highways und **vier Privatinseln**.
 - **Tag/Nacht & Wetter:** dynamische Sonne/Mond/Sterne, Wolken-Shader, Regen, Gewitter mit Blitz & Donner, Nebel, nasse Straßen, Neonlichter, Straßenlaternen.
 - **Fahrzeuge:** über **130 Typen** (Kompakt bis Hypercar, Muscle, Oldtimer, SUV, Pickup, Van, Lkw, Bus, Limousinen, Taxi, Polizei/SWAT/Rettung/Militär, Motorräder, Quads, Jetski/Boote/Yachten, Flugzeuge, Helikopter) mit Fahrphysik (Reifenmodell, Drift, Handbremse, Gewichtsverlagerung), Schaden, Feuer, Explosionen, Tuning und Garagen.
 - **Lebendige Welt:** Fußgänger (Regenschirme, Reaktionen auf Schüsse, Autos, Hupen, Blitze), KI-Verkehr mit Ampeln und Spurführung, geparkte Autos.
@@ -91,5 +106,11 @@ src/
   ui.js / shops.js HUD, Menüs, Läden
   touch.js         Touch-Steuerung
   multiplayer.js   Mehrspieler (PeerJS)
+  life.js          Läden, Schule, YouTube, Gaming, Hausbau, Reisen
+  lifeworld.js     Secrets, Backrooms, Safari, Ski, Häuser
+  prison.js        Gefängnis Alcatraz
+  admin.js         Admin-Panel
+  packdefs.js      Packs, Waffen, Shop-Daten
+  landmarks2.js    Alpen, Terra Mundi, Savanne, Alcatraz
   audio.js         Synthese-Audio & Radio
 ```

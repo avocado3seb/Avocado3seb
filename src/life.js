@@ -323,7 +323,7 @@ export class Life {
   update(dt) {
     const P = P_(), S = this.state;
     // Fähigkeiten: Fahren / Fitness
-    if (P.vehicle && P.vehicle.vtop) { const b = byKey.get(P.vehicle.spec.key); if (b && P.vehicle.owned !== undefined) P.vehicle.vtop = b.topMS * (1 + this.skill('drive') * 0.03); }
+    const pv = P.vehicle; if (pv && pv.vtop && pv.spec.kind === 'car') { const dk = Math.floor(this.skill('drive')); if (pv._dk !== dk) { pv.vtop *= (1 + dk * 0.03) / (1 + (pv._dk || 0) * 0.03); pv._dk = dk; } }
     P.maxHealth = Math.max(P.maxHealth || 100, 100);
     if (S.perks.dog && P.health < P.maxHealth && G.time - P.lastHurt > 8) P.health = Math.min(P.maxHealth, P.health + dt * 0.35);
     if (S.furn.aquarium && P.health < P.maxHealth && G.time - P.lastHurt > 10) P.health = Math.min(P.maxHealth, P.health + dt * 0.1);

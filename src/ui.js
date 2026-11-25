@@ -287,8 +287,9 @@ export class UI {
     }
   }
   tab_packs(c) {
-    const G = this.G; c.replaceChildren(h('h2', {}, 'Content-Packs'), h('p', { class: 'd' }, 'Jedes Pack enthält neue Fahrzeuge, Kleidung, Missionen, Orte und Aktivitäten.'));
+    const G = this.G; c.replaceChildren(h('h2', {}, 'Content-Packs'), h('p', { class: 'd' }, 'Jedes Pack enthält 1 Waffe, 1 Auto, 1 Yacht, 1 Flugzeug und 1 Skin (landen sofort in Garage/Inventar) plus weitere Fahrzeuge, Orte und Aktivitäten.'));
     for (const [id, pk] of Object.entries(PACKS)) {
+      if (pk.admin && !G.admin) continue;
       const own = G.eco.packs[id];
       const vcount = CATALOG.filter((v) => v.pack === id).length;
       c.append(h('div', { class: 'row', style: { borderColor: pk.color } }, h('div', { class: 'grow' }, h('div', { class: 't', style: { color: pk.color } }, pk.name, own && h('span', { class: 'pill' }, 'freigeschaltet')), h('div', { class: 'd' }, pk.desc), h('div', { class: 'd' }, `${vcount} Fahrzeuge · exklusive Outfits & Missionen`)),

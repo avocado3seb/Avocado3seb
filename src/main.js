@@ -57,6 +57,7 @@ async function boot() {
     G.ui.hideLoading();
     startLoop();
     G.ui.showMenu();
+    const jc = new URLSearchParams(location.search).get('join'); if (jc) setTimeout(() => { G.mp.menu(); G.ui.toast('Einladung erkannt – Name eingeben und „Beitreten“ drücken (Code ' + jc.toUpperCase() + ' ist eingetragen).', 7000); const f = document.querySelector('.mpcode'); if (f) f.value = jc.toUpperCase(); }, 400);
     window.G = G; window.__ready = true;
   } catch (e) { console.error(e); window.__err = String(e && e.stack || e); G.ui.setProgress(0, 'Fehler: ' + e.message); }
 }

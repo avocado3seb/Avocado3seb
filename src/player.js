@@ -294,7 +294,7 @@ export class Player {
     // Schutz gegen Schießen nach hinten
     const fwd = new THREE.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
     if (dir.dot(fwd) < 0.1) dir.copy(fwd);
-    G.combat.fire(this, m, dir, this.weapon, { spreadMul: this.aim ? 0.5 : 1.4, dmgMul: this.buff.strong ? 1.5 : 1 });
+    G.combat.fire(this, m, dir, this.weapon, { spreadMul: (this.aim ? 0.5 : 1.4) * Math.max(0.4, 1 - (this.skills?.shoot || 0) * 0.08), dmgMul: this.buff.strong ? 1.5 : 1 });
     this.rig.kick(0.5);
     G.police?.crime('shoot', 0.5, this.pos);
   }

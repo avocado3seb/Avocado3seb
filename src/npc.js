@@ -270,13 +270,13 @@ export class PedManager {
   update(dt) {
     const G = this.G, pp = G.player.position, rain = G.env.w.rain;
     const day = clamp(1 - G.env.night * 0.65, 0.3, 1);
-    this.target = Math.round(40 * (G.settings.peds ?? 1) * day * (1 - rain * 0.35));
+    this.target = Math.round((G.env.q?.peds ?? 40) * (G.settings.peds ?? 1) * day * (1 - rain * 0.35));
     this.cd -= dt;
     // Spawnen / Entfernen
     if (this.cd <= 0) {
       this.cd = 0.18;
       const civs = this.list.filter((p) => p.type === 'civ').length;
-      if (civs < this.target && this.list.length < 120) this.spawnCivilian();
+      if (civs < this.target && this.list.length < 240) this.spawnCivilian();
     }
     // Regen: Unterschlupf suchen
     this.shelterT = (this.shelterT || 0) - dt;
@@ -467,7 +467,7 @@ export class TrafficManager {
     const G = this.G, pp = G.player.position, rain = G.env.w.rain;
     const day = clamp(1 - G.env.night * 0.45, 0.4, 1);
     const n = G.vehicles.list.filter((v) => v.tag === 'traffic' && v.ai).length;
-    this.target = Math.round(32 * (G.settings.traffic ?? 1) * day * (1 - rain * 0.2));
+    this.target = Math.round((G.env.q?.cars ?? 32) * (G.settings.traffic ?? 1) * day * (1 - rain * 0.2));
     this.cd -= dt;
     if (this.cd <= 0) {
       this.cd = 0.25;
