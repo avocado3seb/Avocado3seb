@@ -48,7 +48,9 @@ Der Start-Hub bietet **Spielen** (Parkplatz → Ticket → Park, mit Spielgeld) 
 
 ## Online-Modus (Mehrspieler)
 
-Menü → **🌐 Online**. Direkt von Browser zu Browser über WebRTC (PeerJS), es ist kein eigener Spielserver nötig (Signalisierung über den öffentlichen PeerJS-Broker).
+Menü → **🌐 Online**. Standard-Transport ist ein **WebSocket-Relay auf Cloudflare** (Worker + Durable Object in `coaster/cloudflare/`, ein Raum = eine DO-Instanz, Host-autoritativ, max. 12 Spieler, Origin-Check für github.io/localhost). Alternativ WebRTC über PeerJS (`?peerhost=…`) oder ein eigener Relay (`?relay=wss://…`).
+
+Relay (neu) deployen: `CF_API_TOKEN=… CF_ACCOUNT_ID=… node coaster/cloudflare/deploy.mjs [name]` (Token nie ins Repo; Node ≥ 22 hinter Proxy: `NODE_USE_ENV_PROXY=1`). Die URL steht in `coaster/src/net.js` (`RELAY`).
 
 - **Host** eröffnet einen Raum (5-stelliger Code + Einladungslink `?room=CODE`) und bestimmt Park, Tageszeit und Wetter; der Host betreibt die Bahnen.
 - **Gäste** treten per Code bei, laden automatisch den Park des Hosts und sehen dieselben Züge (Schnappschüsse 6×/s, lokal weiter simuliert).

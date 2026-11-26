@@ -81,7 +81,8 @@ jobs:
           BASE: http://127.0.0.1:4173/coaster/index.html
         run: |
           mkdir -p shots
-          node coaster/tools/online-test.mjs shots
+          TRANSPORT=peer node coaster/tools/online-test.mjs shots
+          node coaster/tools/online-test.mjs shots   # Cloudflare-Relay (Standard-Transport)
       - name: Spielsystem-Test (Phantasialand)
         env:
           BASE: http://127.0.0.1:4173/coaster/index.html

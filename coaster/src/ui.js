@@ -330,7 +330,7 @@ export class UI {
     const room = new URLSearchParams(location.search).get('room') || '';
     const name = (app.settings.name || '').trim();
     body.innerHTML = `<div class="card page help"><h3 style="margin-top:0">🌐 Online-Modus</h3>
-      <div class="note">Gemeinsam Parks erkunden und im selben Zug fahren – direkt von Browser zu Browser (WebRTC), ohne eigenen Server. Der Host bestimmt Park, Tageszeit und Wetter und betreibt die Bahnen; alle sehen dieselben Züge, Mitspieler erscheinen als Avatare oder sitzen im Zug. Chat: <kbd>Enter</kbd>.</div>
+      <div class="note">Gemeinsam Parks erkunden und im selben Zug fahren – über einen kleinen WebSocket-Relay auf Cloudflare (Worker + Durable Object, kein Spielserver nötig – der Host betreibt die Simulation). Der Host bestimmt Park, Tageszeit und Wetter und betreibt die Bahnen; alle sehen dieselben Züge, Mitspieler erscheinen als Avatare oder sitzen im Zug. Chat: <kbd>Enter</kbd>.</div>
       <div class="form" id="onForm" style="margin-top:12px">
         <label>Dein Name<br><input id="onName" maxlength="14" placeholder="Spieler" value="${esc(name)}"></label>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
