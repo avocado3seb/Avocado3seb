@@ -58,6 +58,8 @@ export class LifeWorld {
     this.portalPos = pp;
     // Safari-Tiere
     this.spawnAnimals();
+    this.air = new AirTraffic();
+    this.addPoi({ id: 'terminal_travel', kind: 'travel', shop: 'travel', name: 'Flughafen-Terminal: Flug buchen', x: -900, z: 668 + 14, r: 3.2 });
     this.refreshSecrets(); this.refreshHouses();
   }
   refreshSecrets() { for (const s of SECRETS) if (s.poi) { s.poi.disabled = false; const done = this.life.state.secrets[s.id]; if (s.poi.marker) { s.poi.marker.hidden = !!done; } s.poi.name = done ? s.name + ' (geöffnet)' : s.name; } }
@@ -130,7 +132,7 @@ export class LifeWorld {
     if (this.tour) { const sp = G.world.safariSpots || []; sp.forEach((s, i) => { if (!S.photos[i] && Math.hypot(px - s.x, pz - s.z) < 40) { S.photos[i] = 1; G.ui.toast(`📸 Herde ${Object.keys(S.photos).length}/5 fotografiert!`); G.audio?.pickup?.(); const n = Object.keys(S.photos).length; if (n >= 5) { this.tour = false; P.addMoney(25000, 'Job'); this.life.lootBox(2); G.ui.toast('🦁 Fotosafari abgeschlossen! +$25.000', 6000); } else G.waypoint = { ...sp[(i + 1) % sp.length] }; } }); }
     // Skirennen
     if (this.skiRace) { const r = this.skiRace; r.t += dt; if (Math.hypot(px - r.x, pz - r.z) < 14) { const reward = Math.round(Math.max(1500, (r.limit - r.t) * 90)); P.addMoney(reward, 'Job'); if (!S.skiBest || r.t < S.skiBest) S.skiBest = r.t; G.ui.toast(`🏁 Ziel! ${r.t.toFixed(1)} s · +${fmtMoney(reward)} (Bestzeit ${S.skiBest.toFixed(1)} s)`, 6000); this.skiRace = null; } else if (r.t > r.limit) { G.ui.toast('Zeit abgelaufen – Rennen verloren.'); this.skiRace = null; } }
-    this.backrooms.update(dt);
+    this.backrooms.update(dt); this.air?.update(dt);
   }
 }
 
@@ -224,3 +226,35 @@ class Backrooms {
   }
 }
 export { freeSpot };
+
+
+// ---------- Luftverkehr am Flughafen (lebendige Welt) ----------
+class AirTraffic {
+  constructor() {
+    this.t = 0; this.list = [];
+    const mk = (name, kind, extra) => { const spec = find(name); if (!spec) return; const v = G.vehicles.spawn(spec, -900, 850, 0, { sleep: false }); v.remote = true; v.kinematic = true; v.keep = true; v.tag = 'ambient'; v.locked = true; v.health = 1e9; v.driver = { ai: true }; v.group.visible = false; this.list.push({ v, kind, ...extra }); };
+    mk('Lear Jet LJ', 'dep', { off: 0, per: 140 }); mk('Cargo Dash', 'dep', { off: 70, per: 140 });
+    mk('Lear Jet LJ', 'arr', { off: 35, per: 150 }); mk('Cargo Dash', 'arr', { off: 110, per: 150 });
+    mk('Skyhawk', 'circle', { r: 1500, alt: 260, sp: 0.055, ph: 0 }); mk('Lear Jet LJ', 'circle', { r: 2100, alt: 420, sp: -0.04, ph: 2 });
+  }
+  place(a, x, y, z, yaw, pitch = 0, roll = 0) { const v = a.v; v.pos.set(x, y, z); v.yaw = yaw; v.pitch = pitch; v.roll = roll; v.group.visible = true; v.rotor = (v.rotor || 0) + 0.7; v.thr3 = 0.8; v.in && (v.in.throttle = 1); }
+  update(dt) {
+    this.t += dt; const W = G.world;
+    for (const a of this.list) {
+      const v = a.v; if (!v || v.dead) continue;
+      v.group.visible = false;
+      if (a.kind === 'circle') {
+        const ang = this.t * a.sp + a.ph, cx = -300, cz = 100;
+        this.place(a, cx + Math.cos(ang) * a.r, a.alt, cz + Math.sin(ang) * a.r, Math.atan2(-Math.sin(ang) * Math.sign(a.sp), Math.cos(ang) * Math.sign(a.sp)), 0, 0.2 * Math.sign(a.sp));
+      } else if (a.kind === 'dep') {
+        const u = (this.t + a.off) % a.per, T1 = 14, acc = 55 / T1;
+        if (u < 95) { const x = u < T1 ? -1330 + 0.5 * acc * u * u : -1330 + 0.5 * acc * T1 * T1 + 55 * (u - T1); const y = u < T1 ? 0.35 : 0.35 + (u - T1) * 55 * 0.1; this.place(a, x, y, 852, Math.PI / 2, u < T1 ? 0 : 0.17); }
+      } else if (a.kind === 'arr') {
+        const u = (this.t + a.off) % a.per, sp = 60, T2 = 60;
+        if (u < T2) { const x = 3000 - sp * u; this.place(a, x, Math.max(0.35, (x + 600) * 0.0526), 848, -Math.PI / 2, -0.05); }
+        else if (u < T2 + 24) { const k = (u - T2) / 24, x = -600 - 700 * (1 - Math.pow(1 - k, 2)) * 1; this.place(a, x, 0.35, 848, -Math.PI / 2, 0); }
+        else if (u < T2 + 30) this.place(a, -1300, 0.35, 848, -Math.PI / 2, 0);
+      }
+    }
+  }
+}

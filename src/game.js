@@ -328,9 +328,15 @@ function updateProjectiles(dt) {
 }
 
 // Zeige nächsten POI, Distrikt etc.
+const DISTRICT_TAGS = {
+  'Zentrum': 'Wolkenkratzer, Banken & Business-Volk', 'Ocean Drive': 'Art-déco, Strandpromenade, Clubs & Oldtimer', 'Ocean Beach': 'Sand, Surfer und Sonnenschein', 'Sunset Hills': 'Villenviertel – Sportwagen & Luxus', 'Hafen & Industrie': 'Docks, Lagerhallen, Lkw & Arbeiter',
+  'Westside': 'Streetwear, Graffiti & Straßenrennen', 'Midtown': 'Wohnviertel, Läden & Alltag', 'Vice-Berge': 'Wandern, Ski & Aussicht', 'Flughafen': 'Vice International – Flüge & Hangars', 'Vice Stadion': 'Heimat der Vice Sharks', 'Central Park': 'Grün mitten in der Stadt',
+  'Palm Golfclub': 'Abschlag für Besserverdiener', 'Hafenbecken': 'Boote, Yachten & Marina', 'Südliches Umland': 'Savanne & Safari', 'Westliches Umland': 'Wälder, Sümpfe und Weite', 'Küstenregion': 'Weite Küste mit Inseln',
+};
 function updatePOI(dt) {
   const P = G.player, W = G.world, pp = P.position;
-  G.districtName = W.districtAt(pp.x, pp.z);
+  const dn = W.districtAt(pp.x, pp.z);
+  if (dn !== G.districtName) { G.districtName = dn; const tl = DISTRICT_TAGS[dn]; if (tl && G.mode === 'play' && G.ui && !G.prison?.active) G.ui.toast(`📍 ${dn} – ${tl}`, 4500); }
   let best = null, bd = 1e9;
   const inV = !!P.vehicle;
   for (const p of W.pois) {

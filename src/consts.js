@@ -31,3 +31,18 @@ export const SNOW_LINE = 150;
 export const coastX = (z) => 1235 + 35 * Math.sin(z / 260) + 15 * Math.sin(z / 70 + 1);
 
 export const inRect = (r, x, z, m = 0) => x > r.x0 + m && x < r.x1 - m && z > r.z0 + m && z < r.z1 - m;
+
+// ---------- Brücken & Tunnel ----------
+// Brücken verlaufen entlang x (z fest). y(x) = Fahrbahnhöhe.
+export const BRIDGES = [
+  { id: 'bay', name: 'Vice Bay Bridge', z: -400, x0: 1200, x1: 1800, w: 17, y: (x) => 17 * Math.sin(Math.PI * (x - 1200) / 600), pylons: [1420, 1580] },
+  { id: 'lake', name: 'Lakeside Bridge', z: -900, x0: -1900, x1: -1400, w: 17, y: (x) => 34 * (-1400 - x) / 500, pylons: [] },
+];
+// Tunnel verlaufen entlang z (x = c fest)
+export const TUNNELS = [
+  { id: 'ridge', name: 'Ridge Tunnel', c: 400, a: -1760, b: -1330, w: 22 },
+];
+export function deckY(x, z) {
+  for (let i = 0; i < BRIDGES.length; i++) { const B = BRIDGES[i]; if (x >= B.x0 && x <= B.x1 && Math.abs(z - B.z) < B.w / 2 + 1.2) return B.y(x); }
+  return null;
+}

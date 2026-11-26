@@ -206,7 +206,20 @@ export class PedManager {
     G.on('explosion', (e) => this.onExplosion(e));
     G.on('lightning', (e) => this.onLightning(e));
   }
-  randomOutfit(rng = Math) {
+  randomOutfit(rng = Math, district = '') {
+    const o = this.baseOutfit(rng); const r = () => rng.random(); const pick = (a) => a[Math.floor(r() * a.length)];
+    switch (district) {
+      case 'Zentrum': Object.assign(o, { top: pick([1, 1, 6, 1]), topColor: pick([0xf5f5f5, 0x1e88e5, 0x263238, 0xb0bec5, 0x1b1b1f]), bottom: 3, bottomColor: pick([0x1b1b1f, 0x263238, 0x37474f]), shoe: 2, shoeColor: 0x1b1b1f, hat: 0, glasses: r() < 0.3 ? 2 : 0, watch: r() < 0.5 ? 2 : 0 }); break;
+      case 'Ocean Drive': case 'Ocean Beach': Object.assign(o, { top: pick([2, 3, 3, 0]), topColor: pick([0xff7043, 0x00acc1, 0xfdd835, 0xe91e63, 0xf5f5f5]), bottom: pick([1, 1, 4]), shoe: 0, shoeColor: 0xf5f5f5, hat: r() < 0.3 ? 4 : 0, glasses: r() < 0.5 ? 1 : 0 }); break;
+      case 'Sunset Hills': Object.assign(o, { top: pick([1, 6, 6, 5]), topColor: pick([0xf5f5f5, 0x1b1b1f, 0xd4af37, 0x1a237e]), bottom: pick([2, 3]), shoe: 2, glasses: r() < 0.5 ? 3 : 2, watch: r() < 0.7 ? 3 : 1, hat: r() < 0.12 ? 3 : 0 }); break;
+      case 'Hafen & Industrie': Object.assign(o, { top: pick([0, 4, 4]), topColor: pick([0xff7043, 0xfdd835, 0x607d8b, 0xff9800]), bottom: pick([0, 4]), bottomColor: 0x37474f, shoe: 1, shoeColor: 0x6d4c41, hat: r() < 0.45 ? 1 : 0, hatColor: 0xfdd835 }); break;
+      case 'Westside': Object.assign(o, { top: pick([4, 4, 5, 0]), topColor: pick([0x1b1b1f, 0x8e24aa, 0xe53935, 0x607d8b, 0x43a047]), bottom: pick([0, 0, 4]), hat: r() < 0.35 ? pick([1, 2]) : 0 }); break;
+      case 'Vice-Berge': case 'Westliches Umland': case 'Südliches Umland': case 'Küstenregion': Object.assign(o, { top: pick([0, 1, 4]), topColor: pick([0x6d4c41, 0x43a047, 0xb71c1c, 0x1565c0]), bottom: pick([0, 2]), hat: r() < 0.4 ? 4 : 0 }); break;
+      default: break;
+    }
+    return o;
+  }
+  baseOutfit(rng = Math) {
     const r = () => rng.random();
     const pickA = (a) => a[Math.floor(r() * a.length)];
     return {
@@ -234,7 +247,7 @@ export class PedManager {
       const n = W.nearestNode(x, z, 60);
       if (!n || !n.city || n.hwV <= 0 || n.hwH <= 0) continue;
       const sx = Math.random() < 0.5 ? 1 : -1, sz = Math.random() < 0.5 ? 1 : -1;
-      const p = new Ped(G, this.randomOutfit(), 'civ');
+      const p = new Ped(G, this.randomOutfit(Math, W.districtAt(x, z)), 'civ');
       const c = { node: n, sx, sz }; p.corner = c;
       const cp = p.cornerPos(c);
       // nicht im Sichtfeld spawnen
@@ -341,8 +354,19 @@ export class TrafficManager {
     for (const q of [v, other]) if (q && q.ai && q.driver !== 'player') { if (e.hard > 3) q.ai.panic = Math.max(q.ai.panic, 3.5); }
   }
   panic(v, from) { if (!v.ai) return; v.ai.panic = 8; v.ai.threat = { x: from.x, z: from.z }; }
-  pickModel(avenue) {
-    for (let i = 0; i < 6; i++) { const m = this.weighted[Math.floor(Math.random() * this.weighted.length)]; if (m.cls === 'bus' && !avenue) continue; return m; }
+  pickModel(avenue, district = '') {
+    const BIAS = {
+      'Sunset Hills': { sport: 4, coupe: 3, suv: 3, super: 2, limo: 2, compact: 0.3, truck: 0.1, van: 0.3, bus: 0.1 },
+      'Hafen & Industrie': { truck: 4, van: 3, pickup: 3, bus: 1.5, sport: 0.3, coupe: 0.4, limo: 0.1 },
+      'Ocean Drive': { coupe: 3, classic: 3, muscle: 2.5, sport: 2, taxi: 1.5, truck: 0.2 },
+      'Westside': { compact: 3, muscle: 2, pickup: 1.5, moto: 2, sedan: 1.2, limo: 0.1, sport: 0.4 },
+      'Zentrum': { sedan: 2, taxi: 3, limo: 1.5, bus: 2, suv: 1.5, truck: 0.3 },
+    }[district];
+    for (let i = 0; i < 10; i++) {
+      const m = this.weighted[Math.floor(Math.random() * this.weighted.length)]; if (m.cls === 'bus' && !avenue) continue;
+      if (BIAS) { const w = BIAS[m.cls] ?? 1; if (Math.random() > Math.min(1, w / 2.5)) continue; }
+      return m;
+    }
     return this.weighted[0];
   }
   pickNext(from, to) {
@@ -431,7 +455,7 @@ export class TrafficManager {
       const n = W.nearestNode(x, z, 150); if (!n || !n.out.length) continue;
       const o = n.out[Math.floor(Math.random() * n.out.length)];
       const t = 0.15 + Math.random() * 0.7;
-      const model = this.pickModel(o.edge.kind === 'avenue' || o.edge.kind === 'highway');
+      const model = this.pickModel(o.edge.kind === 'avenue' || o.edge.kind === 'highway', W.districtAt(n.x, n.z));
       const off = (o.edge.kind === 'avenue' ? 5.6 : o.edge.kind === 'highway' ? 3.7 : 3.5);
       const rx = -o.dz, rz = o.dx;
       const px = n.x + o.dx * 100 * t + rx * off, pz = n.z + o.dz * 100 * t + rz * off;

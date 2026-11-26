@@ -3,12 +3,13 @@ import * as THREE from 'three';
 import { RNG, hash2, clamp, lerp, smoothstep, fbm } from './util.js';
 import { terrainH } from './world.js';
 import { ISLANDS, SKI_VILLAGE, SAVANNA, inSavanna } from './consts.js';
+import { Infra } from './infra.js';
 
 const BOX = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 
 export class Landmarks2 {
   constructor(lm) { this.lm = lm; this.c = lm.c; this.W = lm.W; this.rng = new RNG(4711); }
-  all() { this.alps(); this.terraMundi(); this.savanna(); this.alcatraz(); }
+  all() { this.alps(); this.terraMundi(); this.savanna(); this.alcatraz(); new Infra(this.lm).all(); }
   poi(id, kind, name, x, z, r = 3.4, extra = {}) { this.W.pois.push({ id, kind, name, x, z, r, ...extra }); }
   pyramid(mb, x, y0, z, s, h, col) {
     const A = [x - s / 2, y0, z - s / 2], B = [x + s / 2, y0, z - s / 2], C = [x + s / 2, y0, z + s / 2], D = [x - s / 2, y0, z + s / 2], P = [x, y0 + h, z], ref = [x, y0 + h * 0.3, z];

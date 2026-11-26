@@ -314,7 +314,7 @@ export class Vehicle {
     this.u = u; this.v = v; this.omega = w; this.yaw += w * dt;
     const ox = this.pos.x, oz = this.pos.z;
     this.pos.x += this.vx * dt; this.pos.z += this.vz * dt;
-    const g = W.groundY(this.pos.x, this.pos.z);
+    const g = terrainH(this.pos.x, this.pos.z); // Brücken blockieren Boote nicht
     this.gnd = g;
     if (g > SEA - 0.8) { // Strand: Boot blockiert
       this.pos.x = ox; this.pos.z = oz; this.u *= 0.7; this.v *= 0.7;

@@ -6,7 +6,7 @@ import { createMaterials, updateMaterialsForEnv } from './materials.js';
 import { makeTerrainDetail } from './textures.js';
 import { CityGen } from './city.js';
 
-import { HALF, CS, NC, SEA, GX0, GX1, GZ0, GZ1, PITCH, RECTS, ROAD_W, FLAT, ISLANDS, PEAKS, SKI_VILLAGE, SAVANNA, inSavanna, SNOW_LINE, coastX, inRect } from './consts.js';
+import { HALF, CS, NC, SEA, GX0, GX1, GZ0, GZ1, PITCH, RECTS, ROAD_W, FLAT, ISLANDS, PEAKS, SKI_VILLAGE, SAVANNA, inSavanna, SNOW_LINE, coastX, inRect, TUNNELS, BRIDGES, deckY } from './consts.js';
 export * from './consts.js';
 const sdBox = (x, z, x0, x1, z0, z1) => {
   const dx = Math.max(x0 - x, 0, x - x1), dz = Math.max(z0 - z, 0, z - z1);
@@ -15,7 +15,7 @@ const sdBox = (x, z, x0, x1, z0, z1) => {
 };
 
 // ---------- Terrainhöhe ----------
-export function terrainH(x, z) {
+export function terrainBase(x, z) {
   const d = sdBox(x, z, FLAT.x0, FLAT.x1, FLAT.z0, FLAT.z1);
   let h = -0.12;
   if (d > 0) {
@@ -58,6 +58,23 @@ export function terrainH(x, z) {
   // Inselrand der Welt
   const e = smoothstep(HALF - 170, HALF - 20, Math.max(Math.abs(x), Math.abs(z)));
   h = lerp(h, -30, e);
+  return h;
+}
+// Tunnel-Einschnitt (Cut & Cover): Gelände wird entlang der Röhre auf Fahrbahnniveau abgesenkt
+export function tunnelFloor(T, z) {
+  if (T.f0 === undefined) { T.f0 = terrainBase(T.c, T.a - 30) - 0.5; T.f1 = terrainBase(T.c, T.b + 30) - 0.5; }
+  const t = Math.min(1, Math.max(0, (z - T.a) / (T.b - T.a)));
+  return T.f0 + (T.f1 - T.f0) * t;
+}
+export function terrainH(x, z) {
+  const h = terrainBase(x, z);
+  for (let i = 0; i < TUNNELS.length; i++) {
+    const T = TUNNELS[i], d = Math.abs(x - T.c);
+    if (d < T.w / 2 + 10 && z > T.a - 30 && z < T.b + 30) {
+      const fl = Math.min(h, tunnelFloor(T, z));
+      return lerp(fl, h, smoothstep(T.w / 2 + 6, T.w / 2 + 9.5, d));
+    }
+  }
   return h;
 }
 export const isWaterAt = (x, z) => terrainH(x, z) < SEA - 0.35;
@@ -140,7 +157,7 @@ export class World {
     const list = this.colliders.query(x - r - 1, z - r - 1, x + r + 1, z + r + 1, this._tmp);
     for (let i = 0; i < list.length; i++) {
       const c = list[i];
-      if (c.h + c.y0 < y) continue;
+      if (c.h + c.y0 < y || c.y0 > y + 3.2) continue;
       let r2 = null;
       if (c.t === 0) r2 = circleAABB(x + out.x, z + out.z, r, c.x0, c.z0, c.x1, c.z1);
       else {
@@ -175,6 +192,7 @@ export class World {
   }
   groundY(x, z) {
     let y = terrainH(x, z);
+    const dk = deckY(x, z); if (dk !== null && dk > y) y = dk;
     const rs = this.ramps;
     if (rs.length) for (let i = 0; i < rs.length; i++) {
       const r = rs[i], dx = x - r.x, dz = z - r.z; if (dx * dx + dz * dz > r.rad2) continue;
@@ -241,6 +259,8 @@ export class World {
     for (const z of [-400, 0, 400]) L.push({ horiz: true, c: z, a: -1900, b: GX0, kind: 'highway' });
     for (const x of [-800, 0, 400, 800]) L.push({ horiz: false, c: x, a: -1900, b: GZ0, kind: 'highway' });
     for (const x of [-800, 0, 400]) L.push({ horiz: false, c: x, a: GZ1, b: 1900, kind: 'highway' });
+    L.push({ horiz: true, c: -400, a: 1100, b: 1900, kind: 'highway' }); // Vice Bay Bridge → Isla Esmeralda
+    L.push({ horiz: true, c: -900, a: -2400, b: -1400, kind: 'highway' }); // Lakeside Bridge → Westplateau
     L.push({ horiz: false, c: -1900, a: -400, b: 400, kind: 'highway' });
     L.push({ horiz: true, c: -1900, a: -800, b: 800, kind: 'highway' });
     L.push({ horiz: true, c: 1900, a: -800, b: 400, kind: 'highway' });

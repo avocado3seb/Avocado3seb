@@ -62,6 +62,11 @@ Menü → **Mehrspieler**: Raum erstellen (Freies Spiel kooperativ, Freies Spiel
 - **Karte:** Kategorien-Filter (Reisen, Fahrzeuge, Immobilien, Freizeit, Dienste, Läden, Essen, Waffen), Suche, Symbole je Zoomstufe entzerrt, Beschriftungen ohne Überlappung, Touch-Gesten (ziehen, zoomen, tippen = GPS).
 - **Profil:** Name, Admin-Anmeldung und letzter Raum-Code bleiben im Browser gespeichert (Menü zeigt „Angemeldet als …“; Abmelden löscht alles).
 
+- **Infrastruktur:** **Vice Bay Bridge** (600 m Schrägseilbrücke von der Küste zur Isla Esmeralda), **Lakeside Bridge** (am Westsee, steigt auf das Hochplateau) und der **Ridge Tunnel** (420 m durch den Höhenzug im Norden) – befahrbar, mit Verkehr; Boote fahren unter den Brücken hindurch. Dazu Autobahnen, Avenues, Nebenstraßen und Promenade.
+- **Stadtteile mit Charakter:** Passanten-Kleidung und Fahrzeugmix je nach Viertel (Zentrum: Anzüge/Taxis · Ocean Drive: Strandmode/Oldtimer · Sunset Hills: Luxus/Sportwagen · Hafen: Arbeiter/Lkw · Westside: Streetwear/Muscle) plus Willkommenstext beim Betreten.
+- **Flughafen:** Vice International mit Terminal (Flug buchen), Tower, Hangars, Rollfeld; sichtbarer Flugverkehr (Starts, Landungen, Kreisflüge).
+- **Offene Welt:** keine unsichtbaren Wände – der Ozean geht endlos weiter (Boot/Flugzeug testen!).
+
 ## Inhalt
 
 - **Welt:** ~6,4 × 6,4 km. Downtown mit Wolkenkratzern, Ocean Drive (Art-déco, Strand, Pier mit Riesenrad), Sunset Hills (Villen), Westside, Hafen & Industrie, Flughafen, Stadion, Central Park, Golfclub, Umland mit Wäldern, Regenwald, Sumpf, Bergen, Windrädern, Bauernhöfen, Highways und **vier Privatinseln**.

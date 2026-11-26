@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { RNG, hash2, clamp, lerp, smoothstep, strHash } from './util.js';
 import { colorOf } from './builder.js';
 import { terrainH, SpatialHash } from './world.js';
-import { HALF, SEA, PITCH, RECTS, ROAD_W, inRect, ISLANDS } from './consts.js';
+import { HALF, SEA, PITCH, RECTS, ROAD_W, inRect, ISLANDS, deckY } from './consts.js';
 import { SPECIALS, KIOSKS, PROPERTIES } from './data.js';
 import { makeSignTexture } from './textures.js';
 import { Landmarks } from './landmarks.js';
@@ -31,7 +31,7 @@ export class CityGen {
   mb(x, z, k) { return this.W.mb(x, z, k); }
 
   // ================= STRAßEN =================
-  roadY(x, z, px, pz, hw) { return Math.max(terrainH(x, z), terrainH(x + px * hw, z + pz * hw), terrainH(x - px * hw, z - pz * hw)); }
+  roadY(x, z, px, pz, hw) { const dk = deckY(x, z); return Math.max(terrainH(x, z), terrainH(x + px * hw, z + pz * hw), terrainH(x - px * hw, z - pz * hw), dk === null ? -1e9 : dk); }
   ribbon(mb, x0, z0, x1, z1, width, yoff, col, uvs = 8, off = 0, wlim = null) {
     const len = Math.hypot(x1 - x0, z1 - z0); if (len < 0.1) return;
     const n = Math.max(1, Math.ceil(len / 8));
