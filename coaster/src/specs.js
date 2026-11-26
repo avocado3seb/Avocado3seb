@@ -18,6 +18,7 @@ export const CATS = {
   minetrain: { label: 'Mine Train / Familie', style: 'small',rider: 'sit',   cars: 5, spacing: 2.6, across: 2, crr: 0.012, lift: [22, 2.4], dropA: 38, hmax: 7,  clearance: 1.4 },
   family:    { label: 'Familien-Achterbahn',  style: 'small',rider: 'sit',   cars: 5, spacing: 2.6, across: 2, crr: 0.012, lift: [16, 2.2], dropA: 34, hmax: 5,  clearance: 1.4 },
   kids:      { label: 'Kinder-Achterbahn',    style: 'small',rider: 'sit',   cars: 4, spacing: 2.2, across: 2, crr: 0.010, lift: [8, 1.8],  dropA: 24, hmax: 3,  clearance: 1.2 },
+  darkride:  { label: 'Darkride',             style: 'small',rider: 'sit',   cars: 4, spacing: 2.6, across: 2, crr: 0.012, lift: [8, 2],  dropA: 24, hmax: 3,  clearance: 1.3 },
   water:     { label: 'Wasserachterbahn',     style: 'tube', rider: 'sit',   cars: 3, spacing: 3.4, across: 2, crr: 0.011, lift: [30, 3.0], dropA: 50, hmax: 10, clearance: 1.8 },
 };
 export const CAT_ORDER = Object.keys(CATS);

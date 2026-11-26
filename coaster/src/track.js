@@ -23,6 +23,7 @@
 //    TOPHAT:H[:R]                Senkrechter Top-Hat
 //    LAUNCH:L:V[:A]              Katapult (V km/h)
 //    BRAKE:L[:V]                 Bremsstrecke (V m/s)
+//    DRV:V                       Reifenantrieb mit V m/s für alle folgenden Elemente (DRV:0 = aus)
 //    ROLL:bank[:L]               Querneigung ändern
 //    HOME[:bank[:brake]]         Rückfahrt: Gerade, Wendekurve, Bremse (Kurs muss nach Westen zeigen)
 //  Am Ende wird die Strecke automatisch zur Station zurückgeführt (Hermite-Verbinder).
@@ -98,6 +99,7 @@ export class Builder {
 
   seg(L, fn, zone = 0, zv = 0, za = 0) {
     if (!(L > 0.05)) return;
+    if (!zone && this.curZone) { zone = this.curZone; zv = this.curZv; }
     const n = Math.max(1, Math.round(L / this.ds)), h = L / n;
     let last = fn(0);
     for (let i = 1; i <= n; i++) {
@@ -317,6 +319,7 @@ export class Builder {
         break;
       }
       case 'S': this.straight(N(0, 10)); break;
+      case 'DRV': this.curZone = N(0, 0) > 0 ? ZONE.DRIVE : 0; this.curZv = N(0, 0); break; // Reifenantrieb (Darkrides, Wasserfahrten)
       case 'LIFT': this.climb(N(0, 30), N(1, 30), 0, ZONE.LIFT, N(2, 3.2), 4); break;
       case 'CLIMB': this.climb(N(0, 20), N(1, 30), N(2, 0)); break;
       case 'DROP': this.drop(N(0, 20), N(1, 55), N(2, 0), N(3, 0)); break;

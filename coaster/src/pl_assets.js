@@ -122,16 +122,16 @@ export const tex = {
     g.fillStyle = '#2a1a10'; g.fillRect(w / 2 - 2, 0, 4, h); g.fillRect(0, h / 2 - 2, w, 4); g.strokeStyle = '#2a1a10'; g.lineWidth = 6; g.strokeRect(0, 0, w, h);
   }),
 };
-const mats = {};
-const M = (key, make) => mats[key] || (mats[key] = make());
+export const mats = {};
+export const M = (key, make) => mats[key] || (mats[key] = make());
 
 // ---------------------------------------------------------------- Gebäude (jeweils: { group, colliders, lights, windows })
 // Colliders: { x, z, hx, hz, rot, y0, y1 }  (OBB in Weltkoordinaten)
-function box(parent, w, h, d, mat, x, y, z) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m; }
+export function box(parent, w, h, d, mat, x, y, z) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m; }
 function uvScale(geo, sx, sy) { const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * sx, uv.getY(i) * sy); return geo; }
 
 // Wände mit Türöffnung (vorne = +z), Dicke t
-function wallSet(g, w, d, h, t, mat, door = true, cols = null, ox = 0, oz = 0, rot = 0) {
+export function wallSet(g, w, d, h, t, mat, door = true, cols = null, ox = 0, oz = 0, rot = 0) {
   const parts = [];
   const add = (cx, cz, sx, sz, hh = h, y0 = 0) => {
     const m = new THREE.Mesh(uvScale(new THREE.BoxGeometry(sx, hh, sz), Math.max(sx, sz) / 3, hh / 3), mat); m.position.set(cx, y0 + hh / 2, cz); m.castShadow = m.receiveShadow = true; g.add(m); parts.push([cx, cz, sx, sz, y0, y0 + hh]);
@@ -149,7 +149,7 @@ function wallSet(g, w, d, h, t, mat, door = true, cols = null, ox = 0, oz = 0, r
   }
 }
 
-function windowsOn(g, w, d, h, n, litMat, y = null) {
+export function windowsOn(g, w, d, h, n, litMat, y = null) {
   const out = [];
   for (let k = 0; k < n; k++) {
     const fx = -w / 2 + (k + 0.5) * w / n;

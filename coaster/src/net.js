@@ -1,5 +1,5 @@
 // ============================================================================
-//  net.js – Online-Modus (Peer-to-Peer über WebRTC/PeerJS, kein eigener Server nötig)
+//  net.js – Online-Modus (Standard: Cloudflare-Relay per WebSocket; Alternative: WebRTC/PeerJS)
 //  Der Host besitzt die Simulation aller Bahnen im Park und verteilt Schnappschüsse.
 //  Mitspieler erscheinen als Avatare im Park oder sitzen sichtbar im gemeinsamen Zug.
 // ============================================================================
@@ -13,6 +13,8 @@ const COLORS = ['#ff5252', '#40c4ff', '#69f0ae', '#ffd54f', '#e040fb', '#ff9100'
 const MAX_PLAYERS = 12;
 const PREFIX = 'ecs-coaster-';
 const SEND_HZ = 10, SNAP_HZ = 6;
+// Standard: WebSocket-Relay auf Cloudflare (Worker + Durable Object, siehe coaster/cloudflare). Mit ?peerhost=… wird PeerJS/WebRTC genutzt, mit ?relay=wss://… ein eigener Relay.
+const RELAY = 'wss://ecs-relay.jonathanrontgen7.workers.dev';
 
 function nameSprite(name, color) {
   const c = document.createElement('canvas'); c.width = 256; c.height = 64;
@@ -82,7 +84,7 @@ class Remote {
 
 export class Net {
   constructor(app) {
-    this.app = app; this.mode = 'off'; this.peer = null; this.conns = new Map(); this.hostConn = null;
+    this.app = app; this.mode = 'off'; this.peer = null; this.rws = null; this.gws = null; this.conns = new Map(); this.hostConn = null;
     this.remotes = new Map(); this.me = { id: 0, name: 'Spieler' }; this.code = ''; this.nextId = 1;
     this.sendT = 0; this.snapT = 0; this.envT = 0; this.status = ''; this.log = []; this.onChange = () => {};
     this._lastEnv = '';
@@ -96,10 +98,13 @@ export class Net {
     if (q.get('peerhost')) { o.host = q.get('peerhost'); o.port = +(q.get('peerport') || 9000); o.path = q.get('peerpath') || '/'; o.secure = q.get('peersecure') === '1'; }
     return o;
   }
+  relayBase() { const q = new URLSearchParams(location.search); if (q.get('relay')) return q.get('relay').replace(/\/$/, ''); return q.get('peerhost') ? null : RELAY; }
+  get transport() { return this.relayBase() ? 'Cloudflare-Relay' : 'WebRTC (PeerJS)'; }
   setStatus(s) { this.status = s; this.onChange(); }
 
   // ----------------------------------------------------------------- Host
   host(name) {
+    const base = this.relayBase(); if (base) return this.hostRelay(name, base);
     return new Promise((resolve, reject) => {
       this.leave(true); this.me.name = name; this.me.id = 0;
       let tries = 0;
@@ -113,6 +118,27 @@ export class Net {
         });
         peer.on('connection', c => { c.on('data', m => this.onHostData(c, m)); c.on('close', () => this.drop(c)); c.on('error', () => this.drop(c)); });
         peer.on('disconnected', () => { try { peer.reconnect(); } catch (x) { /* */ } });
+      };
+      open();
+    });
+  }
+  hostRelay(name, base) {
+    return new Promise((resolve, reject) => {
+      this.leave(true); this.me.name = name; this.me.id = 0; let tries = 0, settled = false;
+      const open = () => {
+        const code = randCode(); this.code = code; let ws;
+        try { ws = this.rws = new WebSocket(`${base}/room/${code}?role=host`); } catch (e) { this.setStatus('Fehler: ' + e.message); reject(e); return; }
+        const rc = new Map(); this._rc = rc;
+        const timer = setTimeout(() => { if (!settled) { settled = true; try { ws.close(); } catch (e) { /* */ } this.rws = null; this.setStatus('Fehler: Relay nicht erreichbar'); reject(new Error('Relay nicht erreichbar')); } }, 15000);
+        ws.onmessage = ev => {
+          let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+          if (m.r === 'taken') { clearTimeout(timer); try { ws.close(); } catch (e) { /* */ } if (tries++ < 5) open(); else { settled = true; reject(new Error('Kein freier Raumcode')); } return; }
+          if (m.r === 'hosting') { clearTimeout(timer); settled = true; this.mode = 'host'; this.setStatus('Raum offen'); this.chatLine('Raum ' + code + ' geöffnet – Mitspieler können beitreten.', '#ffd54f'); this.app.onNetStart(); resolve(code); return; }
+          if (m.r === 'open') { const cid = m.c, conn = { open: true, _cid: cid, send: d => { if (ws.readyState === 1) ws.send(JSON.stringify({ to: cid, d })); }, close: () => { conn.open = false; } }; rc.set(cid, conn); return; }
+          if (m.r === 'close') { const conn = rc.get(m.c); if (conn) { conn.open = false; rc.delete(m.c); this.drop(conn); } return; }
+          if (m.c !== undefined) { const conn = rc.get(m.c); if (conn) this.onHostData(conn, m.d); }
+        };
+        ws.onclose = () => { clearTimeout(timer); if (this.rws === ws) { this.rws = null; if (this.mode === 'host') { this.app.ui.toast('Verbindung zum Relay verloren'); this.leave(); } else if (!settled) { settled = true; reject(new Error('Relay nicht erreichbar')); } } };
       };
       open();
     });
@@ -140,12 +166,16 @@ export class Net {
   }
   addRemote(id, name) { if (this.remotes.has(id)) return; this.remotes.set(id, new Remote(this, id, name, this.remotes.size + 1)); this.onChange(); }
   removeRemote(id) { const r = this.remotes.get(id); if (!r) return; r.remove(); this.remotes.delete(id); this.onChange(); }
-  broadcast(m, except = null) { for (const [id, c] of this.conns) if (id !== except && c.open) c.send(m); }
+  broadcast(m, except = null) {
+    if (this.rws) { if (this.rws.readyState === 1) { const ex = except != null ? this.conns.get(except)?._cid : undefined; this.rws.send(JSON.stringify({ to: '*', except: ex, d: m })); } return; }
+    for (const [id, c] of this.conns) if (id !== except && c.open) c.send(m);
+  }
   send(m) { if (this.mode === 'host') this.broadcast(m); else if (this.mode === 'client' && this.hostConn?.open) this.hostConn.send(m); }
   envState() { return { hour: this.app.env.hour, weather: this.app.env.weatherName }; }
 
   // ----------------------------------------------------------------- Client
   join(code, name) {
+    const base = this.relayBase(); if (base) return this.joinRelay(code, name, base);
     return new Promise((resolve, reject) => {
       this.leave(true); this.me.name = name; code = code.trim().toUpperCase();
       const peer = this.peer = new Peer(undefined, this.peerOpts());
@@ -168,7 +198,32 @@ export class Net {
       });
     });
   }
+  joinRelay(code, name, base) {
+    return new Promise((resolve, reject) => {
+      this.leave(true); this.me.name = name; code = code.trim().toUpperCase(); let done = false, ws;
+      const fail = msg => { if (done) return; done = true; this.setStatus(msg); try { ws && ws.close(); } catch (x) { /* */ } this.gws = null; this.hostConn = null; this.mode = 'off'; reject(new Error(msg)); };
+      try { ws = this.gws = new WebSocket(`${base}/room/${encodeURIComponent(code)}?role=guest`); } catch (e) { fail('Fehler: ' + e.message); return; }
+      const timer = setTimeout(() => fail('Zeitüberschreitung – Raum nicht gefunden'), 30000);
+      const conn = this.hostConn = { open: false, send: m => { if (ws.readyState === 1) ws.send(JSON.stringify(m)); }, close: () => { try { ws.close(); } catch (e) { /* */ } } };
+      ws.onopen = () => { conn.open = true; ws.send(JSON.stringify({ t: 'hello', name })); };
+      ws.onerror = () => { clearTimeout(timer); fail('Relay nicht erreichbar'); };
+      ws.onmessage = ev => {
+        let w; try { w = JSON.parse(ev.data); } catch (e) { return; }
+        if (w.r === 'nohost') { clearTimeout(timer); fail('Raum nicht gefunden'); return; }
+        if (w.r === 'full') { clearTimeout(timer); fail('Raum ist voll'); return; }
+        const m = w.d; if (!m) return;
+        if (m.t === 'welcome' && !done) {
+          clearTimeout(timer); done = true; this.me.id = m.id; this.code = code; this.mode = 'client';
+          for (const p of m.players) this.addRemote(p.id, p.name);
+          this.setStatus('Verbunden'); this.chatLine('Verbunden mit Raum ' + code, '#ffd54f'); this.app.onNetStart(m); resolve(code);
+        } else if (m.t === 'full') { clearTimeout(timer); fail('Raum ist voll'); }
+        else if (done) this.onData(m);
+      };
+      ws.onclose = () => { clearTimeout(timer); if (this.mode === 'client' && this.gws === ws) { this.app.ui.toast('Verbindung zum Host verloren'); this.leave(); } else if (!done) fail('Raum nicht gefunden'); };
+    });
+  }
   leave(silent = false) {
+    try { this.rws?.close(); } catch (e) { /* */ } this.rws = null; try { this.gws?.close(); } catch (e) { /* */ } this.gws = null;
     for (const r of this.remotes.values()) r.remove(); this.remotes.clear();
     for (const c of this.conns.values()) { try { c.close(); } catch (e) { /* */ } } this.conns.clear();
     try { this.hostConn?.close(); } catch (e) { /* */ } this.hostConn = null;

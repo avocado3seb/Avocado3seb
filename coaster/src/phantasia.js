@@ -13,6 +13,9 @@ import { mulberry32, hashStr } from './gen.js';
 import { textures, signTexture } from './textures.js';
 import { Terrain, fbm } from './pl_terrain.js';
 import * as A from './pl_assets.js';
+import { EXTRA_ZONES, ZONE_OF_AREA } from './pl_data.js';
+import { placePOIs } from './pl_pois.js';
+import { buildChina, buildMystery, buildBerlin, buildParking, buildAirship, buildLightStrings, buildWinterDecor } from './pl_zones2.js';
 
 const TAU = Math.PI * 2;
 const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -25,10 +28,12 @@ export const ZONES = {
   fantasy:   { name: 'Fantasy', x: 280, z: 280, r: 180, tint: [0.3, 0.5, 0.25], fog: 1.0, fogCol: [0.7, 0.75, 0.85], amb: 1, desc: 'Märchenhafte Häuschen und Türme – Winja\'s, Raik, Crazy Bats' },
   berlin:    { name: 'Eingang & Hauptplatz', x: 0, z: 60, r: 140, tint: [0.3, 0.46, 0.22], fog: 1.0, fogCol: [0.75, 0.82, 0.9], amb: 1, desc: 'Eingangstor, Brunnenplatz und Hauptstraße' },
 };
-const AREA_KEY = { 'Klugheim': 'klugheim', 'Deep in Africa': 'africa', 'Rookburgh': 'rookburgh', 'Mexico': 'mexico', 'Fantasy': 'fantasy' };
+Object.assign(ZONES, EXTRA_ZONES);
+const AREA_KEY = ZONE_OF_AREA;
 const PLACE = { // Versatz der Bahn-Mitte zur Zonenmitte
   'Taron': [0, -20], 'Black Mamba': [10, 20], 'F.L.Y.': [0, 0], 'Colorado Adventure': [0, 0],
   "Winja's Fear": [-70, -60], "Winja's Force": [70, -60], 'Raik': [-60, 70], 'Crazy Bats': [80, 80],
+  'Chiapas': [40, 10], 'Talocan': [-30, 80], 'River Quest': [-30, 20], 'Mystery Castle': [60, 40], 'Maus au Chocolat': [-70, 90], 'Wakobato': [-10, -20], 'Feng Ju Palace': [20, -10],
 };
 
 export class PhantasiaWorld extends ParkWorld {
@@ -52,7 +57,9 @@ export class PhantasiaWorld extends ParkWorld {
     this.markFlatPaths();
     this.buildTerrainPL();
     this.buildPathMeshes();
+    this.pois = placePOIs(this);
     this.buildZoneDecor();
+    this.buildExtras();
     this.buildEffects();
     this.buildVisitors();
     this.buildMinimapData();
@@ -77,7 +84,7 @@ export class PhantasiaWorld extends ParkWorld {
       const A_ = this.nodes[a], B_ = this.nodes[b], L = Math.hypot(B_.x - A_.x, B_.z - A_.z);
       for (let t = 0; t <= L; t += 6) this.markFlat(A_.x + (B_.x - A_.x) * t / L, A_.z + (B_.z - A_.z) * t / L, w * 0.9 + 3);
     }
-    this.markFlat(0, 60, 62); this.markFlat(this.gate.x, this.gate.z, 24);
+    this.markFlat(0, 60, 62); this.markFlat(this.gate.x, this.gate.z, 24); this.markFlat(0, 520, 150); for (let z = 110; z < 340; z += 20) this.markFlat(0, z, 40);
   }
 
   // ------------------------------------------------------------------ Bahnen fest platzieren
@@ -133,7 +140,7 @@ export class PhantasiaWorld extends ParkWorld {
     const q = this.quality, step = q === 'low' ? 8 : 5;
     this.terrain = new Terrain(1900, step, this.features);
     const f = this.features;
-    const mesh = this.terrain.build((x, z, y, slope) => {
+    this.terrainColor = (x, z, y, slope) => {
       let r = 0, g = 0, b = 0, wsum = 0;
       for (const k in ZONES) { const zn = ZONES[k], d = Math.hypot(x - zn.x, z - zn.z), w = Math.exp(-(d * d) / (zn.r * zn.r * 0.55)); r += zn.tint[0] * w; g += zn.tint[1] * w; b += zn.tint[2] * w; wsum += w; }
       if (wsum < 0.05) { r = 0.3; g = 0.46; b = 0.22; wsum = 1; }
@@ -143,9 +150,10 @@ export class PhantasiaWorld extends ParkWorld {
       const rr = 0.38 + 0.12 * fbm(x / 9, z / 9);
       const wet = y < -0.6 ? 0.55 : 1;
       return [(r * (1 - rock) + rr * rock) * n * wet, (g * (1 - rock) + rr * 0.95 * rock) * n * wet, (b * (1 - rock) + rr * 0.9 * rock) * n * wet];
-    });
+    };
+    const mesh = this.terrainMesh = this.terrain.build(this.terrainColor);
     this.group.add(mesh);
-    const far = new THREE.Mesh(new THREE.PlaneGeometry(30000, 30000), new THREE.MeshStandardMaterial({ color: 0x3a5a2c, roughness: 1 }));
+    const far = this.farPlane = new THREE.Mesh(new THREE.PlaneGeometry(30000, 30000), new THREE.MeshStandardMaterial({ color: 0x3a5a2c, roughness: 1 }));
     far.rotation.x = -Math.PI / 2; far.position.y = -0.4; far.receiveShadow = true; this.group.add(far);
   }
   h(x, z) { return this.terrain.at(x, z); }
@@ -157,9 +165,11 @@ export class PhantasiaWorld extends ParkWorld {
     const hub = this.node(0, 60), gate = this.node(this.gate.x, this.gate.z), g2 = this.node(0, 200);
     this.edge(gate, g2, 10); this.edge(g2, hub, 10);
     const zc = {};
-    for (const k of ['klugheim', 'africa', 'rookburgh', 'mexico', 'fantasy']) {
+    const lot = this.node(0, 500); this.edge(lot, gate, 10);
+    for (const k of ['klugheim', 'africa', 'rookburgh', 'mexico', 'fantasy', 'china', 'mystery']) {
       const z = ZONES[k]; zc[k] = this.node(z.x - Math.sign(z.x) * 30, z.z + (z.z < 0 ? 50 : -40));
     }
+    zc.berlin = hub;
     // Hauptwege (mit Zwischenknoten)
     const link = (a, b, w = 8, kink = true) => {
       const A_ = this.nodes[a], B_ = this.nodes[b];
@@ -168,10 +178,10 @@ export class PhantasiaWorld extends ParkWorld {
       this.edge(a, mid, w); this.edge(mid, b, w);
     };
     for (const k in zc) link(hub, zc[k], 8);
-    link(zc.klugheim, zc.fantasy, 6); link(zc.africa, zc.mexico, 6); link(zc.rookburgh, zc.klugheim, 6); link(zc.rookburgh, zc.africa, 6); link(zc.mexico, zc.fantasy, 6);
+    link(zc.klugheim, zc.fantasy, 6); link(zc.africa, zc.mexico, 6); link(zc.rookburgh, zc.klugheim, 6); link(zc.rookburgh, zc.africa, 6); link(zc.mexico, zc.fantasy, 6); link(zc.china, zc.rookburgh, 6); link(zc.china, zc.africa, 6); link(zc.mystery, zc.rookburgh, 6); link(zc.mystery, zc.klugheim, 6);
     for (const r of this.rides) {
       const e = r.entrance, an = this.node(e.x + r.dir[0] * 12, e.z + r.dir[1] * 12), en = this.node(e.x, e.z);
-      this.edge(an, en, 5); r.pathNode = an;
+      this.edge(an, en, 5); r.pathNode = an; r.entranceNode = en;
       link(zc[r.zone], an, 5, false);
     }
   }
@@ -281,7 +291,7 @@ export class PhantasiaWorld extends ParkWorld {
     const crownG = new THREE.IcosahedronGeometry(1, 1); crownG.translate(0, 0.7, 0);
     const coneG = new THREE.ConeGeometry(1, 1, 7); coneG.translate(0, 0.5, 0);
     const trunkM = new THREE.MeshStandardMaterial({ color: 0x4a3524, roughness: 1 });
-    const leafM = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 });
+    const leafM = this.leafM = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 });
     const trunks = new A.Inst(trunkG, trunkM, 4200, G, { shadow: true });
     const crowns = new A.Inst(crownG, leafM, 1800, G, { shadow: true });
     const cones1 = new A.Inst(coneG, leafM, 5200, G, { shadow: true });
@@ -526,7 +536,7 @@ export class PhantasiaWorld extends ParkWorld {
     const zone = r.zone, tr = r.track, n = r.wn, out = this.out;
     const wp = r.wp, hAbove = k => wp[k * 3 + 1] - Math.max(-1, this.h(wp[k * 3], wp[k * 3 + 2]));
     const skip = Math.ceil((tr.stationLen + 24) / 2), endSkip = n - 8;
-    const rocky = zone === 'klugheim' || zone === 'mexico', jungle = zone === 'africa', industrial = zone === 'rookburgh';
+    const rocky = zone === 'klugheim' || zone === 'mexico' || zone === 'mystery', jungle = zone === 'africa', industrial = zone === 'rookburgh';
     const cols = zone === 'mexico' ? rockCol.m : zone === 'klugheim' ? rockCol.k : zone === 'africa' ? rockCol.a : rockCol.g;
     // Tunnelabschnitte (tief + gerade)
     const tunnels = []; let st = -1;
@@ -726,26 +736,187 @@ export class PhantasiaWorld extends ParkWorld {
     }
   }
 
+  // ------------------------------------------------------------------ Extras: Zonen, POIs, Winter, Routen
+  buildExtras() {
+    const rng = this.prng, out = this.out;
+    buildChina(this, rng); buildMystery(this, rng); buildBerlin(this, rng); buildParking(this, rng); buildAirship(this);
+    // Stichwege zu den POIs (für Besucher und Navigation)
+    const spur = [];
+    for (const p of this.pois) {
+      const n = this.node(p.ax, p.az); p.node = n; let best = -1, bd = 1e9;
+      for (let i = 0; i < this.nodes.length; i++) { if (i === n) continue; const d = Math.hypot(this.nodes[i].x - p.ax, this.nodes[i].z - p.az); if (d < bd && d > 1) { bd = d; best = i; } }
+      if (best >= 0) { this.edge(n, best, 3); spur.push([n, best]); }
+    }
+    this.spurMesh(spur);
+    for (const pt of buildLightStrings(this)) out.glow.push(pt);
+    this.winterGroup = buildWinterDecor(this, rng);
+    for (const k of ['china', 'mystery']) this.zoneSign(k);
+    // Interaktionspunkte
+    this.interactables = [];
+    for (const p of this.pois) this.interactables.push({ type: 'poi', poi: p, x: p.ax, z: p.az, r: p.kind === 'hotel' ? 9 : p.kind === 'stage' ? 10 : p.kind === 'restaurant' || p.kind === 'shop' ? 6 : 4.5, name: p.name, kind: p.kind });
+    for (const r of this.rides) this.interactables.push({ type: 'ride', ride: r, x: r.entrance.x, z: r.entrance.z, r: 9, name: r.coaster.name, kind: 'ride' });
+    this.interactables.push({ type: 'gate', x: 0, z: 352, r: 16, name: 'Ticketscanner / Eingang', kind: 'gate' });
+    for (const r of this.rides) this.makeQueueSign(r);
+    this.winter = false; this.hist = { inPark: 0, entered: 0 };
+  }
+  spurMesh(spur) {
+    const pos = [], uv = [], idx = [];
+    for (const [a, b] of spur) {
+      const A_ = this.nodes[a], B_ = this.nodes[b], L = Math.hypot(B_.x - A_.x, B_.z - A_.z) || 1, nx = -(B_.z - A_.z) / L * 1.5, nz = (B_.x - A_.x) / L * 1.5, i = pos.length / 3;
+      const ya = Math.max(0.05, this.h(A_.x, A_.z)) + 0.09, yb = Math.max(0.05, this.h(B_.x, B_.z)) + 0.09;
+      pos.push(A_.x + nx, ya, A_.z + nz, A_.x - nx, ya, A_.z - nz, B_.x - nx, yb, B_.z - nz, B_.x + nx, yb, B_.z + nz); uv.push(0, 0, 1, 0, 1, L / 3, 0, L / 3); idx.push(i, i + 1, i + 2, i, i + 2, i + 3);
+    }
+    if (!pos.length) return;
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: textures.paving(), roughness: 1, color: 0xb8b0a0, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 })); m.receiveShadow = true; this.group.add(m);
+  }
+  makeQueueSign(r) {
+    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 96; const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: true }));
+    sp.scale.set(7.5, 2.8, 1); sp.position.set(r.entrance.x, r.yOff + 8.5, r.entrance.z); this.group.add(sp);
+    r.qs = { cv, tex, sp, last: -9 }; r.queueCount = 0; this.drawQueueSign(r);
+  }
+  waitMinutes(r) { const spec = r.spec, cap = spec.cars * (spec.rows || 1) * spec.across, cyc = r.track.L / 12 + 25; return Math.round((r.queueCount / cap) * cyc / 60 * (r.sets && r.sets.length > 1 ? 0.6 : 1)) + (r.queueCount > 0 ? 2 : 0); }
+  drawQueueSign(r) {
+    const g = r.qs.cv.getContext('2d'), w = this.waitMinutes(r); g.clearRect(0, 0, 256, 96);
+    g.fillStyle = 'rgba(10,14,24,.82)'; g.beginPath(); g.roundRect(2, 2, 252, 92, 14); g.fill(); g.strokeStyle = r.coaster.trackColor; g.lineWidth = 4; g.stroke();
+    g.fillStyle = '#fff'; g.textAlign = 'center'; g.font = '700 22px "Segoe UI", sans-serif'; g.fillText(r.coaster.name.slice(0, 20), 128, 32);
+    g.fillStyle = w > 20 ? '#ff8a6a' : w > 8 ? '#ffd060' : '#7aff9a'; g.font = '800 34px "Segoe UI", sans-serif'; g.fillText(w + ' Min.', 128, 72); r.qs.tex.needsUpdate = true;
+  }
+  routeTo(px, pz, target) {
+    let a = 0, ad = 1e9; for (let i = 0; i < this.nodes.length; i++) { const d = Math.hypot(this.nodes[i].x - px, this.nodes[i].z - pz); if (d < ad) { ad = d; a = i; } }
+    const b = target.node !== undefined ? target.node : (target.ride ? target.ride.entranceNode : a);
+    const path = this.bfs(a, b); return path.map(i => [this.nodes[i].x, this.nodes[i].z]);
+  }
+  bfs(from, to) {
+    this._bc = this._bc || new Map(); const key = from * 4096 + to; if (this._bc.has(key)) return this._bc.get(key);
+    const prev = new Int32Array(this.nodes.length).fill(-1); prev[from] = from; const q = [from];
+    for (let h = 0; h < q.length; h++) { const n = q[h]; if (n === to) break; for (const m of this.nodes[n].adj) if (prev[m] < 0) { prev[m] = n; q.push(m); } }
+    const path = []; if (prev[to] >= 0) for (let n = to; ; n = prev[n]) { path.push(n); if (n === from) break; }
+    path.reverse(); if (this._bc.size > 3000) this._bc.clear(); this._bc.set(key, path); return path;
+  }
+  setRoute(pts) {
+    this.clearRoute(); if (!pts || pts.length < 2) return;
+    const v = []; for (let i = 0; i < pts.length - 1; i++) { const a = pts[i], b = pts[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.round(L / 5)); for (let k = 0; k < n; k++) { const x = a[0] + (b[0] - a[0]) * k / n, z = a[1] + (b[1] - a[1]) * k / n; v.push(x, Math.max(0, this.h(x, z)) + 0.9, z); } }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+    this.routeLine = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffd040, size: 9, sizeAttenuation: false, transparent: true, opacity: 0.95, depthTest: false })); this.routeLine.renderOrder = 20; this.routeLine.frustumCulled = false; this.group.add(this.routeLine);
+  }
+  clearRoute() { if (this.routeLine) { this.group.remove(this.routeLine); this.routeLine.geometry.dispose(); this.routeLine = null; } }
+
+  // ------------------------------------------------------------------ Wintertraum
+  setWinter(on) {
+    if (this.winter === on) return; this.winter = on;
+    this.terrain.recolor(this.terrainMesh, on ? (x, z, y, sl) => { const c = this.terrainColor(x, z, y, sl), k = Math.max(0, 1 - sl * 1.4); const w = 0.8 + 0.2 * fbm(x / 18, z / 18); return [c[0] + (w - c[0]) * k * 0.9, c[1] + (w - c[1]) * k * 0.9, c[2] + (w * 1.05 - c[2]) * k * 0.9]; } : this.terrainColor);
+    const tm = this.terrainMesh.material; if (on) { this._gm = this._gm || tm.map; tm.map = null; } else if (this._gm) tm.map = this._gm; tm.needsUpdate = true;
+    if (this.farPlane) this.farPlane.material.color.set(on ? 0xd8e2ec : 0x3a5a2c);
+    const snow = new THREE.Color(0xcfd8e0);
+    for (const key of ['turf', 'slate', 'thatch']) { const m = A.mats[key]; if (m) { m.emissive = m.emissive || new THREE.Color(0); m.emissive.copy(on ? snow : new THREE.Color(0)); m.emissiveIntensity = on ? 0.55 : 0; m.needsUpdate = true; } }
+    if (this.leafM) { this.leafM.emissive.copy(on ? new THREE.Color(0xb8c8d0) : new THREE.Color(0)); this.leafM.emissiveIntensity = on ? 0.5 : 0; }
+    if (this.winterGroup) { this.winterGroup.visible = on; this.winterGroup.userData.glow.visible = on; }
+    this.env.setWeather(on ? 'snow' : 'clear'); this.env.apply(true);
+  }
+
+  // ------------------------------------------------------------------ Besucher-KI
+  buildVisitors() {
+    super.buildVisitors();
+    const mk = (geo, color) => { const m = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.9 }), 40); m.frustumCulled = false; m.castShadow = true; this.group.add(m); return m; };
+    const body = new THREE.BoxGeometry(0.46, 0.64, 0.28); body.translate(0, 1.05, 0);
+    const legs = new THREE.BoxGeometry(0.32, 0.72, 0.2); legs.translate(0, 0.38, 0);
+    const head = new THREE.SphereGeometry(0.15, 6, 5); head.translate(0, 1.55, 0);
+    this.staffMeshes = [mk(body, 0xe8a010), mk(legs, 0x20242c), mk(head, 0xe0b090)];
+    this.staff = Array.from({ length: 36 }, (_, i) => ({ a: this.rng() * this.nodes.length | 0, b: 0, t: 1, speed: 0.9 + this.rng() * 0.5, dwell: 0, x: 0, z: 0, yaw: 0, path: [], pi: 0, off: this.R(-1, 1) }));
+    this.vFood = this.pois.filter(p => p.kind === 'restaurant' || p.kind === 'stand'); this.vStands = this.pois.filter(p => p.kind === 'stand'); this.vShops = this.pois.filter(p => p.kind === 'shop');
+    this.vHotels = this.pois.filter(p => p.kind === 'hotel'); this.vStages = this.pois.filter(p => p.kind === 'stage'); this.vWC = this.pois.filter(p => p.kind === 'wc');
+    this.lotNode = this.nodes.findIndex(n => n.x === 0 && n.z === 500); this.groups = {}; this.simT = 0; this.statT = 0;
+    this.thrill = new Set(['launch', 'hyper', 'inverted', 'floorless', 'dive', 'flying', 'wing', 'sitdown']);
+  }
+  showActive(p) { const h = this.env.hour; for (const [, times] of p.shows || []) for (const t of times) { const d = (h - t + 24) % 24; if (d < 0.9) return true; } return false; }
+  pickGoal(v, i) {
+    const R = this.rng; const pick = a => a[Math.floor(R() * a.length)];
+    const grp = this.groups[v.gid]; let tgt = null;
+    if (grp && i % 3 !== 0 && this.simT - grp.t < 12) tgt = grp.target;
+    if (!tgt) {
+      const stage = this.vStages.find(s => s.active), r = R();
+      if (v.hunger > 0.62 && this.vFood.length) tgt = { kind: 'food', poi: pick(this.vFood) };
+      else if (v.thirst > 0.6 && this.vStands.length) tgt = { kind: 'food', poi: pick(this.vStands) };
+      else if (v.tired > 0.88 && this.vWC.length) tgt = { kind: 'wc', poi: pick(this.vWC) };
+      else if (stage && r < 0.35) tgt = { kind: 'stage', poi: stage };
+      else if (r < 0.1 && this.vShops.length) tgt = { kind: 'shop', poi: pick(this.vShops) };
+      else if (r < 0.13 && this.vHotels.length) tgt = { kind: 'hotel', poi: pick(this.vHotels) };
+      else if (r < 0.17) tgt = { kind: 'leave' };
+      else { const rs = this.rides.filter(x => (v.like === 'thrill') === this.thrill.has(x.coaster.cat) || R() < 0.25); tgt = { kind: 'ride', ride: pick(rs.length ? rs : this.rides) }; }
+      if (i % 3 === 0) this.groups[v.gid] = { target: tgt, t: this.simT };
+    }
+    const node = tgt.kind === 'ride' ? tgt.ride.entranceNode : tgt.kind === 'leave' ? this.lotNode : tgt.poi.node;
+    v.tgt = tgt; const path = this.bfs(v.a, node);
+    if (path.length < 2) { v.dwell = 1; v.mode = 'dwell'; return; }
+    v.path = path; v.pi = 1; v.b = path[1]; v.t = 0; v.mode = 'walk';
+  }
+  arrive(v) {
+    const t = v.tgt || {}; v.mode = 'dwell'; v.seated = false; v.qi = 0;
+    if (t.kind === 'ride') { const r = t.ride; v.qi = r.queueCount++; v.dwell = Math.min(40, 6 + v.qi * 1.3); }
+    else if (t.kind === 'food') { v.dwell = 14 + this.R(0, 14); v.seated = t.poi.kind === 'restaurant'; }
+    else if (t.kind === 'shop') v.dwell = 10 + this.R(0, 6); else if (t.kind === 'stage') v.dwell = 18 + this.R(0, 12);
+    else if (t.kind === 'wc') v.dwell = 5; else if (t.kind === 'hotel') v.dwell = 8; else v.dwell = 3;
+    if (t.poi) t.poi.visitors = (t.poi.visitors || 0) + 1;
+  }
+  finishDwell(v) {
+    const t = v.tgt || {};
+    if (t.poi && t.poi.visitors) t.poi.visitors--;
+    if (t.kind === 'ride') { t.ride.queueCount = Math.max(0, t.ride.queueCount - 1); v.fun = 0; v.ridden = (v.ridden || 0) + 1; this.hist.rides = (this.hist.rides || 0) + 1; }
+    else if (t.kind === 'food') { v.hunger = t.poi.kind === 'restaurant' ? 0 : v.hunger * 0.5; v.thirst = 0; this.hist.meals = (this.hist.meals || 0) + 1; }
+    else if (t.kind === 'wc') v.tired *= 0.4; else if (t.kind === 'shop') this.hist.sales = (this.hist.sales || 0) + 1;
+    else if (t.kind === 'leave') { v.a = this.lotNode; v.hunger = v.thirst = 0; this.hist.entered++; }
+    v.seated = false;
+  }
   updateVisitors(dt) {
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), pv = new THREE.Vector3(), s = new THREE.Vector3(1, 1, 1), up = new THREE.Vector3(0, 1, 0);
-    if (!this.visMeshes) return;
-    const [iBody, iLegs, iHead] = this.visMeshes;
+    if (!this.visMeshes || !this.vFood) { return; }
+    this.simT += dt; this.statT += dt;
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), pv = new THREE.Vector3(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+    const [iBody, iLegs, iHead] = this.visMeshes, N = this.nodes;
+    for (const p of this.vStages) p.active = this.showActive(p);
     for (let i = 0; i < this.vis.length; i++) {
-      const v = this.vis[i], A_ = this.nodes[v.a], B_ = this.nodes[v.b];
-      const L = Math.hypot(B_.x - A_.x, B_.z - A_.z) || 1;
-      v.t += v.speed * dt / L; v.ph += dt * 7 * v.speed;
-      if (v.t >= 1) {
-        const prev = v.a; v.a = v.b; v.t = 0;
-        const adj = this.nodes[v.a].adj; let nb = adj[Math.floor(this.rng() * adj.length)];
-        if (adj.length > 1) for (let k = 0; k < 4 && nb === prev; k++) nb = adj[Math.floor(this.rng() * adj.length)];
-        v.b = nb;
+      const v = this.vis[i];
+      if (v.mode === undefined) { v.mode = 'dwell'; v.dwell = this.R(0, 4); v.hunger = this.R(0, 0.5); v.thirst = this.R(0, 0.5); v.tired = this.R(0, 0.4); v.fun = this.R(0.3, 1); v.kid = i % 4 === 3; v.like = ['thrill', 'family', 'thrill', 'family', 'food'][i % 5]; v.gid = Math.floor(i / 3); v.path = []; if (i % 5 === 0 && this.lotNode >= 0) v.a = this.lotNode; v.b = v.a; v.t = 0; }
+      v.hunger = Math.min(1, v.hunger + dt * 0.004); v.thirst = Math.min(1, v.thirst + dt * 0.005); v.tired = Math.min(1, v.tired + dt * 0.0025); v.fun = Math.min(1, v.fun + dt * 0.01);
+      const kid = v.kid ? 0.72 : 1;
+      if (v.mode === 'dwell') {
+        v.dwell -= dt; if (v.dwell <= 0) { if (v.tgt) this.finishDwell(v); this.pickGoal(v, i); }
+      } else {
+        const A_ = N[v.a], B_ = N[v.b], L = Math.hypot(B_.x - A_.x, B_.z - A_.z) || 1;
+        v.t += v.speed * kid * dt / L; v.ph += dt * 7 * v.speed;
+        if (v.t >= 1) { v.a = v.b; v.t = 0; if (v.pi + 1 < v.path.length) { v.b = v.path[++v.pi]; } else this.arrive(v); }
       }
-      const A2 = this.nodes[v.a], B2 = this.nodes[v.b], L2 = Math.hypot(B2.x - A2.x, B2.z - A2.z) || 1;
-      const dx = (B2.x - A2.x) / L2, dz = (B2.z - A2.z) / L2;
-      v.x = A2.x + dx * L2 * v.t - dz * v.off; v.z = A2.z + dz * L2 * v.t + dx * v.off; v.yaw = Math.atan2(dx, dz);
-      q.setFromAxisAngle(up, v.yaw); pv.set(v.x, Math.max(0.05, this.h(v.x, v.z)) + 0.07 + Math.abs(Math.sin(v.ph)) * 0.06, v.z);
-      m.compose(pv, q, s); iBody.setMatrixAt(i, m); iLegs.setMatrixAt(i, m); iHead.setMatrixAt(i, m);
+      const A2 = N[v.a], B2 = N[v.b], L2 = Math.hypot(B2.x - A2.x, B2.z - A2.z) || 1; let dx = (B2.x - A2.x) / L2, dz = (B2.z - A2.z) / L2;
+      if (v.mode === 'dwell') {
+        let ox = 0, oz = 0;
+        if (v.tgt && v.tgt.kind === 'ride') { const r = v.tgt.ride; const row = Math.floor(v.qi / 3), col = (v.qi % 3) - 1; ox = -r.dir[0] * (row * 1.1) + (-r.dir[1]) * col * 1.0; oz = -r.dir[1] * (row * 1.1) + r.dir[0] * col * 1.0; dx = r.dir[0]; dz = r.dir[1]; }
+        else { ox = Math.sin(i * 12.9) * 2.2; oz = Math.cos(i * 7.7) * 2.2; if (v.tgt && v.tgt.poi) { dx = v.tgt.poi.x - A2.x; dz = v.tgt.poi.z - A2.z; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l; } }
+        v.x = A2.x + ox; v.z = A2.z + oz;
+      } else { v.x = A2.x + dx * L2 * v.t - dz * v.off; v.z = A2.z + dz * L2 * v.t + dx * v.off; }
+      v.yaw = Math.atan2(dx, dz);
+      const bob = v.mode === 'walk' ? Math.abs(Math.sin(v.ph)) * 0.06 : 0;
+      q.setFromAxisAngle(up, v.yaw); pv.set(v.x, Math.max(0.05, this.h(v.x, v.z)) + 0.07 + bob, v.z); sc.set(kid, kid * (v.seated ? 0.78 : 1), kid);
+      m.compose(pv, q, sc); iBody.setMatrixAt(i, m); iLegs.setMatrixAt(i, m); iHead.setMatrixAt(i, m);
     }
     for (const mm of this.visMeshes) mm.instanceMatrix.needsUpdate = true;
+    // Personal: pendelt zwischen Bereichen, "arbeitet" an Punkten
+    const [sb, sl, sh] = this.staffMeshes;
+    for (let i = 0; i < this.staff.length; i++) {
+      const s = this.staff[i];
+      if (s.dwell > 0) { s.dwell -= dt; if (s.dwell <= 0) { const tn = this.pois[Math.floor(this.rng() * this.pois.length)]; s.path = this.bfs(s.a, tn.node); s.pi = 1; if (s.path.length > 1) { s.b = s.path[1]; s.t = 0; } else s.dwell = 4; } }
+      else { const A_ = N[s.a], B_ = N[s.b], L = Math.hypot(B_.x - A_.x, B_.z - A_.z) || 1; s.t += s.speed * dt / L; if (s.t >= 1) { s.a = s.b; s.t = 0; if (s.pi + 1 < s.path.length) s.b = s.path[++s.pi]; else s.dwell = 8 + this.R(0, 12); } }
+      const A2 = N[s.a], B2 = N[s.b], L2 = Math.hypot(B2.x - A2.x, B2.z - A2.z) || 1, dx = (B2.x - A2.x) / L2, dz = (B2.z - A2.z) / L2;
+      s.x = A2.x + dx * L2 * s.t - dz * s.off; s.z = A2.z + dz * L2 * s.t + dx * s.off; s.yaw = Math.atan2(dx, dz);
+      q.setFromAxisAngle(up, s.yaw); pv.set(s.x, Math.max(0.05, this.h(s.x, s.z)) + 0.07, s.z); sc.set(1, 1, 1); m.compose(pv, q, sc); sb.setMatrixAt(i, m); sl.setMatrixAt(i, m); sh.setMatrixAt(i, m);
+    }
+    for (const mm of this.staffMeshes) mm.instanceMatrix.needsUpdate = true;
+    if (this.statT > 2) {
+      this.statT = 0; let inPark = 0; for (const v of this.vis) if (!(v.a === this.lotNode && v.mode === 'dwell')) inPark++; this.hist.inPark = inPark;
+      for (const r of this.rides) if (r.qs) this.drawQueueSign(r);
+    }
+    // Showbühnen: Scheinwerfer
+    for (const p of this.vStages) if (p.spots) p.spots.forEach((sp, k) => { sp.material.opacity = p.active ? (0.35 + 0.35 * Math.sin(this.time * 4 + k)) * Math.min(1, (this.env.night || 0) * 1.5 + 0.2) : 0; sp.material.color.setHSL((this.time * 0.2 + k / 6) % 1, 0.9, 0.6); });
   }
+
 }

@@ -37,7 +37,9 @@ export class Environment {
     const sc = this.sun.shadow.camera; sc.left = -170; sc.right = 170; sc.top = 170; sc.bottom = -170; sc.near = 10; sc.far = 900;
     this.sun.shadow.bias = -0.0003; this.sun.shadow.normalBias = 0.6;
     scene.add(this.sun); scene.add(this.sun.target);
-    this.moon = new THREE.DirectionalLight(0x8fa8ff, 0.0); scene.add(this.moon);
+    this.moon = new THREE.DirectionalLight(0x8fa8ff, 0.0); this.moon.castShadow = false; this.moon.shadow.mapSize.set(1024, 1024);
+    { const mc = this.moon.shadow.camera; mc.left = -150; mc.right = 150; mc.top = 150; mc.bottom = -150; mc.near = 10; mc.far = 800; this.moon.shadow.bias = -0.0004; this.moon.shadow.normalBias = 0.7; }
+    scene.add(this.moon); scene.add(this.moon.target);
     scene.fog = new THREE.FogExp2(0xbcd0e6, 0.00035);
 
     // Sterne
@@ -131,7 +133,7 @@ export class Environment {
     this.hemi.intensity *= (this.ambMul || 1); this.sun.intensity *= 0.5 + 0.5 * (this.ambMul || 1);
     this.hemi.color.setRGB(lerp(0.15, 0.7, day), lerp(0.2, 0.82, day), lerp(0.4, 1.0, day));
     this.moon.intensity = (1 - day) * 2.4 * (1 - dark * 0.5);
-    this.moon.position.set(-this.sunDir.x * 300, Math.max(60, -this.sunDir.y * 300), -this.sunDir.z * 300);
+    this.moonDir = new THREE.Vector3(-this.sunDir.x, Math.max(0.35, -this.sunDir.y), -this.sunDir.z).normalize();
     // Nebel
     const fogDay = new THREE.Color(0.74, 0.83, 0.93), fogDusk = new THREE.Color(0.95, 0.6, 0.4), fogNight = new THREE.Color(0.025, 0.035, 0.07), fogGray = new THREE.Color(0.55, 0.58, 0.62);
     const fc = fogNight.clone().lerp(fogDay, day).lerp(fogDusk, dusk * 0.7).lerp(fogGray.clone().multiplyScalar(lerp(0.15, 1, day)), Math.min(1, dark * 1.3));
@@ -177,5 +179,11 @@ export class Environment {
     this.sun.position.set(f.x + this.sunDir.x * 400, f.y + this.sunDir.y * 400 + 20, f.z + this.sunDir.z * 400);
     this.sun.target.position.set(f.x, f.y, f.z); this.sun.target.updateMatrixWorld();
     if (this.sunDir.y < 0.02) this.sun.castShadow = false; else this.sun.castShadow = this.shadowOn;
+    // Mondlicht mit Schatten in der Nacht
+    if (this.moonDir) {
+      this.moon.position.set(f.x + this.moonDir.x * 400, f.y + this.moonDir.y * 400 + 20, f.z + this.moonDir.z * 400);
+      this.moon.target.position.set(f.x, f.y, f.z); this.moon.target.updateMatrixWorld();
+      this.moon.castShadow = this.shadowOn && (this.night || 0) > 0.55;
+    }
   }
 }

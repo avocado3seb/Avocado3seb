@@ -23,6 +23,8 @@ for (const c of db.coasters) {
   if (st.assist > 3) issues.push('Hilfsantrieb ' + st.assist.toFixed(1) + 's');
   if (tr.connLen > 160) issues.push('Verbinder ' + tr.connLen.toFixed(0) + 'm');
   if (tr.bounds.minY < -0.5) issues.push('minY ' + tr.bounds.minY.toFixed(1));
+  const attr = c.kind === 'Attraktion';
+  if (attr) { rows.push([c.name, c.park, 'A', tr.L.toFixed(0), '-', (st.maxV * 3.6).toFixed(0), '-', st.maxY.toFixed(0), '-', tr.inversions, '-', st.maxG.toFixed(1), tr.connLen.toFixed(0), t.toFixed(0), t >= 900 ? 'LAUFT NICHT DURCH' : (tr.connLen > 160 ? 'Verbinder ' + tr.connLen.toFixed(0) : '')]); if (t >= 900 || tr.connLen > 160) bad++; continue; }
   if (st.maxG > 6.5) issues.push('G+ ' + st.maxG.toFixed(1) + ' @' + gTok);
   if (st.minG < -1.8) issues.push('G- ' + st.minG.toFixed(1));
   if (tr.warn.length) issues.push(tr.warn.join(';'));
