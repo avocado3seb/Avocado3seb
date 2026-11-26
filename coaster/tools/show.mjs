@@ -1,0 +1,10 @@
+import { buildTrack } from '../src/track.js';
+import { genLayout } from '../src/gen.js';
+import { CATS } from '../src/specs.js';
+const c = JSON.parse(process.argv[2]);
+const spec=CATS[c.cat];
+const dsl=genLayout(c); console.log(dsl);
+const tr=buildTrack(dsl,{trainLen:spec.cars*spec.spacing});
+let x=0;
+for(const [t,a,b] of tr.log) console.log(t.padEnd(30), a.toFixed(0).padStart(5), b.toFixed(0).padStart(5));
+console.log('L',tr.L,'bounds',tr.bounds);
