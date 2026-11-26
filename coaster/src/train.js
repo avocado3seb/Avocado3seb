@@ -33,10 +33,11 @@ function rider(b, seat, spec, rng, armsUp) {
   const x = seat.x, z = seat.z;
   const sc = spec.style === 'small' ? 0.85 : 1;
   if (spec.rider === 'fly') {
-    // liegend (Kopf nach vorn)
-    b.box(x, 0.15, z, 0.85 * sc, 0.28, 0.4, shirt);
-    b.box(x + 0.55, 0.2, z, 0.22, 0.22, 0.22, skin); b.box(x + 0.55, 0.3, z, 0.24, 0.08, 0.24, hair);
-    b.box(x - 0.7, 0.1, z, 0.6, 0.2, 0.34, [0.18, 0.2, 0.3]);
+    // liegend in Bauchlage (Kopf nach vorn, Arme am Körper, Beine gestreckt)
+    b.box(x, 0.16, z, 0.95 * sc, 0.26, 0.46, shirt);
+    b.box(x + 0.62, 0.3, z, 0.24, 0.24, 0.24, skin); b.box(x + 0.62, 0.43, z, 0.26, 0.09, 0.26, hair);
+    b.box(x - 0.85, 0.1, z, 0.85, 0.2, 0.36, [0.18, 0.2, 0.3]);
+    b.box(x + 0.15, 0.22, z - 0.3, 0.55, 0.12, 0.12, shirt); b.box(x + 0.15, 0.22, z + 0.3, 0.55, 0.12, 0.12, shirt);
     return;
   }
   b.box(x - 0.04, 0.42 * sc, z, 0.3, 0.5 * sc, 0.4, shirt);          // Oberkörper

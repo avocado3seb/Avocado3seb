@@ -13,7 +13,7 @@ export class Touch {
         <div id="joy"><i id="joyK"></i></div>
         <div id="tbtns">
           <button data-a="jump">⤒<small>Sprung</small></button><button data-a="use">E<small>Aktion</small></button><button data-a="run">»<small>Rennen</small></button>
-          <button data-a="map">🗺</button><button data-a="photo">📷</button><button data-a="go">▶<small>Start</small></button><button data-a="cam">🎥</button><button data-a="menu">☰</button>
+          <button data-a="map">🗺</button><button data-a="photo">📷</button><button data-a="go">▶<small>Start</small></button><button data-a="exit">⏏<small>Aussteigen</small></button><button data-a="cam">🎥</button><button data-a="menu">☰</button>
         </div></div>`);
     this.el = $('#tc'); const joy = $('#joy'), K = $('#joyK');
     const upd = (e) => {
@@ -40,7 +40,7 @@ export class Touch {
     const a = this.app, show = this.on && a.state !== 'menu';
     this.el.classList.toggle('hide', !show); if (!show) { this.stick.x = this.stick.y = 0; this.applyKeys(); return; }
     const ride = a.state === 'ride', walk = a.state === 'park' && a.parkMode === 'walk', pl = a.park && a.park.def.name === 'Phantasialand';
-    for (const [k, vis] of [['jump', walk], ['use', walk && pl], ['run', a.state === 'park'], ['map', pl], ['photo', pl], ['go', ride], ['cam', ride], ['menu', true]]) { const b = this.el.querySelector(`[data-a="${k}"]`); if (b) b.classList.toggle('hide', !vis); }
+    for (const [k, vis] of [['jump', walk], ['use', walk && pl], ['run', a.state === 'park'], ['map', pl], ['photo', pl], ['go', ride], ['exit', ride], ['cam', ride], ['menu', true]]) { const b = this.el.querySelector(`[data-a="${k}"]`); if (b) b.classList.toggle('hide', !vis); }
     $('#joy').classList.toggle('hide', ride);
   }
   applyKeys() {
@@ -54,7 +54,8 @@ export class Touch {
     else if (a === 'run') { this.run = !this.run; b.classList.toggle('on', this.run); this.applyKeys(); }
     else if (a === 'map') app.ui.openMap();
     else if (a === 'photo') app.game.takePhoto('Foto');
-    else if (a === 'go') { if (app.ride && app.ride.sim.state === 'station') app.ride.sim.timer = Math.min(app.ride.sim.timer, 0.3); }
+    else if (a === 'go') app.departNow();
+    else if (a === 'exit') { if (app.ride && app.ride.sim.state === 'station') app.exitRide(); else app.ui.toast('Aussteigen nur in der Station'); }
     else if (a === 'cam') app.cycleCamera();
     else if (a === 'menu') app.showMenu();
   }

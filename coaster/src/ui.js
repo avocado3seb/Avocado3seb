@@ -408,7 +408,7 @@ Am Ende wird die Strecke automatisch zur Station zurückgeführt.</pre>
         <tr><td><kbd>C</kbd></td><td>Kamera weiterschalten</td></tr>
         <tr><td><kbd>Maus ziehen</kbd></td><td>Umschauen / Drohne drehen</td></tr>
         <tr><td><kbd>Mausrad</kbd></td><td>Zoom / Drohnen-Abstand</td></tr>
-        <tr><td><kbd>Leertaste</kbd></td><td>Abfahrt sofort · Blick zentrieren</td></tr>
+        <tr><td><kbd>Leertaste</kbd></td><td>In der Station: aussteigen · sonst Blick zentrieren</td></tr><tr><td><kbd>G</kbd></td><td>In der Station: sofort losfahren (sonst automatisch nach dem Countdown)</td></tr>
         <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Sitzplatz links/rechts · <kbd>↑</kbd> <kbd>↓</kbd> Wagen vor/zurück</td></tr>
         <tr><td><kbd>W A S D</kbd> <kbd>Q E</kbd></td><td>Freie Kamera / Fliegen / Gehen (<kbd>Shift</kbd> schneller)</td></tr>
         <tr><td><kbd>E</kbd></td><td>Phantasialand (Gehen): Interagieren – Restaurants, Shops, Hotels, Ticketscanner, Bahn-Eingang</td></tr>
@@ -469,7 +469,7 @@ Am Ende wird die Strecke automatisch zur Station zurückgeführt.</pre>
     $('#gS').textContent = d.kmh.toFixed(0); $('#gH').textContent = d.h.toFixed(0);
     $('#gV').textContent = d.gv.toFixed(1); $('#gL').textContent = d.gl.toFixed(1);
     $('#hProg').style.width = (d.prog * 100).toFixed(1) + '%'; $('#hState').textContent = d.state;
-    $('#hCount').innerHTML = d.count ? `<div class="big">${d.count}</div><div class="sm">Leertaste: sofort losfahren</div>` : '';
+    $('#hCount').innerHTML = d.count ? `<div class="big">${d.count}</div><div class="sm">Leertaste: aussteigen · G: sofort losfahren</div>` : '';
   }
   setRide(c) { $('#hName').textContent = c ? c.name : ''; $('#hPark').textContent = c ? `${c.park} · ${cname(c.cc)}` : ''; }
   setCam(id) { $('#hCams').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.c === id)); }

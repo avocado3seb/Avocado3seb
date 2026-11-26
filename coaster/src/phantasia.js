@@ -16,6 +16,7 @@ import * as A from './pl_assets.js';
 import { EXTRA_ZONES, ZONE_OF_AREA } from './pl_data.js';
 import { placePOIs } from './pl_pois.js';
 import { buildBeauty } from './pl_beauty.js';
+import { buildMedieval, buildAviation } from './pl_themes.js';
 import { buildChina, buildMystery, buildBerlin, buildParking, buildAirship, buildLightStrings, buildWinterDecor } from './pl_zones2.js';
 
 const TAU = Math.PI * 2;
@@ -63,6 +64,7 @@ export class PhantasiaWorld extends ParkWorld {
     this.buildTerrainPL();
     this.buildPathMeshes();
     this.pois = placePOIs(this);
+    buildMedieval(this); buildAviation(this);
     this.buildZoneDecor();
     this.buildExtras();
     this.buildEffects();
@@ -315,16 +317,16 @@ export class PhantasiaWorld extends ParkWorld {
       if (this.nearStation(x, z) && !(this._rockForce)) return;
       const k = v ?? Math.floor(this.rng() * 5), ry = this.R(0, TAU);
       this.rocks[k].add(x, y, z, s * this.R(0.9, 1.4), s * this.R(0.7, 1.1), s * this.R(0.9, 1.4), ry, col, this.R(-0.1, 0.1), this.R(-0.1, 0.1));
-      if (collide && s > 1.3) out.colliders.push({ x, z, r: s * 0.85, y0: y - 1, y1: y + s * 0.75 });
+      if (collide && s > 0.7) out.colliders.push({ x, z, r: s * 1.15, y0: y - 1, y1: y + s * 0.85 });
     };
     this.addRock = addRock;
     const rockCol = { k: ['#4a4d52', '#3c3f45', '#585b60', '#2f3237'], a: ['#6a5a45', '#5a4c3a', '#7a6a55', '#4a4a3e'], m: ['#a8553a', '#b8663f', '#8a4a32', '#c8794a'], g: ['#6a6a68', '#5a5a58', '#787875'] };
     const pick = a => a[Math.floor(this.rng() * a.length)];
     const pineAt = (x, y, z, s, dark = true) => {
       const h = 5 * s, col = new THREE.Color().setHSL(0.36 + this.R(-0.03, 0.03), this.R(0.35, 0.55), this.R(0.1, 0.2));
-      trunks.add(x, y, z, s * 0.6, h * 0.45, s * 0.6, 0, '#3a2a1c'); cones1.add(x, y + h * 0.2, z, 2.6 * s, 5.5 * s, 2.6 * s, this.R(0, TAU), col); cones2.add(x, y + h * 0.75, z, 1.9 * s, 4.4 * s, 1.9 * s, this.R(0, TAU), col);
+      out.colliders.push({ x, z, r: 0.3 * s + 0.3, y0: y - 1, y1: y + 5 }); trunks.add(x, y, z, s * 0.6, h * 0.45, s * 0.6, 0, '#3a2a1c'); cones1.add(x, y + h * 0.2, z, 2.6 * s, 5.5 * s, 2.6 * s, this.R(0, TAU), col); cones2.add(x, y + h * 0.75, z, 1.9 * s, 4.4 * s, 1.9 * s, this.R(0, TAU), col);
     };
-    const leafyAt = (x, y, z, s) => { const col = new THREE.Color().setHSL(0.27 + this.R(-0.05, 0.05), this.R(0.4, 0.6), this.R(0.2, 0.32)); trunks.add(x, y, z, s * 0.7, 3.4 * s, s * 0.7, 0, '#4a3524'); crowns.add(x, y + 2.8 * s, z, 2.8 * s, 2.4 * s, 2.8 * s, this.R(0, TAU), col); };
+    const leafyAt = (x, y, z, s) => { out.colliders.push({ x, z, r: 0.35 * s + 0.3, y0: y - 1, y1: y + 4 }); const col = new THREE.Color().setHSL(0.27 + this.R(-0.05, 0.05), this.R(0.4, 0.6), this.R(0.2, 0.32)); trunks.add(x, y, z, s * 0.7, 3.4 * s, s * 0.7, 0, '#4a3524'); crowns.add(x, y + 2.8 * s, z, 2.8 * s, 2.4 * s, 2.8 * s, this.R(0, TAU), col); };
     this.pineAt = pineAt; this.leafyAt = leafyAt;
 
     // ---------- Hauptplatz / Eingang: Fachwerk-Häuser

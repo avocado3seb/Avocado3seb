@@ -152,11 +152,18 @@ class App {
 
   enterRide(r, fresh = false) {
     this.state = 'ride'; this.ride = r; this.coaster = r.coaster;
-    if (fresh) { if (!this.net.active) { r.sim.reset(0); r.sim.timer = 6; r.sim.dispatch = 9; } this.camMode = this.camMode === 'free' ? 'fp' : this.camMode; this.seat = { car: -1, row: 0, s: -1 }; this.look.yaw = this.look.pitch = 0; this.outside.idx = -1; this.chase.init = false; }
+    if (fresh) { if (!this.net.active) { r.sim.reset(0); r.sim.timer = 30; r.sim.dispatch = 22; } this.camMode = this.camMode === 'free' ? 'fp' : this.camMode; this.seat = { car: -1, row: 0, s: -1 }; this.look.yaw = this.look.pitch = 0; this.outside.idx = -1; this.chase.init = false; }
     this.game.lapSeen.set(r.sim, r.sim.lap);
     this.ui.setMode('ride'); this.ui.setRide(r.coaster); this.ui.setTrains(r); this.ui.setCam(this.camMode); this.camInit = false;
     this.setCamera(this.camMode, true);
     this.ui.toast(`${r.coaster.name} – ${r.coaster.park}`);
+  }
+  departNow() { const r = this.ride; if (!r || r.sim.state !== 'station') return; if (this.net.active && !this.net.isHost) this.net.send({ t: 'dispatch', r: this.park.rides.indexOf(r) }); else r.sim.timer = Math.min(r.sim.timer, 0.3); }
+  exitRide() { // Aussteigen: zurück auf die Wege direkt vor dem Eingang der Bahn
+    const r = this.ride; if (!r) return; this.replayExit(true); const e = r.entrance, d = r.dir || [0, 1];
+    this.enterPark();
+    const gx = e.x + d[0] * 3, gz = e.z + d[1] * 3; this.camera.position.set(gx, (this.park.groundAt ? this.park.groundAt(gx, gz, 60) : 0) + 3, gz);
+    this.free.yaw = Math.atan2(-d[0], -d[1]); this.free.pitch = 0; this.setParkMode('walk'); this.ui.toast('Ausgestiegen – bis zum nächsten Mal!');
   }
   enterPark() {
     this.state = 'park'; this.ride = null; this.coaster = null;
@@ -238,6 +245,7 @@ class App {
       else if (k === 'm' || k === 'M') this.openMapOrMini();
       else if ((k === 'e' || k === 'E') && this.state === 'park' && this.parkMode === 'walk') this.game.interact();
       else if (k === 'k' || k === 'K') this.game.takePhoto('Foto');
+      else if ((k === 'g' || k === 'G') && this.state === 'ride') this.departNow();
       else if (k === 'Tab') { e.preventDefault(); if (this.state === 'ride') this.enterPark(); else if (this.state === 'park') { const r = this.park.rides[0]; if (r) this.enterRide(r); } }
       else if (k === 't' || k === 'T') { this.env.setTime(this.env.hour + 3); this.ui.root.querySelectorAll('#mTime,#hTime').forEach(x => x.value = this.env.hour); this.ui.toast('Uhrzeit ' + this.ui.clock(this.env.hour)); this.saveSettings(); }
       else if (k === 'r' || k === 'R') { const ks = Object.keys(WEATHERS); const n = ks[(ks.indexOf(this.env.weatherName) + 1) % ks.length]; this.env.setWeather(n); this.ui.root.querySelectorAll('#mWeather,#hWeather').forEach(x => x.value = n); this.ui.toast('Wetter: ' + WEATHERS[n].label); this.saveSettings(); }
@@ -248,7 +256,7 @@ class App {
         e.preventDefault();
         if (this.replay) { this.replay.playing = !this.replay.playing; return; }
         if (this.state === 'park' && this.parkMode === 'walk') { this.walk.jump = true; return; }
-        if (this.state === 'ride' && this.ride.sim.state === 'station') { if (this.net.active && !this.net.isHost) this.net.send({ t: 'dispatch', r: this.park.rides.indexOf(this.ride) }); else this.ride.sim.timer = Math.min(this.ride.sim.timer, 0.3); }
+        if (this.state === 'ride' && this.ride.sim.state === 'station') { this.exitRide(); return; }
         this.look.yaw = this.look.pitch = 0;
       } else if (this.state === 'ride' && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.code)) {
         e.preventDefault();
@@ -503,10 +511,12 @@ class App {
       const mv = new THREE.Vector3();
       if (K.has('KeyW')) mv.add(fwd); if (K.has('KeyS')) mv.sub(fwd); if (K.has('KeyD')) mv.add(right); if (K.has('KeyA')) mv.sub(right);
       if (mv.lengthSq()) mv.normalize().multiplyScalar(sp);
-      f.pos.add(mv);
-      const feetY0 = f.pos.y - 1.75, room = this.game.room;
-      if (room) { f.pos.x = clamp(f.pos.x, 3000 - 3.05, 3000 + 3.05); f.pos.z = clamp(f.pos.z, 3000 - 2.55, 3000 + 2.55); }
-      else if (w.collide) w.collide(f.pos, 0.42, feetY0);
+      const feetY0 = f.pos.y - 1.75, room = this.game.room, nSub = Math.max(1, Math.ceil(mv.length() / 0.2)); // in kleinen Schritten bewegen → nichts wird durchlaufen
+      for (let i = 0; i < nSub; i++) {
+        f.pos.x += mv.x / nSub; f.pos.z += mv.z / nSub;
+        if (room) { f.pos.x = clamp(f.pos.x, 3000 - 3.05, 3000 + 3.05); f.pos.z = clamp(f.pos.z, 3000 - 2.55, 3000 + 2.55); }
+        else if (w.collide) w.collide(f.pos, 0.5, feetY0);
+      }
       let feet = f.pos.y - 1.75; const ground = room ? 0.1 : w.groundAt ? w.groundAt(f.pos.x, f.pos.z, feet + 0.6) : 0;
       f.vy = (f.vy || 0) - 20 * dt; feet += f.vy * dt;
       let grounded = false;

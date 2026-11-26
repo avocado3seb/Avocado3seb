@@ -42,6 +42,9 @@ Der Start-Hub bietet **Spielen** (Parkplatz → Ticket → Park, mit Spielgeld) 
 - **Achterbahn-Editor**: Bausteine (Lift, Launch, Abfahrt, Looping, Korkenzieher, Zero-G-Roll, Helix, Top Hat, Hügel, Kurven, Bremsen …) aneinanderreihen, Parameter, Undo/Redo, Vorschau mit Kennzahlen und Validierung, Testfahrt, Speichern/Laden/Löschen.
 - **Touch** (Tablet/Handy): Joystick, Wischen = Umschauen, Pinch-Zoom, Aktionsknöpfe.
 
+- **Steuerung in Bahnen**: Beim Einsteigen läuft ein 30-s-Countdown; `Leertaste` = aussteigen (zurück an den Eingang), `G` = sofort losfahren. Beim Laufen gibt es Kollision (in kleinen Schritten, nichts wird durchlaufen).
+- **Themen**: Klugheim als Mittelalterwelt (Burg mit Ringmauer/Türmen/Bergfried, Fachwerkhäuser, Marktstände, Banner, Windmühle), Rookburgh in Pionierzeit der Fliegerei (Holz-Hangars, Doppeldecker, Gleiter, Windsäcke); F.L.Y. mit roten Schienen und liegenden Fahrgästen, Black Mamba als Floorless-Zug mit 3 Loopings und 2 Korkenziehern.
+
 **Hinweis zu den Daten**: Namen, Speisekarten, Preise, Zimmertypen, Showzeiten und Ticketpreise der Gastronomie/Hotels/Shops sind **frei ergänzte Beispielangebote** (Spielgeld), keine echten Angaben des Parks. Echt sind nur Bahn-, Themenbereichs- und Hotelnamen.
 
 **Ehrlich gesagt**: Das ist eine stilisierte Nachbildung mit Platzhalter-Geometrie (Low-Poly), keine fotorealistische oder maßstabsgetreue Kopie des Parks. Streckenverläufe sind aus Höhe, Länge, Tempo, Inversionen und typischen Elementen abgeleitet.
