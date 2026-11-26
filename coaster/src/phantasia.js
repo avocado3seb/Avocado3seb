@@ -70,6 +70,7 @@ export class PhantasiaWorld extends ParkWorld {
     this.buildEffects();
     this.buildVisitors();
     this.buildMinimapData();
+    this.buildRockColliders();
     this.buildColliderHash();
   }
 
@@ -317,7 +318,6 @@ export class PhantasiaWorld extends ParkWorld {
       if (this.nearStation(x, z) && !(this._rockForce)) return;
       const k = v ?? Math.floor(this.rng() * 5), ry = this.R(0, TAU);
       this.rocks[k].add(x, y, z, s * this.R(0.9, 1.4), s * this.R(0.7, 1.1), s * this.R(0.9, 1.4), ry, col, this.R(-0.1, 0.1), this.R(-0.1, 0.1));
-      if (collide && s > 0.7) out.colliders.push({ x, z, r: s * 1.15, y0: y - 1, y1: y + s * 0.85 });
     };
     this.addRock = addRock;
     const rockCol = { k: ['#4a4d52', '#3c3f45', '#585b60', '#2f3237'], a: ['#6a5a45', '#5a4c3a', '#7a6a55', '#4a4a3e'], m: ['#a8553a', '#b8663f', '#8a4a32', '#c8794a'], g: ['#6a6a68', '#5a5a58', '#787875'] };
@@ -662,6 +662,21 @@ export class PhantasiaWorld extends ParkWorld {
   }
 
   // ------------------------------------------------------------------ Kollision & Boden
+  buildRockColliders() { // jede Felsen-Instanz bekommt einen Kollisionskreis (aus Position/Skalierung) → kein Durchlaufen; Felsen auf Wegen werden entfernt → Wege bleiben frei
+    const m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), zero = new THREE.Vector3(0, 0, 0), segs = this.edges.map(e => ({ A: this.nodes[e[0]], B: this.nodes[e[1]], w: e[2] }));
+    const onPath = (x, z, r) => { for (const e of segs) { const vx = e.B.x - e.A.x, vz = e.B.z - e.A.z, L2 = vx * vx + vz * vz || 1, t = Math.max(0, Math.min(1, ((x - e.A.x) * vx + (z - e.A.z) * vz) / L2)), d = Math.hypot(x - (e.A.x + vx * t), z - (e.A.z + vz * t)); if (d < e.w / 2 + 0.8 + r * 0.7) return true; } return false; };
+    let n = 0, removed = 0;
+    for (const k in this.rocks) {
+      const im = this.rocks[k].mesh;
+      for (let i = 0; i < im.count; i++) {
+        im.getMatrixAt(i, m); m.decompose(p, q, sc); const r = 0.82 * Math.max(sc.x, sc.z);
+        if (onPath(p.x, p.z, r)) { m.compose(p, q, zero); im.setMatrixAt(i, m); removed++; continue; }
+        if (r < 0.4) continue; this.out.colliders.push({ x: p.x, z: p.z, r, y0: p.y - 1.5, y1: p.y + sc.y * 0.75 }); n++;
+      }
+      im.instanceMatrix.needsUpdate = true;
+    }
+    this.rockColliders = n; this.rocksRemoved = removed;
+  }
   buildColliderHash() {
     const c = 12; this.chash = new Map(); this.cc = c;
     for (const col of this.out.colliders) {
