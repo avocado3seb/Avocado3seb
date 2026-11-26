@@ -4,7 +4,7 @@ const require = createRequire(import.meta.url); const { chromium } = require(exe
 const BASE = process.env.BASE || 'http://127.0.0.1:5173/coaster/index.html';
 const Q = '?peerhost=127.0.0.1&peerport=9000&peerpath=/';
 const OUT = process.argv[2] || '.';
-const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'] });
+const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader', '--disable-features=WebRtcHideLocalIpsWithMdns'] });
 const errs = []; let fails = 0;
 const mk = async (tag) => { const p = await browser.newPage({ viewport: { width: 1100, height: 650 } }); p.on('pageerror', e => errs.push(tag + ' PAGEERROR ' + e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(tag + ' ' + m.text()); }); return p; };
 const check = (name, ok, extra = '') => { console.log((ok ? '✔ ' : '✖ ') + name + (extra ? '  ' + extra : '')); if (!ok) fails++; };

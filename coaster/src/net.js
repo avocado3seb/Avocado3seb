@@ -150,7 +150,7 @@ export class Net {
       this.leave(true); this.me.name = name; code = code.trim().toUpperCase();
       const peer = this.peer = new Peer(undefined, this.peerOpts());
       const fail = msg => { this.setStatus(msg); try { peer.destroy(); } catch (x) { /* */ } this.peer = null; this.mode = 'off'; reject(new Error(msg)); };
-      const timer = setTimeout(() => fail('Zeitüberschreitung – Raum nicht gefunden'), 15000);
+      const timer = setTimeout(() => fail('Zeitüberschreitung – Raum nicht gefunden'), 30000);
       peer.on('error', e => { clearTimeout(timer); fail(e.type === 'peer-unavailable' ? 'Raum nicht gefunden' : 'Fehler: ' + (e.type || e.message)); });
       peer.on('open', () => {
         const conn = peer.connect(PREFIX + code, { reliable: true, serialization: 'json' }); this.hostConn = conn;
