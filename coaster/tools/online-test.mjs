@@ -11,10 +11,13 @@ const check = (name, ok, extra = '') => { console.log((ok ? '✔ ' : '✖ ') + n
 const A = await mk('A'), B = await mk('B');
 await A.goto(BASE + Q); await B.goto(BASE + Q);
 for (const p of [A, B]) await p.waitForFunction(() => window.__app && window.__app.park && window.__app.state === 'menu', null, { timeout: 90000 });
-const code = await A.evaluate(async () => { const a = window.__app; await a.net.host('Anna'); await a.openPark('Phantasialand'); return a.net.code; });
+const code = await A.evaluate(async () => { const a = window.__app; await a.net.host('Anna'); return a.net.code; });
 check('Host eröffnet Raum', /^[A-Z0-9]{5}$/.test(code), code);
 await B.evaluate(async code => { await window.__app.net.join(code, 'Ben'); }, code);
-await B.waitForFunction(() => window.__app.park && window.__app.park.def.name === 'Phantasialand' && window.__app.state === 'park', null, { timeout: 60000 });
+await B.waitForFunction(() => window.__app.net.mode === 'client', null, { timeout: 60000 });
+// Host wechselt in den Park – der Gast folgt
+await A.evaluate(async () => { await window.__app.openPark('Phantasialand'); });
+await B.waitForFunction(() => window.__app.park && window.__app.park.def.name === 'Phantasialand' && window.__app.state === 'park', null, { timeout: 240000 });
 check('Gast folgt dem Park des Hosts', true);
 await A.waitForTimeout(1500);
 check('Host sieht Gast', await A.evaluate(() => [...window.__app.net.remotes.values()].some(r => r.name === 'Ben')));
