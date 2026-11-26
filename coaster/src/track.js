@@ -24,6 +24,7 @@
 //    LAUNCH:L:V[:A]              Katapult (V km/h)
 //    BRAKE:L[:V]                 Bremsstrecke (V m/s)
 //    ROLL:bank[:L]               Querneigung ändern
+//    HOME[:bank[:brake]]         Rückfahrt: Gerade, Wendekurve, Bremse (Kurs muss nach Westen zeigen)
 //  Am Ende wird die Strecke automatisch zur Station zurückgeführt (Hermite-Verbinder).
 // ============================================================================
 
@@ -243,7 +244,7 @@ export class Builder {
     const { th, psi, phi } = this;
     this.seg(L1, s => { const u = sstep(s / L1); return [th + th1 * u, psi, phi + PI * u * dir]; });
     const th2 = this.th, psi2 = this.psi, phi2 = this.phi;
-    const rFn = t => 1 + 1.4 * Math.pow(t, 1.4);
+    const rFn = t => 1 + 0.7 * t;
     // Dive-Loop: von th2 nach -PI (relativ zur normierten Lage)
     let tb = arcTable(th2, -PI, rFn);
     // Höhenverlust bis th = -PI/2 ... Gesamt = H
@@ -340,6 +341,15 @@ export class Builder {
       }
       case 'BRAKE': this.straight(N(0, 20), ZONE.BRAKE, N(1, 4)); break;
       case 'ROLL': this.rollTo(N(0, 0) * D2R, N(1, 20)); break;
+      case 'HOME': { // Rückweg: Gerade bis hinter die Station, Wendekurve rechts, Bremsstrecke
+        const bank = N(0, 45), brake = N(1, 30);
+        const xb = -26 - 0.15 * Math.max(10, this.z / 2);
+        if (this.x - xb > 1) this.straight(this.x - xb);
+        const Rr = Math.max(14, this.z / 2);
+        this.turn(180, Rr, bank);
+        this.straight(brake, ZONE.BRAKE, 5);
+        break;
+      }
       default: this.warn.push('Unbekanntes Element: ' + tok);
     }
   }

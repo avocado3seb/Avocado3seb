@@ -121,15 +121,15 @@ export class Environment {
     u.turbidity.value = lerp(2, 20, Math.min(1, this.wCur.turb / 20)) ;
     u.rayleigh.value = lerp(0.6, 3.2, dusk) * (1 - dark * 0.6) + 0.2;
     u.mieCoefficient.value = 0.005 + dark * 0.02;
-    this.renderer.toneMappingExposure = lerp(0.18, 0.5, day) * (1 - dark * 0.35);
+    this.renderer.toneMappingExposure = lerp(0.42, 0.5, day) * (1 - dark * 0.35);
     // Licht
-    this.scene.environmentIntensity = lerp(0.03, 0.5, day) * (1 - dark * 0.4);
+    this.scene.environmentIntensity = lerp(0.28, 0.5, day) * (1 - dark * 0.4);
     const warm = new THREE.Color(1, 0.55, 0.28), white = new THREE.Color(1, 0.96, 0.9);
     this.sun.color.copy(white).lerp(warm, 1 - smooth(0.0, 0.5, e));
     this.sun.intensity = (3.6 * smooth(-0.02, 0.2, e)) * (1 - dark * 0.8) + this.flash * 3;
-    this.hemi.intensity = lerp(0.12, 1.05, day) * (1 - dark * 0.35) + this.flash * 1.5;
+    this.hemi.intensity = lerp(0.5, 1.05, day) * (1 - dark * 0.35) + this.flash * 1.5;
     this.hemi.color.setRGB(lerp(0.15, 0.7, day), lerp(0.2, 0.82, day), lerp(0.4, 1.0, day));
-    this.moon.intensity = (1 - day) * 0.55 * (1 - dark * 0.5);
+    this.moon.intensity = (1 - day) * 1.4 * (1 - dark * 0.5);
     this.moon.position.set(-this.sunDir.x * 300, Math.max(60, -this.sunDir.y * 300), -this.sunDir.z * 300);
     // Nebel
     const fogDay = new THREE.Color(0.74, 0.83, 0.93), fogDusk = new THREE.Color(0.95, 0.6, 0.4), fogNight = new THREE.Color(0.025, 0.035, 0.07), fogGray = new THREE.Color(0.55, 0.58, 0.62);
@@ -143,7 +143,7 @@ export class Environment {
     this.cloudMats.forEach((m, i) => { m.color.copy(cc); m.opacity = Math.min(0.85, this.wCur.clouds * (0.35 + 0.65 * (i % 7) / 7) * 0.9); });
     // Lampen
     const night = 1 - smooth(0.0, 0.3, e);
-    for (const m of this.lamps) m.emissiveIntensity = night * 2.6;
+    for (const m of this.lamps) m.emissiveIntensity = night * 4;
     this.night = night;
     // Niederschlag
     this.precip.rain.visible = this.wCur.rain > 0.05; this.precip.rain.material.uniforms.uAlpha.value = Math.min(1, this.wCur.rain);

@@ -145,8 +145,8 @@ export function genLayout(c) {
           pre = [upTok(hh, 28)]; post = [downTok(hh, 28, vIn)]; vmin = 7;
         }
         else if (k === 'COBRA') {
-          if (ah < 40 || ah > 70) { queue.splice(0, 1, 'CORK', 'CORK'); continue; }
-          tok = `COBRA:${f1(clamp(ah * 0.38, 14, 24))}`; vmin = 9;
+          if (ah < 62 || ah > 90) { queue.splice(0, 1, 'CORK', 'CORK'); continue; }
+          tok = `COBRA:${f1(clamp(ah * 0.4, 28, 36))}`; vmin = 9;
         }
       } else {
         const r = R();
