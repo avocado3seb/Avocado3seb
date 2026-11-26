@@ -7,6 +7,7 @@ import { PARK_INFO, THEME_BY_COUNTRY } from './parks.js';
 import { LAYOUTS } from './layouts.js';
 import { PALETTES, CATS } from '../specs.js';
 import { hashStr } from '../gen.js';
+import { ATTRACTIONS } from '../pl_data.js';
 
 const SOURCES = [dachBenelux, frEsIt, gbNordicEast];
 
@@ -28,7 +29,7 @@ export function buildDatabase(custom = []) {
     const c = {
       id, name, park, cc, cat: CATS[cat] ? cat : 'sitdown', maker, year, h, len, v, dur, inv,
       trackColor: ex.tc || pal[0], supportColor: ex.sc || pal[1], trainColor: ex.tr || ex.tc || pal[0], trainAccent: ex.ta || ex.sc || pal[1],
-      trains: ex.trains || 1, area: ex.area || '',
+      trains: ex.trains || 1, area: ex.area || '', kind: ex.kind || 'Achterbahn', note: ex.note || '',
       alias: ((ex.al || '') + ' ' + (/Bolliger/.test(maker) ? 'B&M BM' : '') + (/Great Coasters/.test(maker) ? ' GCI' : '') + (/Rocky Mountain/.test(maker) ? ' RMC' : '') + (/Custom Coasters/.test(maker) ? ' CCI' : '')).trim(), custom,
       layout: ex.layout || LAYOUTS[name + '@' + park] || LAYOUTS[name] || null,
     };
@@ -40,6 +41,8 @@ export function buildDatabase(custom = []) {
     for (const r of p.rows) addCoaster(p.park, p.cc, r);
     for (const f of (p.flats || [])) pk.flats.push({ kind: f[0], name: f[1] });
   }
+  // stilisierte Attraktionen (keine bekannten Echtdaten) im Phantasialand
+  for (const [name, cat, area, layout, col, note] of ATTRACTIONS) addCoaster('Phantasialand', 'DE', [name, cat, 'k. A.', 0, 0, 0, 0, 0, 0, { tc: col, sc: '#3a3a40', tr: col, area, layout, kind: 'Attraktion', note }]);
   for (const p of custom) {
     addPark(p.park, p.cc || 'DE');
     for (const r of p.rows) addCoaster(p.park, p.cc || 'DE', r, true);

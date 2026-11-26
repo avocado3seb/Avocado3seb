@@ -5,6 +5,7 @@ import { CATS, COUNTRIES } from './specs.js';
 import { WEATHERS } from './env.js';
 import { getTrack } from './park.js';
 import { ZONES } from './phantasia.js';
+import { plUi } from './pl_ui.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -34,12 +35,12 @@ export class UI {
       <header>
         <div class="logo"><b>EUROPA</b> COASTER SIMULATOR<small>Alle Achterbahnen Europas · fahren · erkunden · entdecken</small></div>
         <div class="tabs">
-          <button class="tab on" data-t="db">🎢 Datenbank</button>
+          <button class="tab on" data-t="hub">🏠 Start</button>
+          <button class="tab" data-t="db">🎢 Datenbank</button>
           <button class="tab" data-t="parks">🏰 Parks</button>
           <button class="tab" data-t="pl">🎡 Phantasialand</button>
           <button class="tab" data-t="online">🌐 Online</button>
-          <button class="tab" data-t="custom">➕ Eigene Bahn</button>
-          <button class="tab" data-t="help">⚙ Hilfe &amp; Einstellungen</button>
+          <button class="tab" data-t="help">⚙ Einstellungen</button>
         </div>
         <div class="env">
           <label>🕒 Zeit <input id="mTime" type="range" min="0" max="24" step="0.1"><span id="mTimeV"></span></label>
@@ -52,7 +53,7 @@ export class UI {
     <div id="hud" class="hide">
       <div id="hTL" class="hudbox"><div class="n" id="hName"></div><div class="p" id="hPark"></div><div class="p hide" id="hNet" style="color:var(--acc2)"></div></div>
       <div id="chat" class="hide"><div id="chatLog"></div><input id="chatIn" maxlength="200" placeholder="Enter = Chat"></div>
-      <div id="hTR"><button class="btn sm" id="bMap">🗺 Karte</button><button class="btn sm" id="bPark">🏞 Park</button><button class="btn sm" id="bSnd">🔊</button><button class="btn sm" id="bHelp">❓</button><button class="btn sm" id="bMenu">☰ Menü</button></div>
+      <div id="hTR"><button class="btn sm" id="bPhoto" title="Foto (K)">📷</button><button class="btn sm" id="bMap">🗺 Karte</button><button class="btn sm" id="bPark">🏞 Park</button><button class="btn sm" id="bSnd">🔊</button><button class="btn sm" id="bHelp">❓</button><button class="btn sm" id="bMenu">☰ Menü</button></div>
       <div id="hCams" class="hudbox"></div>
       <div id="hGauge" class="hudbox">
         <div class="m"><b id="gH">0</b><small>Höhe m</small></div>
@@ -68,7 +69,7 @@ export class UI {
         <label>⏱ <select id="hSpeed"><option value="1">1×</option><option value="0.5">0,5×</option><option value="2">2×</option><option value="4">4×</option></select></label>
       </div>
       <div id="hCount"></div>
-      <div id="replay" class="hudbox hide"><button class="btn sm" id="rpPlay">⏸</button><input id="rpBar" type="range" min="0" max="1000" value="0"><select id="rpSpeed"><option value="0.25">0,25×</option><option value="0.5">0,5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select><button class="btn sm" id="rpLive">⏹ Live</button><span class="note">REPLAY</span></div>
+      <div id="replay" class="hudbox hide"><button class="btn sm" id="rpPlay">⏸</button><input id="rpBar" type="range" min="0" max="1000" value="0"><select id="rpSpeed"><option value="0.25">0,25×</option><option value="0.5">0,5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select><button class="btn sm" id="rpSave">💾 Fahrt speichern</button><button class="btn sm" id="rpLive">⏹ Live</button><span class="note">REPLAY</span></div>
       <div id="toast"></div>
       <div id="park" class="hudbox hide"><h4 id="pTitle"></h4><div class="modes"><button class="btn sm" data-m="fly">✈ Fliegen</button><button class="btn sm" data-m="walk">🚶 Gehen</button><button class="btn sm" data-m="visitor">👥 Besucher</button></div><div class="list" id="pList"></div></div>
       <div id="mini" class="hudbox hide"><canvas id="miniC" width="260" height="260"></canvas></div>
@@ -90,7 +91,9 @@ export class UI {
     this.root.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => this.tab(t.dataset.t)));
     $('#mBack').addEventListener('click', () => app.resume());
     $('#bMenu').addEventListener('click', () => app.showMenu());
-    $('#bMap').addEventListener('click', () => this.toggleMini());
+    $('#bMap').addEventListener('click', () => app.openMapOrMini());
+    $('#bPhoto').addEventListener('click', () => app.game.takePhoto('Foto'));
+    $('#rpSave').addEventListener('click', () => { if (app.replay && app.game.saveRide(app.replay.rec, app.ride)) this.toast('💾 Fahrt gespeichert (Fotoalbum → Gespeicherte Fahrten)'); });
     $('#bPark').addEventListener('click', () => app.toPark());
     $('#bSnd').addEventListener('click', () => { const on = app.audio.toggle(); $('#bSnd').textContent = on ? '🔊' : '🔇'; });
     $('#bHelp').addEventListener('click', () => this.toggleHelp());
@@ -104,7 +107,8 @@ export class UI {
     CAM_LIST.forEach(([id, label], i) => { const b = document.createElement('button'); b.dataset.c = id; b.innerHTML = `<b>${i + 1}</b>${label}`; b.addEventListener('click', () => app.setCamera(id)); cams.appendChild(b); });
     $('#park').querySelectorAll('.modes button').forEach(b => b.addEventListener('click', () => app.setParkMode(b.dataset.m)));
     $('#miniC').addEventListener('click', e => this.miniClick(e));
-    this.tab('db');
+    this.plBuild();
+    this.tab('hub');
   }
 
   clock(h) { const hh = Math.floor(h) % 24, mm = Math.floor((h % 1) * 60); return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`; }
@@ -114,7 +118,9 @@ export class UI {
     this.root.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x.dataset.t === t));
     this.curTab = t;
     const body = $('#mbody');
-    if (t === 'db') this.buildDb(body);
+    if (['hub', 'attr', 'hotels', 'food', 'photos', 'stats', 'saves', 'editor'].includes(t)) this.plTab(t, body);
+    else if (t === 'custom') this.buildCustom(body);
+    else if (t === 'db') this.buildDb(body);
     else if (t === 'parks') this.buildParks(body);
     else if (t === 'pl') this.buildPL(body);
     else if (t === 'online') this.buildOnline(body);
@@ -283,7 +289,7 @@ export class UI {
     const st = { q: '', fav: false };
     const render = () => {
       const q = st.q.toLowerCase(), grid = $('#plGrid'); grid.innerHTML = '';
-      const list = park.coasters.filter(c => (!st.fav || app.favs.has(c.id)) && (!q || (c.name + ' ' + c.area + ' ' + c.maker + ' ' + c.alias + ' ' + tlabel(c.cat)).toLowerCase().includes(q)));
+      const list = park.coasters.filter(c => c.kind === 'Achterbahn' && (!st.fav || app.favs.has(c.id)) && (!q || (c.name + ' ' + c.area + ' ' + c.maker + ' ' + c.alias + ' ' + tlabel(c.cat)).toLowerCase().includes(q)));
       for (const c of list) {
         const zone = { 'Klugheim': 'klugheim', 'Deep in Africa': 'africa', 'Rookburgh': 'rookburgh', 'Mexico': 'mexico', 'Fantasy': 'fantasy' }[c.area] || 'fantasy';
         const el = document.createElement('div'); el.className = 'card pcard'; el.style.padding = '0'; el.style.overflow = 'hidden';
@@ -405,9 +411,12 @@ Am Ende wird die Strecke automatisch zur Station zurückgeführt.</pre>
         <tr><td><kbd>Leertaste</kbd></td><td>Abfahrt sofort · Blick zentrieren</td></tr>
         <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Sitzplatz links/rechts · <kbd>↑</kbd> <kbd>↓</kbd> Wagen vor/zurück</td></tr>
         <tr><td><kbd>W A S D</kbd> <kbd>Q E</kbd></td><td>Freie Kamera / Fliegen / Gehen (<kbd>Shift</kbd> schneller)</td></tr>
+        <tr><td><kbd>E</kbd></td><td>Phantasialand (Gehen): Interagieren – Restaurants, Shops, Hotels, Ticketscanner, Bahn-Eingang</td></tr>
+        <tr><td><kbd>M</kbd></td><td>Phantasialand: große Parkkarte (Suche, Filter, Navigation) · sonst Minikarte</td></tr>
+        <tr><td><kbd>K</kbd></td><td>Foto aufnehmen (Fotoalbum)</td></tr>
         <tr><td>Gehen</td><td>Klick = Maus einfangen · Maus = Umsehen · <kbd>Leertaste</kbd> springen · <kbd>Mausrad</kbd> zoomen · <kbd>Esc</kbd> Menü</td></tr></table></div>
       <div><h3>Allgemein</h3><table>
-        <tr><td><kbd>P</kbd></td><td>Pause</td></tr><tr><td><kbd>M</kbd></td><td>Minikarte</td></tr><tr><td><kbd>Tab</kbd></td><td>Park-Ansicht (Erkunden)</td></tr>
+        <tr><td><kbd>P</kbd></td><td>Pause</td></tr><tr><td><kbd>Tab</kbd></td><td>Park-Ansicht (Erkunden)</td></tr>
         <tr><td><kbd>T</kbd></td><td>Tageszeit weiter · <kbd>R</kbd> Wetter weiter</td></tr><tr><td><kbd>H</kbd></td><td>HUD aus/an</td></tr>
         <tr><td><kbd>F</kbd></td><td>Vollbild</td></tr><tr><td><kbd>N</kbd></td><td>Nächster Besucher (Besucher-Modus)</td></tr>
         <tr><td><kbd>Esc</kbd></td><td>Menü / Datenbank</td></tr></table></div></div>`;
@@ -421,9 +430,16 @@ Am Ende wird die Strecke automatisch zur Station zurückgeführt.</pre>
         <label>Sichtfeld (FOV) <span id="sFovV">${s.fov}</span>°<br><input id="sFov" type="range" min="55" max="100" value="${s.fov}"></label>
         <label>Mausempfindlichkeit<br><input id="sSens" type="range" min="0.3" max="2.5" step="0.1" value="${s.sens}"></label>
         <label>Lautstärke<br><input id="sVol" type="range" min="0" max="1" step="0.05" value="${s.vol}"></label>
+        <label>Tageszyklus (automatisch)<br><select id="sAuto"><option value="0">Aus</option><option value="1">An (1 Spielstunde = 1 Minute)</option></select></label>
+        <label>Onride-Fotos<br><select id="sPhoto"><option value="1">Automatisch</option><option value="0">Aus</option></select></label>
+        <label>Touch-Steuerung (Tablet/Handy)<br><select id="sTouch"><option value="1">An</option><option value="0">Aus</option></select></label>
       </div><div class="note">Qualitätsänderungen (Bäume, Besucher) gelten ab dem nächsten Parkwechsel.</div>${this.helpHtml()}
       <h3>Über dieses Spiel</h3><div class="note">Alle Modelle, Texturen und Geräusche entstehen zur Laufzeit im Browser (three.js, keine externen Assets). Streckenlayouts sind stilisierte Nachbildungen auf Basis von Höhe, Länge, Geschwindigkeit, Inversionen und Typ; Stammdaten sind gerundete Näherungswerte ohne Gewähr. Alle Markennamen gehören ihren Inhabern.</div></div>`;
     $('#sQ').value = s.quality; $('#sSh').value = s.shadows ? '1' : '0';
+    $('#sAuto').value = s.autoTime ? '1' : '0'; $('#sPhoto').value = s.autoPhoto === false ? '0' : '1'; $('#sTouch').value = a.touch && a.touch.on ? '1' : '0';
+    $('#sAuto').addEventListener('change', e => { s.autoTime = e.target.value === '1'; a.saveSettings(); });
+    $('#sPhoto').addEventListener('change', e => { s.autoPhoto = e.target.value === '1'; a.saveSettings(); });
+    $('#sTouch').addEventListener('change', e => { s.touch = e.target.value === '1'; a.touch.setEnabled(s.touch); a.saveSettings(); });
     $('#sQ').addEventListener('change', e => { s.quality = e.target.value; a.saveSettings(); a.applyQuality(); });
     $('#sSh').addEventListener('change', e => { s.shadows = e.target.value === '1'; a.saveSettings(); a.applyQuality(); });
     $('#sFov').addEventListener('input', e => { s.fov = +e.target.value; $('#sFovV').textContent = s.fov; a.saveSettings(); });
@@ -445,6 +461,7 @@ Am Ende wird die Strecke automatisch zur Station zurückgeführt.</pre>
     $('#bPark').classList.toggle('hide', mode === 'park');
     $('#cross').classList.toggle('hide', true);
     if (mode !== 'ride') { $('#hCount').innerHTML = ''; }
+    this.updateWallet(); if (this.app.touch) this.app.touch.refresh();
     $('#mBack').classList.toggle('hide', !this.app.canResume());
     if (menu) { this.renderRows && this.curTab === 'db' && this.renderRows(); }
   }
@@ -508,3 +525,5 @@ Am Ende wird die Strecke automatisch zur Station zurückgeführt.</pre>
     if (best && bd < R * 0.12) this.app.flyTo(best); else this.app.flyToXZ(x, z);
   }
 }
+
+Object.assign(UI.prototype, plUi);

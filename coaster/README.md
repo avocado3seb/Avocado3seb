@@ -27,6 +27,23 @@ Eigene, handgebaute und begehbare Welt (stilisiert im Stil des Parks, **keine** 
 - **Nacht**: frei einstellbare Uhrzeit, Sonnenuntergang, Sterne; leuchtende Fenster, Laternen/Fackeln (dynamische Lichter in der Nähe), beleuchtete Schienen, leuchtende Wasserfälle und Lagune, glühender Vulkan, Industrie-Licht in Rookburgh, Dschungelfackeln, Tunnel-Beleuchtung, Scheinwerfer an der Fahrt, Bodennebel je Themenbereich.
 - Besucher laufen über das Wegenetz, Riesenrad/Karussell/Freifallturm sind animiert.
 
+### Phantasialand-Spielsystem (Start-Hub 🏠)
+
+Der Start-Hub bietet **Spielen** (Parkplatz → Ticket → Park, mit Spielgeld) und **Freie Erkundung** (ohne Ticket) sowie Achterbahnen, Attraktionen, Parkkarte, Hotels, Gastronomie, Fotoalbum, Statistiken, Editor, Spielstände und Einstellungen. Hintergrund: animierte 3D-Kamerafahrt über den Park.
+
+- **Welten**: Klugheim, Deep in Africa, Rookburgh, Mexico, Fantasy sowie (frei gestaltet) China Town, Mystery, Berlin/Hauptplatz und Parkplatz.
+- **Bahnen & Attraktionen**: 8 Achterbahnen (Taron, F.L.Y., Black Mamba, Colorado Adventure, Winja's Fear/Force, Raik, Crazy Bats) und 7 stilisierte Fahrgeschäfte (Chiapas, River Quest, Mystery Castle, Talocan, Maus au Chocolat, Wakobato, Feng Ju Palace) mit Warteschlangen und Wartezeit-Schildern (Besucher-Simulation).
+- **Interaktion (`E`)** an Restaurants, Imbissen, Shops, Hotels, Bühnen, Ticketscanner und Bahn-Eingängen: Speisekarte/Kauf, Hotelbuchung mit begehbarem Zimmer (Check-in/-out), Showzeiten, Ticketkauf (`Tageskarte` …).
+- **Parkkarte (`M`)**: Zoom/Verschieben/Pinch, Suche, Filter, Favoriten, Spielerposition, Klick → Details, **Navigation** (Route über das Wegenetz auf der Karte und als gelbe Punkte im Park, Richtungspfeil im HUD).
+- **Besucher-KI**: Hunger/Durst/Müdigkeit, Gruppen, Familien, Warteschlangen, Shows, Shops, Hotels, Parkplatz/Abreise; Personal an Ständen.
+- **Wintertraum** (Schnee, Lichterketten), **Tageszeit/Wetter** frei einstellbar oder automatischer **Tageszyklus**.
+- **Fotos** (`K`, automatische Onride-Fotos), Fotoalbum, gespeicherte Replays (Zeitlupe, alle Kameras).
+- **Statistiken & 18 Erfolge**, **Spielstände** (3 Slots + Autosave, localStorage).
+- **Achterbahn-Editor**: Bausteine (Lift, Launch, Abfahrt, Looping, Korkenzieher, Zero-G-Roll, Helix, Top Hat, Hügel, Kurven, Bremsen …) aneinanderreihen, Parameter, Undo/Redo, Vorschau mit Kennzahlen und Validierung, Testfahrt, Speichern/Laden/Löschen.
+- **Touch** (Tablet/Handy): Joystick, Wischen = Umschauen, Pinch-Zoom, Aktionsknöpfe.
+
+**Hinweis zu den Daten**: Namen, Speisekarten, Preise, Zimmertypen, Showzeiten und Ticketpreise der Gastronomie/Hotels/Shops sind **frei ergänzte Beispielangebote** (Spielgeld), keine echten Angaben des Parks. Echt sind nur Bahn-, Themenbereichs- und Hotelnamen.
+
 **Ehrlich gesagt**: Das ist eine stilisierte Nachbildung mit Platzhalter-Geometrie (Low-Poly), keine fotorealistische oder maßstabsgetreue Kopie des Parks. Streckenverläufe sind aus Höhe, Länge, Tempo, Inversionen und typischen Elementen abgeleitet.
 
 ## Online-Modus (Mehrspieler)
@@ -69,6 +86,7 @@ Voraussetzung: Repo-Einstellungen → Pages → Quelle „GitHub Actions“.
 
 ```
 node coaster/tools/validate.mjs        # simuliert jede Bahn eine Runde und meldet Auffälligkeiten
+node coaster/tools/game-test.mjs       # Spielsystem-Test (Hub, Kauf, Karte, Hotel, Editor, Speichern …)
 node coaster/tools/online-test.mjs <ordner>   # 2-Browser-Test des Online-Modus (PeerServer: npm run coaster:peer)
 node coaster/tools/gtrace.mjs "Taron"  # G-Kräfte-Spitzen mit Streckenelement
 node coaster/tools/probe.mjs LOOP:25   # Geometrie eines Elements prüfen
@@ -78,4 +96,4 @@ node coaster/tools/shot.mjs <ausgabeordner> '[{"eval":"…","wait":1000,"shot":"
 ## Steuerung
 
 `1`–`7` Kamera · `C` weiter · Maus ziehen = umschauen · Rad = Zoom · `Leertaste` sofort losfahren · Pfeile = Sitzplatz · `WASD/QE` frei/fliegen/gehen (`Shift` schneller) ·
-`P` Pause · `M` Minikarte · `Tab` Park/Fahrt · `T` Uhrzeit · `R` Wetter · `H` HUD · `F` Vollbild · `N` nächster Besucher · `Esc` Menü
+`E` Interagieren (Phantasialand) · `K` Foto · `P` Pause · `M` Parkkarte/Minikarte · `Tab` Park/Fahrt · `T` Uhrzeit · `R` Wetter · `H` HUD · `F` Vollbild · `N` nächster Besucher · `Esc` Menü

@@ -82,6 +82,10 @@ jobs:
         run: |
           mkdir -p shots
           node coaster/tools/online-test.mjs shots
+      - name: Spielsystem-Test (Phantasialand)
+        env:
+          BASE: http://127.0.0.1:4173/coaster/index.html
+        run: node coaster/tools/game-test.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

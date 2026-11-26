@@ -68,6 +68,15 @@ export class Terrain {
     const H = this.H, a = H[j * N + i], b = H[j * N + i + 1], c = H[(j + 1) * N + i], d = H[(j + 1) * N + i + 1];
     return a + (b - a) * fu + (c - a) * fv + (a - b - c + d) * fu * fv;
   }
+  recolor(mesh, colorFn) {
+    const n = this.n, N = n + 1, size = this.size, step = this.step, col = mesh.geometry.attributes.color;
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const k = j * N + i, x = -size / 2 + i * step, z = -size / 2 + j * step, y = this.H[k];
+      const hx = this.H[j * N + Math.min(n, i + 1)] - this.H[j * N + Math.max(0, i - 1)], hz = this.H[Math.min(n, j + 1) * N + i] - this.H[Math.max(0, j - 1) * N + i];
+      const c = colorFn(x, z, y, Math.hypot(hx, hz) / (2 * step)); col.setXYZ(k, c[0], c[1], c[2]);
+    }
+    col.needsUpdate = true;
+  }
   build(colorFn) {
     const n = this.n, N = n + 1, size = this.size, step = this.step;
     const pos = new Float32Array(N * N * 3), col = new Float32Array(N * N * 3), uv = new Float32Array(N * N * 2);
