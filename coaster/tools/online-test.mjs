@@ -23,7 +23,8 @@ check('Gast sieht Host', await B.evaluate(() => [...window.__app.net.remotes.val
 await A.evaluate(() => { const a = window.__app, r = a.park.rides.find(x => x.coaster.name === 'Taron'); a.enterRide(r, true); });
 await B.evaluate(() => { const a = window.__app, r = a.park.rides.find(x => x.coaster.name === 'Taron'); a.enterRide(r, true); a.seat = { car: 1, row: 0, s: 0, custom: true }; });
 await A.evaluate(() => { const r = window.__app.ride; r.sim.timer = 0.2; });
-await A.waitForTimeout(6000);
+await A.waitForFunction(() => { const s = window.__app.ride.sim; return s.state === 'run' && s.v > 1; }, null, { timeout: 120000 }).catch(() => {});
+await B.waitForFunction(() => window.__app.ride.sim.state === 'run', null, { timeout: 60000 }).catch(() => {});
 const sa = await A.evaluate(() => { const s = window.__app.ride.sim; return { st: s.state, s: s.s, v: s.v }; });
 const sb = await B.evaluate(() => { const s = window.__app.ride.sim; return { st: s.state, s: s.s, v: s.v }; });
 check('Zug fährt beim Host', sa.st === 'run' && sa.v > 1, JSON.stringify(sa));
