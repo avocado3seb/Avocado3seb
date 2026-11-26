@@ -1,4 +1,4 @@
-name: Build & Deploy Vice City
+name: Build, Test & Deploy (Vice City + Europa Coaster Simulator)
 
 on:
   push:
@@ -12,12 +12,23 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # Streckenlayouts + Fahrphysik aller Bahnen simulieren (reines Node, schnell)
+  coaster-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node coaster/tools/validate.mjs --strict
+
   build:
     runs-on: ubuntu-latest
+    needs: coaster-validate
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,6 +37,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 7
       - uses: actions/configure-pages@v5
         continue-on-error: true
         with:
@@ -36,9 +52,46 @@ jobs:
         with:
           path: dist
 
+  # Echte Browser-Tests gegen den Produktions-Build: Start, Park, zwei Spieler online (Host + Gast), Zug-Sync, Chat
+  coaster-e2e:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - name: Playwright installieren
+        run: |
+          npm install -g playwright
+          playwright install --with-deps chromium
+      - name: Lokalen PeerJS-Signalserver und Vorschau starten
+        run: |
+          node coaster/tools/peerserver.mjs 9000 &
+          npx vite preview --port 4173 --host 127.0.0.1 &
+          sleep 6
+      - name: Online-Test (2 Browser)
+        env:
+          BASE: http://127.0.0.1:4173/coaster/index.html
+        run: |
+          mkdir -p shots
+          node coaster/tools/online-test.mjs shots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-screenshots
+          path: shots
+          retention-days: 7
+
   deploy:
     if: github.ref_name == 'main'
-    needs: build
+    needs: [build, coaster-e2e]
     runs-on: ubuntu-latest
     environment:
       name: github-pages

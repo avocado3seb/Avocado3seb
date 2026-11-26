@@ -11,7 +11,7 @@ for (const c of db.coasters) {
   const spec = CATS[c.cat];
   const layout = c.layout || genLayout(c);
   let tr;
-  try { tr = buildTrack(layout, { trainLen: spec.cars * spec.spacing }); } catch (e) { console.log('FEHLER', c.name, e.message); bad++; continue; }
+  try { tr = buildTrack(layout, { trainLen: spec.cars * spec.spacing }); } catch (e) { console.log('FEHLER', c.name, e.message); bad++; globalThis.__crash = true; continue; }
   const sim = new Sim(tr, { cars: spec.cars, spacing: spec.spacing, crr: spec.crr });
   let t = 0; sim.timer = 0.1;
   let gmax = 0, gAt = 0;
@@ -35,3 +35,5 @@ for (const c of db.coasters) {
 const w = [26, 22, 1, 5, 5, 4, 4, 3, 3, 2, 2, 4, 4, 4];
 for (const r of rows) console.log(r.slice(0, 14).map((x, i) => String(x).slice(0, w[i] + 4).padEnd(w[i])).join(' ') + (r[14] ? '  ⚠ ' + r[14] : ''));
 console.log(`\n${db.coasters.length} Bahnen, ${bad} mit Auffälligkeiten`);
+const fatal = rows.filter(r => /LAUFT NICHT DURCH|Verbinder|minY/.test(r[14])).length;
+if (process.argv.includes('--strict') && (fatal || globalThis.__crash)) { console.log('STRICT: ' + fatal + ' Bahnen mit schweren Fehlern'); process.exit(1); }

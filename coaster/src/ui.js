@@ -35,6 +35,7 @@ export class UI {
         <div class="tabs">
           <button class="tab on" data-t="db">🎢 Datenbank</button>
           <button class="tab" data-t="parks">🏰 Parks</button>
+          <button class="tab" data-t="online">🌐 Online</button>
           <button class="tab" data-t="custom">➕ Eigene Bahn</button>
           <button class="tab" data-t="help">⚙ Hilfe &amp; Einstellungen</button>
         </div>
@@ -47,7 +48,8 @@ export class UI {
       <div class="mbody" id="mbody"></div>
     </div>
     <div id="hud" class="hide">
-      <div id="hTL" class="hudbox"><div class="n" id="hName"></div><div class="p" id="hPark"></div></div>
+      <div id="hTL" class="hudbox"><div class="n" id="hName"></div><div class="p" id="hPark"></div><div class="p hide" id="hNet" style="color:var(--acc2)"></div></div>
+      <div id="chat" class="hide"><div id="chatLog"></div><input id="chatIn" maxlength="200" placeholder="Enter = Chat"></div>
       <div id="hTR"><button class="btn sm" id="bMap">🗺 Karte</button><button class="btn sm" id="bPark">🏞 Park</button><button class="btn sm" id="bSnd">🔊</button><button class="btn sm" id="bHelp">❓</button><button class="btn sm" id="bMenu">☰ Menü</button></div>
       <div id="hCams" class="hudbox"></div>
       <div id="hGauge" class="hudbox">
@@ -106,6 +108,7 @@ export class UI {
     const body = $('#mbody');
     if (t === 'db') this.buildDb(body);
     else if (t === 'parks') this.buildParks(body);
+    else if (t === 'online') this.buildOnline(body);
     else if (t === 'custom') this.buildCustom(body);
     else this.buildHelp(body);
   }
@@ -239,6 +242,60 @@ export class UI {
       <div class="chips">${p.coasters.map(c => `<span class="chip" style="border-left:4px solid ${c.trackColor}">${esc(c.name)}</span>`).join('')}</div>
       <div class="acts"><button class="btn blue" data-p="${esc(p.name)}">🏞 Park erkunden</button></div></div>`).join('')}</div></div>`;
     body.querySelectorAll('button[data-p]').forEach(b => b.addEventListener('click', () => this.app.openPark(b.dataset.p)));
+  }
+
+  // ------------------------------------------------------------------ Online
+  buildOnline(body) {
+    const app = this.app, net = app.net;
+    const room = new URLSearchParams(location.search).get('room') || '';
+    const name = (app.settings.name || '').trim();
+    body.innerHTML = `<div class="card page help"><h3 style="margin-top:0">🌐 Online-Modus</h3>
+      <div class="note">Gemeinsam Parks erkunden und im selben Zug fahren – direkt von Browser zu Browser (WebRTC), ohne eigenen Server. Der Host bestimmt Park, Tageszeit und Wetter und betreibt die Bahnen; alle sehen dieselben Züge, Mitspieler erscheinen als Avatare oder sitzen im Zug. Chat: <kbd>Enter</kbd>.</div>
+      <div class="form" id="onForm" style="margin-top:12px">
+        <label>Dein Name<br><input id="onName" maxlength="14" placeholder="Spieler" value="${esc(name)}"></label>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+          <button class="btn pri" id="onHost">🏠 Raum eröffnen (Host)</button>
+          <span style="color:var(--dim)">oder</span>
+          <label>Raum-Code<br><input id="onCode" maxlength="5" style="text-transform:uppercase;width:120px;letter-spacing:4px;text-align:center" value="${esc(room.toUpperCase())}"></label>
+          <button class="btn blue" id="onJoin">➜ Beitreten</button>
+        </div>
+        <div id="onMsg" class="note"></div>
+      </div>
+      <div id="onRoom"></div></div>`;
+    $('#onHost').addEventListener('click', async () => {
+      app.settings.name = $('#onName').value.trim(); app.saveSettings(); app.audio.start();
+      $('#onMsg').textContent = 'Raum wird eröffnet …';
+      try { await net.host(app.settings.name || 'Host'); if (!app.park) await app.loadPark(Object.keys(app.db.parks)[0]); this.refreshNet(); } catch (e) { $('#onMsg').textContent = '✖ ' + e.message; }
+    });
+    $('#onJoin').addEventListener('click', async () => {
+      app.settings.name = $('#onName').value.trim(); app.saveSettings(); app.audio.start();
+      const code = $('#onCode').value.trim(); if (code.length < 4) { $('#onMsg').textContent = 'Bitte Raum-Code eingeben.'; return; }
+      $('#onMsg').textContent = 'Verbinde …';
+      try { await net.join(code, app.settings.name || 'Gast'); } catch (e) { $('#onMsg').textContent = '✖ ' + e.message; }
+    });
+    this.refreshNet();
+  }
+  refreshNet(chatOnly) {
+    const net = this.app.net, active = net.active;
+    const hn = $('#hNet'); if (hn) { hn.classList.toggle('hide', !active); hn.textContent = active ? `🌐 Raum ${net.code} · ${net.players.length} Spieler` : ''; }
+    const chat = $('#chat'); if (chat) {
+      chat.classList.toggle('hide', !active);
+      const lg = $('#chatLog'); lg.innerHTML = net.log.slice(-7).map(l => `<div style="color:${l.color}">${esc(l.text)}</div>`).join('');
+    }
+    const el = $('#onRoom'); if (!el || chatOnly === true) return;
+    if (!active) { el.innerHTML = net.status ? `<div class="note" style="margin-top:12px">${esc(net.status)}</div>` : ''; return; }
+    el.innerHTML = `<h3>Raum <span style="letter-spacing:4px;color:var(--acc)">${net.code}</span> · ${net.isHost ? 'du bist Host' : 'verbunden'}</h3>
+      ${net.isHost ? `<div class="note">Einladungslink: <input id="onLink" readonly style="width:min(480px,90%)" value="${esc(net.link)}"> <button class="btn sm" id="onCopy">Kopieren</button></div>` : '<div class="note">Park, Tageszeit und Wetter bestimmt der Host.</div>'}
+      <div class="chips" style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0">${net.players.map(p => `<span class="chip" style="border-left:4px solid ${p.color}">${esc(p.name)}${p.local ? ' (du)' : ''}</span>`).join('')}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn blue" id="onPark">🏞 Zum Park</button><button class="btn" id="onLeave">Raum verlassen</button></div>
+      ${net.isHost ? '<div class="note" style="margin-top:8px">Tipp: Wähle in der Datenbank „Park erkunden“ oder eine Bahn – alle Mitspieler folgen dir in denselben Park.</div>' : ''}`;
+    $('#onLeave').addEventListener('click', () => net.leave());
+    $('#onPark').addEventListener('click', () => { if (this.app.park) this.app.enterPark(); });
+    const cp = $('#onCopy'); if (cp) cp.addEventListener('click', () => { const i = $('#onLink'); i.select(); try { navigator.clipboard.writeText(i.value); } catch (e) { document.execCommand('copy'); } cp.textContent = '✔ Kopiert'; });
+  }
+  syncEnv() {
+    const h = this.app.env.hour; document.querySelectorAll('#mTime,#hTime').forEach(e => e.value = h); const v = $('#mTimeV'); if (v) v.textContent = this.clock(h);
+    document.querySelectorAll('#mWeather,#hWeather').forEach(e => e.value = this.app.env.weatherName);
   }
 
   // ------------------------------------------------------------------ Eigene Bahn

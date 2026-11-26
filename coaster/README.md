@@ -15,6 +15,16 @@ Läuft als zweite Seite des Vite-Projekts: `npm install && npm run dev` → http
 - **Datenbank**: Suche (Name/Park/Hersteller/Alias, auch „B&M“, „GCI“, „RMC“), Filter nach Land, Park, Typ, Tempo, Höhe, Inversionen, Favoriten; Sortierung nach Länge/Höhe/Tempo/…; Layout-Vorschau.
 - **Grafik**: Tag/Nacht, Sonnenuntergang, Sterne, Wolken, Wetter (Sonne, bewölkt, Regen, Gewitter, Nebel, Schnee), Schatten, Beleuchtung, prozedurale Texturen, Sound (Wind, Fahrt, Kettenlift, Regen, Donner).
 
+## Online-Modus (Mehrspieler)
+
+Menü → **🌐 Online**. Direkt von Browser zu Browser über WebRTC (PeerJS), es ist kein eigener Spielserver nötig (Signalisierung über den öffentlichen PeerJS-Broker).
+
+- **Host** eröffnet einen Raum (5-stelliger Code + Einladungslink `?room=CODE`) und bestimmt Park, Tageszeit und Wetter; der Host betreibt die Bahnen.
+- **Gäste** treten per Code bei, laden automatisch den Park des Hosts und sehen dieselben Züge (Schnappschüsse 6×/s, lokal weiter simuliert).
+- Mitspieler erscheinen als **Avatare** (Gehen/Fliegen mit Namensschild) oder **sitzen sichtbar im Zug** – gemeinsame Fahrt im selben Wagen möglich (Sitz per Pfeiltasten). Gäste lösen die Abfahrt per `Leertaste` beim Host aus.
+- **Chat** mit `Enter`, bis zu 12 Spieler pro Raum.
+- Eigener Signalserver (z. B. hinter strengen Firewalls): `npm run coaster:peer` und die Seite mit `?peerhost=HOST&peerport=9000&peerpath=/` öffnen. Für Mobilfunk/strenge NATs kann ein TURN-Server nötig sein.
+
 ## Wichtig: Genauigkeit
 
 - Stammdaten (Höhe, Länge, Tempo, Dauer, Inversionen, Jahr, Hersteller) sind **aus dem Gedächtnis gerundet und ohne Gewähr**. Es gab beim Erstellen keinen Zugriff auf RCDB/Wikipedia. Bitte bei Bedarf in `src/data/*.js` korrigieren.
@@ -30,10 +40,22 @@ Läuft als zweite Seite des Vite-Projekts: `npm install && npm run dev` → http
    `ST LIFT:60:40:3.6 DROP:58:62 HILL:20:110 TR:180:55:60 LOOP:25 HOME:55:55`
 4. Neue Parks: Metadaten (Stadt, Thema, Wahrzeichen) in `src/data/parks.js`.
 
+## GitHub Actions
+
+`.github/workflows/deploy.yml` läuft bei jedem Push (main und `claude/**`) und bei Pull Requests:
+
+1. **coaster-validate** – simuliert alle Bahnen (`validate.mjs --strict`).
+2. **build** – `npm ci && npm run build` (Vice City + Coaster), Artefakt `dist`.
+3. **coaster-e2e** – Playwright/Chromium gegen den Produktions-Build mit lokalem PeerJS-Server: Start, Park laden, Host + Gast online, Zug-Sync, Chat, Wetter-Sync (Screenshots als Artefakt).
+4. **deploy** – nur auf `main`: Veröffentlichung auf GitHub Pages (`/` = Vice City, `/coaster/` = Simulator).
+
+Voraussetzung: Repo-Einstellungen → Pages → Quelle „GitHub Actions“.
+
 ## Werkzeuge (Node)
 
 ```
 node coaster/tools/validate.mjs        # simuliert jede Bahn eine Runde und meldet Auffälligkeiten
+node coaster/tools/online-test.mjs <ordner>   # 2-Browser-Test des Online-Modus (PeerServer: npm run coaster:peer)
 node coaster/tools/gtrace.mjs "Taron"  # G-Kräfte-Spitzen mit Streckenelement
 node coaster/tools/probe.mjs LOOP:25   # Geometrie eines Elements prüfen
 node coaster/tools/shot.mjs <ausgabeordner> '[{"eval":"…","wait":1000,"shot":"name"}]'  # Playwright-Screenshots

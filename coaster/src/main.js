@@ -10,6 +10,7 @@ import { poseAt, newPose } from './track.js';
 import { AudioFx } from './audio.js';
 import { CATS } from './specs.js';
 import { seatLayout } from './train.js';
+import { Net } from './net.js';
 
 const LS = {
   get(k, d) { try { const v = localStorage.getItem('ecs_' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
@@ -50,7 +51,9 @@ class App {
     this.keys = new Set(); this.hudOn = true;
     this.menuOrbit = 0;
     this.camQ = new THREE.Quaternion(); this.camInit = false;
+    this.net = new Net(this);
     this.ui = new UI(this);
+    this.net.onChange = chat => this.ui.refreshNet(chat);
     this.bindInput();
     this.applyQuality();
     window.addEventListener('resize', () => this.resize()); this.resize();
@@ -58,7 +61,7 @@ class App {
     this._pose = newPose();
     // Startpark laden
     const startPark = LS.get('lastPark', 'Europa-Park');
-    this.loadPark(this.db.parks[startPark] ? startPark : Object.keys(this.db.parks)[0]).then(() => { this.ui.loading(false); this.showMenu(); });
+    this.loadPark(this.db.parks[startPark] ? startPark : Object.keys(this.db.parks)[0]).then(() => { this.ui.loading(false); this.showMenu(); if (new URLSearchParams(location.search).get('room')) this.ui.tab('online'); });
     this.loop();
     window.__app = this; // Debug / Tests
   }
@@ -93,6 +96,7 @@ class App {
     if (this.park && this.park.def.name === name && this.park.quality === this.settings.quality) return this.park;
     this.ui.loading(true, `Lade ${name} …`, 'Bahnen, Wege, Gebäude und Besucher werden gebaut');
     await new Promise(r => setTimeout(r, 40));
+    this.net.remotes.forEach(r => r.detach());
     if (this.park) { this.scene.remove(this.park.group); this.park.dispose(); this.park = null; }
     const def = this.db.parks[name];
     const t0 = performance.now();
@@ -117,14 +121,17 @@ class App {
 
   async openRide(c) {
     this.audio.start(); this.audio.setVolume(this.settings.vol);
+    if (this.net.active && !this.net.isHost && (!this.park || this.park.def.name !== c.park)) { this.ui.toast('Online: Nur der Host wechselt den Park (aktuell: ' + (this.park ? this.park.def.name : '–') + ')', 3500); return; }
     await this.loadPark(c.park);
+    this.net.announcePark();
     this.ui.loading(false);
     const r = this.park.rides.find(x => x.coaster.id === c.id);
     if (r) this.enterRide(r, true);
   }
   async openPark(name) {
     this.audio.start();
-    await this.loadPark(name); this.ui.loading(false);
+    if (this.net.active && !this.net.isHost && (!this.park || this.park.def.name !== name)) { this.ui.toast('Online: Nur der Host wechselt den Park', 3000); return; }
+    await this.loadPark(name); this.net.announcePark(); this.ui.loading(false);
     this.enterPark();
   }
   rideOn(r) { this.audio.start(); this.enterRide(r, true); }
@@ -132,7 +139,7 @@ class App {
 
   enterRide(r, fresh = false) {
     this.state = 'ride'; this.ride = r; this.coaster = r.coaster;
-    if (fresh) { r.sim.reset(0); r.sim.timer = 6; r.sim.dispatch = 9; this.camMode = this.camMode === 'free' ? 'fp' : this.camMode; this.seat = { car: -1, row: 0, s: -1 }; this.look.yaw = this.look.pitch = 0; this.outside.idx = -1; this.chase.init = false; }
+    if (fresh) { if (!this.net.active) { r.sim.reset(0); r.sim.timer = 6; r.sim.dispatch = 9; } this.camMode = this.camMode === 'free' ? 'fp' : this.camMode; this.seat = { car: -1, row: 0, s: -1 }; this.look.yaw = this.look.pitch = 0; this.outside.idx = -1; this.chase.init = false; }
     this.ui.setMode('ride'); this.ui.setRide(r.coaster); this.ui.setCam(this.camMode); this.camInit = false;
     this.setCamera(this.camMode, true);
     this.ui.toast(`${r.coaster.name} – ${r.coaster.park}`);
@@ -196,6 +203,8 @@ class App {
       else this.zoom = clamp((this.zoom || 0) + Math.sign(e.deltaY) * 4, -25, 30);
     }, { passive: false });
     window.addEventListener('keydown', e => {
+      if (e.target.id === 'chatIn') { if (e.key === 'Enter') { this.net.sendChat(e.target.value); e.target.value = ''; e.target.blur(); } else if (e.key === 'Escape') e.target.blur(); e.stopPropagation(); return; }
+      if (e.key === 'Enter' && this.net.active && this.state !== 'menu') { e.preventDefault(); document.getElementById('chatIn')?.focus(); return; }
       if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName) && e.key !== 'Escape') return;
       this.keys.add(e.code);
       const k = e.key;
@@ -213,7 +222,7 @@ class App {
       else if (k === 'n' || k === 'N') { this.visIdx = (this.visIdx + 1 + Math.floor(Math.random() * 7)) % (this.park ? this.park.vis.length : 1); }
       else if (e.code === 'Space') {
         e.preventDefault();
-        if (this.state === 'ride' && this.ride.sim.state === 'station') this.ride.sim.timer = Math.min(this.ride.sim.timer, 0.3);
+        if (this.state === 'ride' && this.ride.sim.state === 'station') { if (this.net.active && !this.net.isHost) this.net.send({ t: 'dispatch', r: this.park.rides.indexOf(this.ride) }); else this.ride.sim.timer = Math.min(this.ride.sim.timer, 0.3); }
         this.look.yaw = this.look.pitch = 0;
       } else if (this.state === 'ride' && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.code)) {
         e.preventDefault();
@@ -229,6 +238,33 @@ class App {
     });
     window.addEventListener('keyup', e => this.keys.delete(e.code));
     window.addEventListener('blur', () => this.keys.clear());
+  }
+
+  // ------------------------------------------------------------------ Online
+  netState() {
+    if (!this.park) return null;
+    if (this.state === 'ride' && this.ride) { const st = this.seatSel(); return { k: 'ride', r: this.park.rides.indexOf(this.ride), c: st.car, row: st.row, s: st.s }; }
+    if (this.state === 'park') {
+      const c = this.camera.position;
+      if (this.parkMode === 'walk') return { k: 'walk', p: [c.x, 0, c.z], yaw: this.walk.yaw + Math.PI };
+      return { k: 'fly', p: [c.x, c.y - 1.6, c.z], yaw: this.free.yaw + Math.PI };
+    }
+    return { k: 'menu' };
+  }
+  async onNetStart(m) {
+    this.ui.setMode(this.state); this.ui.refreshNet();
+    if (m) { // Client: Umgebung & Park des Hosts übernehmen
+      if (m.env) { this.env.setTime(m.env.hour); this.env.setWeather(m.env.weather); this.ui.syncEnv(); }
+      if (m.park) await this.followPark(m.park, m.rides);
+    }
+  }
+  onNetEnd() { this.ui && this.ui.refreshNet && this.ui.refreshNet(); }
+  async followPark(name, rides) {
+    if (!this.db.parks[name]) { this.ui.toast('Park „' + name + '“ ist in deiner Datenbank nicht vorhanden'); return; }
+    const was = this.state;
+    await this.loadPark(name); this.ui.loading(false);
+    if (rides && JSON.stringify(rides) !== JSON.stringify(this.park.rides.map(r => r.coaster.id))) this.ui.toast('Achtung: Deine Bahnen-Datenbank weicht vom Host ab – Synchronisation evtl. ungenau', 5000);
+    if (was !== 'menu' || this.net.active) this.enterPark();
   }
 
   seatSel() {
@@ -367,7 +403,9 @@ class App {
     requestAnimationFrame(() => this.loop());
     let dt = Math.min(0.05, this.clock.getDelta());
     if (!this.park) { return; }
-    const simDt = (this.paused ? 0 : dt) * this.timeScale;
+    const online = this.net.active;
+    const simDt = (this.paused && !online ? 0 : dt) * (online && !this.net.isHost ? 1 : this.timeScale);
+    this.net.update(dt);
     this.park.update(dt, simDt);
     this.updateCamera(dt);
     this.env.update(dt, this.camera, this.state === 'ride' && this.ride ? this.camera.position : this.camera.position);
