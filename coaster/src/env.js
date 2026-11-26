@@ -31,6 +31,8 @@ export class Environment {
     u.turbidity.value = 3; u.rayleigh.value = 1.5; u.mieCoefficient.value = 0.004; u.mieDirectionalG.value = 0.85;
 
     try { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture; pm.dispose(); } catch (e) { /* ohne IBL weiter */ }
+    // Umgebungslicht/Reflexionen aus dem echten Himmel (wird bei Tageszeit-/Wetterwechsel neu berechnet)
+    try { this.pm = new THREE.PMREMGenerator(renderer); this.envScene = new THREE.Scene(); this.envSky = new Sky(); this.envSky.scale.setScalar(1); this.envScene.add(this.envSky); this.iblKey = ''; this.iblRT = null; } catch (e) { this.pm = null; }
     this.hemi = new THREE.HemisphereLight(0xbfd8ff, 0x6b5f4c, 1.0); scene.add(this.hemi);
     this.sun = new THREE.DirectionalLight(0xfff2dc, 3); this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
@@ -125,7 +127,7 @@ export class Environment {
     u.mieCoefficient.value = 0.005 + dark * 0.02;
     this.renderer.toneMappingExposure = lerp(0.42, 0.5, day) * (1 - dark * 0.35);
     // Licht
-    this.scene.environmentIntensity = lerp(0.28, 0.5, day) * (1 - dark * 0.4);
+    this.scene.environmentIntensity = (this.iblRT ? lerp(0.12, 0.62, day) : lerp(0.28, 0.5, day)) * (1 - dark * 0.4);
     const warm = new THREE.Color(1, 0.55, 0.28), white = new THREE.Color(1, 0.96, 0.9);
     this.sun.color.copy(white).lerp(warm, 1 - smooth(0.0, 0.5, e));
     this.sun.intensity = (3.6 * smooth(-0.02, 0.2, e)) * (1 - dark * 0.8) + this.flash * 3;
@@ -152,8 +154,17 @@ export class Environment {
     // Niederschlag
     this.precip.rain.visible = this.wCur.rain > 0.05; this.precip.rain.material.uniforms.uAlpha.value = Math.min(1, this.wCur.rain);
     this.precip.snow.visible = this.wCur.snow > 0.05; this.precip.snow.material.uniforms.uAlpha.value = Math.min(1, this.wCur.snow);
+    this.refreshIBL(immediate && !this.iblRT);
   }
 
+  refreshIBL(force) { // Himmel → PMREM (Reflexionen + Umgebungslicht passend zu Tageszeit und Wetter)
+    if (!this.pm) return; const key = Math.round(this.hour * 4) + '|' + this.weatherName; if (!force && key === this.iblKey) return; this.iblKey = key;
+    try {
+      const us = this.sky.material.uniforms, ue = this.envSky.material.uniforms; for (const k of ['sunPosition', 'turbidity', 'rayleigh', 'mieCoefficient', 'mieDirectionalG']) ue[k].value = us[k].value.clone ? us[k].value.clone() : us[k].value;
+      const rt = this.pm.fromScene(this.envScene, 0, 0.1, 100); if (this.iblRT) this.iblRT.dispose(); this.iblRT = rt; this.scene.environment = rt.texture;
+    } catch (e) { this.pm = null; }
+  }
+  setShadowSpan(r) { const sc = this.sun.shadow.camera; if (Math.abs(sc.right - r) < 1) return; sc.left = -r; sc.right = r; sc.top = r; sc.bottom = -r; sc.updateProjectionMatrix(); }
   setShadows(on, size = 2048) {
     this.shadowOn = on; this.sun.castShadow = on;
     if (on && this.sun.shadow.mapSize.x !== size) { this.sun.shadow.mapSize.set(size, size); this.sun.shadow.map?.dispose(); this.sun.shadow.map = null; }

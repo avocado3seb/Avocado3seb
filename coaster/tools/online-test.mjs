@@ -37,6 +37,9 @@ check('Gast sitzt sichtbar im Zug (Host-Sicht)', await A.evaluate(() => { const 
 await B.evaluate(() => window.__app.net.sendChat('Hallo Anna!'));
 await A.waitForTimeout(800);
 check('Chat kommt an', await A.evaluate(() => window.__app.net.log.some(l => l.text.includes('Ben: Hallo Anna!'))));
+// Skin des Gastes wird beim Host sichtbar (Vice-City-Figur + Zubehör)
+await B.evaluate(() => { const g = window.__app.game; g.wardrobe().skins.ritter = true; g.equipSkin('ritter'); });
+await A.waitForFunction(() => { const r = [...window.__app.net.remotes.values()].find(x => x.name === 'Ben'); return !!r && r.lookKey.includes('helmet'); }, null, { timeout: 120000 }).then(() => check('Skin des Mitspielers wird übertragen', true)).catch(() => check('Skin des Mitspielers wird übertragen', false));
 // Wetter/Zeit vom Host
 await A.evaluate(() => { window.__app.env.setTime(21); window.__app.env.setWeather('rain'); });
 await B.waitForFunction(() => window.__app.env.weatherName === 'rain' && Math.abs(window.__app.env.hour - 21) < 0.5, null, { timeout: 120000 }).then(() => check('Tageszeit/Wetter folgen dem Host', true)).catch(() => check('Tageszeit/Wetter folgen dem Host', false));

@@ -78,5 +78,7 @@ export const ACHIEVEMENTS = [
   ['shopper', 'Souvenir gekauft', 'Kaufe etwas im Shop', s => s.purchases >= 1, s => Math.min(1, s.purchases / 1)],
   ['stay', 'Übernachtet', 'Buche einen Hotelaufenthalt', s => s.bookings >= 1, s => Math.min(1, s.bookings / 1)],
   ['editor', 'Achterbahn-Baumeister', 'Speichere eine eigene Achterbahn', s => s.designs >= 1, s => Math.min(1, s.designs / 1)],
+  ['skin', 'Neuer Look', 'Kaufe deinen ersten Skin', s => s.skins >= 2, s => Math.min(1, Math.max(0, s.skins - 1) / 1)],
+  ['stil', 'Stilikone', 'Besitze 6 Skins', s => s.skins >= 6, s => Math.min(1, s.skins / 6)],
   ['km', '10 km gefahren', 'Fahre insgesamt 10 km', s => s.km >= 10, s => Math.min(1, s.km / 10)],
 ];
