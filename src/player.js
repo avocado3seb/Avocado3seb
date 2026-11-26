@@ -73,7 +73,8 @@ export class Player {
     this.G.emit('playerDied', { src });
   }
   respawn(x, z, yaw = 0) {
-    this.alive = true; this.health = 100; this.armor = 0; this.pos.set(x, this.G.world.groundY(x, z), z); this.vel.set(0, 0, 0);
+    this.alive = true; this.health = Math.max(100, this.maxHealth || 100); this.armor = 0; this.pos.set(x, this.G.world.groundY(x, z), z); this.vel.set(0, 0, 0);
+    this.enterT = 0; this.exitT = 0; this.vy = 0; this.knocked = false; this.chute = false; this.onGround = true; this.swimming = false; this.reloadT = 0; this.cd = 0.3; this.lastHurt = -99;
     this.yaw = yaw; this.char.state.dead = false; this.stun = 0; this.hunger = Math.max(this.hunger, 40);
     this.G.camera?.position && this.rig.snap(this);
   }
@@ -106,6 +107,7 @@ export class Player {
   update(dt) {
     const G = this.G, I = G.input, W = G.world;
     this.stats.timePlayed += dt;
+    if (this.enterT > 0) this.enterT -= dt;
     // Hunger / Regeneration
     this.hunger = Math.max(0, this.hunger - dt * 0.028);
     if (this.alive) {

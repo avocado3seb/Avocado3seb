@@ -65,7 +65,7 @@ export class FX {
     this.skMesh.frustumCulled = false; this.skMesh.renderOrder = 4;
     this.group.add(this.skMesh);
     // Licht für Explosionen
-    this.light = new THREE.PointLight(0xffa040, 0, 60, 1.8); this.light.visible = false; this.group.add(this.light);
+    this.light = new THREE.PointLight(0xffa040, 0, 60, 1.8); this.group.add(this.light);
     this.lightT = 0;
     this.shots = []; // Leuchtspuren
     this.tracerMat = new THREE.LineBasicMaterial({ color: 0xffe9a0, transparent: true, opacity: 0.9, toneMapped: false });
@@ -86,7 +86,7 @@ export class FX {
     for (let i = 0; i < 26; i++) this.glowP.emit(x + (Math.random() - 0.5) * 2, y, z + (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 14 * scale, Math.random() * 10 * scale, (Math.random() - 0.5) * 14 * scale, 5 * scale, 1, 0.5 + Math.random() * 0.6, 1, 0.55 + Math.random() * 0.25, 0.12, 0.95, -2, 1.5);
     for (let i = 0; i < 22; i++) this.smoke(x + (Math.random() - 0.5) * 3, y + Math.random() * 2, z + (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 6, 2 + Math.random() * 6, (Math.random() - 0.5) * 6, 5 * scale, 4 + Math.random() * 3, 0x1c1c1c, 0.7);
     for (let i = 0; i < 24; i++) this.glowP.emit(x, y, z, (Math.random() - 0.5) * 30, Math.random() * 18, (Math.random() - 0.5) * 30, 0.3, 0.1, 0.8 + Math.random() * 0.8, 1, 0.7, 0.25, 1, 18, 0.3);
-    this.light.position.set(x, y + 2, z); this.light.visible = true; this.lightT = 0.9; this.light.intensity = 900 * scale;
+    this.light.position.set(x, y + 2, z); this.lightT = 0.9; this.light.intensity = 900 * scale;
     this.G.emit('shake', { x, z, power: 1.2 * scale });
   }
   spray(x, y, z, speed) {
@@ -117,7 +117,7 @@ export class FX {
     this.smokeP.mat.uniforms.uScale.value = this.glowP.mat.uniforms.uScale.value = vh * 0.62;
     this.smokeP.update(dt); this.glowP.update(dt);
     if (this.skDirty) { this.skAttr.needsUpdate = true; this.skDirty = false; }
-    if (this.lightT > 0) { this.lightT -= dt; this.light.intensity *= Math.exp(-5 * dt); if (this.lightT <= 0) this.light.visible = false; }
+    if (this.lightT > 0) { this.lightT -= dt; this.light.intensity *= Math.exp(-5 * dt); if (this.lightT <= 0) this.light.intensity = 0; }
     for (let i = this.shots.length - 1; i >= 0; i--) { const s = this.shots[i]; s.t -= dt; if (s.t <= 0) { this.group.remove(s.l); s.l.geometry.dispose(); this.shots.splice(i, 1); } }
   }
 }

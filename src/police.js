@@ -197,7 +197,7 @@ export class Police {
     // Suchscheinwerfer
     const cone = new THREE.Mesh(new THREE.ConeGeometry(9, 55, 20, 1, true), new THREE.MeshBasicMaterial({ color: 0xfff4d0, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
     cone.geometry.translate(0, -27.5, 0); cone.rotation.x = 0; this.G.scene.add(cone); h.cone = cone;
-    const spot = new THREE.SpotLight(0xfff0d0, 0, 140, 0.16, 0.4, 1.2); this.G.scene.add(spot); this.G.scene.add(spot.target); h.spot = spot;
+    this.spotPool = this.spotPool || []; let spot = this.spotPool.pop(); if (!spot) { spot = new THREE.SpotLight(0xfff0d0, 0, 140, 0.16, 0.4, 1.2); this.G.scene.add(spot); this.G.scene.add(spot.target); } h.spot = spot;
     this.helis.push(h); return h;
   }
   updateHeli(h, dt) {
@@ -292,7 +292,7 @@ export class Police {
     if (this.stars > 0 && !pl.vehicle) { /* zu Fuß */ }
     G.hudWanted = { stars: this.stars, searching: this.searching };
   }
-  killHeli(h) { if (h.cone) this.G.scene.remove(h.cone); if (h.spot) { this.G.scene.remove(h.spot); this.G.scene.remove(h.spot.target); } h.keep = false; this.G.vehicles.despawn(h); }
+  killHeli(h) { if (h.cone) this.G.scene.remove(h.cone); if (h.spot) { h.spot.intensity = 0; (this.spotPool = this.spotPool || []).push(h.spot); h.spot = null; } h.keep = false; this.G.vehicles.despawn(h); }
   updateBust(dt) {
     const G = this.G, pl = G.player, v = pl.vehicle;
     let close = false;

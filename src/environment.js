@@ -111,7 +111,7 @@ export class Environment {
     this.hemi = new THREE.HemisphereLight(0xbfd8ff, 0x59503f, 0.9); scene.add(this.hemi);
     // Straßenlaternen-Lichter
     this.lampLights = [];
-    for (let i = 0; i < q.lamps; i++) { const l = new THREE.PointLight(0xffc27a, 0, 34, 1.6); l.visible = false; scene.add(l); this.lampLights.push(l); }
+    for (let i = 0; i < q.lamps; i++) { const l = new THREE.PointLight(0xffc27a, 0, 34, 1.6); scene.add(l); this.lampLights.push(l); }
     this.fog = new THREE.Fog(0x9fb8d6, 200, 1500); scene.fog = this.fog;
     this.pmrem = new THREE.PMREMGenerator(renderer);
     // Wasser
@@ -176,9 +176,9 @@ export class Environment {
     this.viewDist = q.view;
     this.composer.renderTarget1.samples = q.samples; this.composer.renderTarget2.samples = q.samples;
     this.composer.renderTarget1.dispose(); this.composer.renderTarget2.dispose();
-    for (const l of this.lampLights) l.visible = false;
+    for (const l of this.lampLights) l.intensity = 0;
     while (this.lampLights.length > q.lamps) { const l = this.lampLights.pop(); this.scene.remove(l); }
-    while (this.lampLights.length < q.lamps) { const l = new THREE.PointLight(0xffc27a, 0, 34, 1.6); l.visible = false; this.scene.add(l); this.lampLights.push(l); }
+    while (this.lampLights.length < q.lamps) { const l = new THREE.PointLight(0xffc27a, 0, 34, 1.6); this.scene.add(l); this.lampLights.push(l); }
   }
   resize(w, h) {
     this.renderer.setSize(w, h);
@@ -341,7 +341,8 @@ export class Environment {
   updateLampLights(focus) {
     const W = this.G.world; if (!W || !W.lampHash) return;
     const n = this.night;
-    for (const l of this.lampLights) l.visible = false;
+    // Lichtanzahl konstant halten (sonst werden alle Materialien neu kompiliert → Ruckler)
+    for (const l of this.lampLights) { l.visible = true; l.intensity = 0; }
     if (n < 0.05) return;
     const cam = this.camera.position;
     const items = W.lampHash.query(cam.x - 55, cam.z - 55, cam.x + 55, cam.z + 55, []);
