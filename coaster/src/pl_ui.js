@@ -6,6 +6,8 @@
 import { POIS, TICKETS, ACHIEVEMENTS } from './pl_data.js';
 import { ZONES } from './phantasia.js';
 import { getTrack } from './park.js';
+import { Preview, EXTRAS } from './pl_char.js';
+import { SKIN_SHOP, PART_KINDS, EXTRA_PRICE, COLORABLE, HAIR, SKIN_TONES, PALETTE, HAIRCOL, skinById } from './pl_skins.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -84,6 +86,7 @@ export const plUi = {
       const pk = $('#gPocket'); if (pk) pk.addEventListener('click', () => { g.addMoney(100); this.renderPanel(); });
       return;
     }
+    if (kind === 'wardrobe') { tit.textContent = '👕 Skins & Kleiderschrank'; this.buildWardrobe(body, ''); return; }
     if (kind === 'inventory') {
       tit.textContent = '🎒 Inventar'; const items = g.inventory(), food = items.filter(x => x.kind !== 'shop'), souv = items.filter(x => x.kind === 'shop'), b = S.bookings;
       const row = (x, eat) => `<div class="row2"><span>${esc(x.name)} <span class="chip">×${x.n}</span><div class="note">${esc(x.from || '')}${x.price ? ' · ' + eur(x.price) + ' pro Stück' : ''}</div></span>${eat ? `<button class="btn pri sm" data-eat="${esc(x.name)}">Verzehren</button>` : ''}</div>`;
@@ -134,6 +137,7 @@ export const plUi = {
     const wire = () => body.querySelectorAll('[data-home]').forEach(b => b.addEventListener('click', () => this.tab('hub')));
     if (t === 'hub') return this.buildHub(body);
     if (t === 'attr') this.buildAttr(body, back);
+    else if (t === 'skins') this.buildWardrobe(body, back);
     else if (t === 'hotels') this.buildHotels(body, back);
     else if (t === 'food') this.buildFood(body, back);
     else if (t === 'photos') this.buildPhotos(body, back);
@@ -150,7 +154,7 @@ export const plUi = {
       ['map', '🗺', 'Parkkarte', 'Zoom, Suche, Filter, Navigation'], ['hotels', '🏨', 'Hotels', 'Lobby, Zimmer, Buchung'],
       ['food', '🍽', 'Gastronomie', 'Restaurants, Imbisse, Shops'], ['photos', '📷', 'Fotoalbum', 'Fotos, gespeicherte Fahrten'],
       ['stats', '📊', 'Statistiken', 'Fahrten, Erfolge, Fortschritt'], ['editor', '🛠', 'Achterbahn-Editor', 'Eigene Bahn bauen und testen'],
-      ['inv', '🎒', 'Inventar', 'Gekauftes Essen und Souvenirs'], ['online', '🌐', 'Multiplayer', 'Mit Freunden im Park – Raum erstellen oder beitreten'],
+      ['skins', '👕', 'Skins', 'Outfits kaufen, anziehen, anpassen'], ['inv', '🎒', 'Inventar', 'Gekauftes Essen und Souvenirs'], ['online', '🌐', 'Multiplayer', 'Mit Freunden im Park – Raum erstellen oder beitreten'],
       ['saves', '💾', 'Spielstände', '3 Slots + Autosave'], ['help', '⚙', 'Einstellungen', 'Grafik, Steuerung, Zeit, Wetter'],
     ];
     body.innerHTML = `<div class="hub"><div class="hubhead"><div><h1>Phantasialand <small>Simulator</small></h1><div class="note">Stilisierte, frei erkundbare Nachbildung – keine offizielle Anwendung. Namen/Preise/Menüs der Gastronomie sind Beispielangebote.</div></div>
@@ -175,7 +179,7 @@ export const plUi = {
   async hubAction(k) {
     const a = this.app, g = a.game;
     if (k === 'inv') return this.openPanel('inventory');
-    if (['pl', 'attr', 'hotels', 'food', 'photos', 'stats', 'saves', 'editor', 'help', 'db', 'online', 'custom'].includes(k)) return this.tab(k);
+    if (['pl', 'attr', 'skins', 'hotels', 'food', 'photos', 'stats', 'saves', 'editor', 'help', 'db', 'online', 'custom'].includes(k)) return this.tab(k);
     a.audio.start();
     if (k === 'play') { g.S.mode = 'play'; if (!g.S.stats.flags.started) { g.S.stats.flags.started = 1; } await a.phantasiaPlay(); }
     else if (k === 'free') { g.S.mode = 'free'; await a.phantasia('walk'); }
@@ -285,6 +289,52 @@ export const plUi = {
     body.querySelectorAll('[data-l]').forEach(b => b.addEventListener('click', () => { this.app.audio.start(); g.load(b.dataset.l === 'auto' ? 'auto' : +b.dataset.l); }));
     body.querySelectorAll('[data-d]').forEach(b => b.addEventListener('click', () => { g.del(+b.dataset.d); this.tab('saves'); }));
     $('#svNew').addEventListener('click', () => { if (confirm('Neues Spiel beginnen? Der aktuelle Fortschritt (nicht die Slots) wird zurückgesetzt.')) { g.newGameState(); this.toast('Neues Spiel'); this.tab('hub'); } });
+  },
+
+  // ------------------------------------------------------------------ Skin-Shop / Kleiderschrank
+  buildWardrobe(body, back) {
+    const a = this.app, g = a.game, hex = v => '#' + (v >>> 0).toString(16).padStart(6, '0'), st = this.wdState || (this.wdState = { tab: 'skins' });
+    body.innerHTML = `<div class="card page wd"><div class="pghead">${back}<h3>👕 Skins &amp; Kleiderschrank</h3><span class="wal">💶 <b id="wdW"></b></span></div>
+      <div class="note">Skins, Preise und Namen sind frei erfunden (Spielgeld). Geld bekommst du über Erfolge (+40 €), den Tagesbonus (+100 €) und Taschengeld am Eingang.</div>
+      <div class="wdgrid"><div class="wdprev card"><canvas id="wdCv"></canvas><div id="wdName" class="wdn"></div><div class="btnrow" style="justify-content:center"><button class="btn sm" id="wdSpin">⏸ Drehung</button></div></div>
+      <div class="wdmain"><div class="btnrow" id="wdTabs">${[['skins', '👕 Skins'], ['wear', '👖 Kleidung'], ['looks', '💇 Aussehen'], ['extras', '🎩 Extras']].map(t => `<button class="btn sm ${st.tab === t[0] ? 'pri' : ''}" data-t="${t[0]}">${t[1]}</button>`).join('')}</div><div id="wdBody"></div></div></div></div>`;
+    const prev = this.wdPrev || (this.wdPrev = new Preview(a, 260, 360)); prev.spin = true; prev.setLook(g.lookNow()); prev.attach($('#wdCv'));
+    const W = () => g.wardrobe();
+    const head = () => { $('#wdW').textContent = eur(g.S.wallet); const sk = skinById(W().skinId); $('#wdName').innerHTML = sk ? `<b>${esc(sk.name)}</b><div class="note">${esc(sk.zone)}</div>` : '<b>Eigener Look</b><div class="note">selbst zusammengestellt</div>'; };
+    const refresh = () => { prev.setLook(g.lookNow()); head(); render(); };
+    const sw = (list, cur, key) => `<div class="swatches">${list.map(c => `<button class="sw ${cur === c ? 'on' : ''}" style="background:${hex(c)}" data-${key}="${c}"></button>`).join('')}</div>`;
+    const wire = (root, sel, attr, fn) => root.querySelectorAll(sel).forEach(el => el.addEventListener('click', () => fn(el.dataset[attr], el)));
+    const render = () => {
+      const bd = $('#wdBody'), o = g.lookNow().outfit;
+      if (st.tab === 'skins') {
+        bd.innerHTML = `<div class="skingrid">${SKIN_SHOP.map(sk => { const own = !!W().skins[sk.id], on = W().skinId === sk.id; return `<div class="card skin ${on ? 'on' : ''}"><img data-sid="${sk.id}" alt=""><div class="sn"><b>${esc(sk.name)}</b> <span class="chip">${esc(sk.zone)}</span></div><div class="note">${esc(sk.desc)}</div>
+          ${on ? '<button class="btn sm" disabled>✔ Angezogen</button>' : own ? `<button class="btn blue sm" data-eq="${sk.id}">Anziehen</button>` : `<button class="btn pri sm" data-buy="${sk.id}">Kaufen · ${eur(sk.price)}</button>`}</div>`; }).join('')}</div>`;
+        wire(bd, '[data-eq]', 'eq', id => { g.equipSkin(id); refresh(); }); wire(bd, '[data-buy]', 'buy', id => { g.buySkin(id); refresh(); });
+        const imgs = [...bd.querySelectorAll('img[data-sid]')], cache = this.wdThumbs || (this.wdThumbs = new Map());
+        const tp = this.wdThumbPrev || (this.wdThumbPrev = new Preview(a, 150, 215)); tp.spin = false;
+        let k = 0; const next = () => { if (k >= imgs.length || !bd.isConnected) return; const img = imgs[k++], sk = skinById(img.dataset.sid); let u = cache.get(sk.id);
+          if (!u) { const cv = document.createElement('canvas'); document.body.appendChild(cv); cv.style.display = 'none'; tp.cv = cv; cv.width = 150; cv.height = 215; tp.setLook(sk.look); tp.ang = 0.5; try { tp.draw(0); u = cv.toDataURL('image/png'); cache.set(sk.id, u); } catch (e) { /* */ } cv.remove(); }
+          if (u) img.src = u; setTimeout(next, 25); }; setTimeout(next, 20);
+      } else if (st.tab === 'wear') {
+        bd.innerHTML = PART_KINDS.map(([kind, label, names]) => `<div class="wsec"><h4>${label}</h4><div class="chips2">${names.map((n, i) => { const p = g.partPrice(kind, i), own = g.ownsPart(kind, i), on = o[kind] === i; return `<button class="btn sm ${on ? 'pri' : ''}" data-k="${kind}" data-i="${i}">${esc(n)} <small>${on ? '✔' : own ? '' : eur(p)}</small></button>`; }).join('')}</div>
+          ${COLORABLE[kind] ? sw(PALETTE, o[COLORABLE[kind]], 'c' + kind) : ''}</div>`).join('');
+        bd.querySelectorAll('[data-k]').forEach(b => b.addEventListener('click', () => { const kind = b.dataset.k, i = +b.dataset.i; if (g.buyPart(kind, i)) g.equipPart(kind, i); refresh(); }));
+        for (const kind of Object.keys(COLORABLE)) wire(bd, `[data-c${kind}]`, 'c' + kind, v => { g.setOutfitField(COLORABLE[kind], +v); refresh(); });
+      } else if (st.tab === 'looks') {
+        bd.innerHTML = `<div class="wsec"><h4>Frisur</h4><div class="chips2">${HAIR.map((n, i) => `<button class="btn sm ${o.hairStyle === i ? 'pri' : ''}" data-h="${i}">${esc(n)}</button>`).join('')}</div>${sw(HAIRCOL, o.hairColor, 'hc')}</div>
+          <div class="wsec"><h4>Hautton</h4>${sw(SKIN_TONES, o.skin, 'sk')}</div><div class="wsec"><h4>Statur</h4><input type="range" id="wdBuild" min="0.85" max="1.2" step="0.01" value="${o.build || 1}" style="width:260px"></div>`;
+        wire(bd, '[data-h]', 'h', v => { g.setOutfitField('hairStyle', +v); refresh(); }); wire(bd, '[data-hc]', 'hc', v => { g.setOutfitField('hairColor', +v); refresh(); }); wire(bd, '[data-sk]', 'sk', v => { g.setOutfitField('skin', +v); refresh(); });
+        $('#wdBuild').addEventListener('input', e => { g.setOutfitField('build', +e.target.value); prev.setLook(g.lookNow()); head(); });
+      } else {
+        const ex = g.lookNow().extras;
+        bd.innerHTML = `<div class="rows">${Object.keys(EXTRAS).map(n => { const own = g.ownsExtra(n) || g.skinHasExtra(n), eq = ex.find(e => e[0] === n); return `<div class="row2"><span><b>${esc(EXTRAS[n].label)}</b><div class="note">${own ? 'im Besitz' : eur(EXTRA_PRICE[n] || 30)}</div></span>${eq ? sw(PALETTE, eq[1] ?? EXTRAS[n].color, 'x' + n) : ''}${own ? `<button class="btn ${eq ? 'pri' : 'blue'} sm" data-t2="${n}">${eq ? 'Ablegen' : 'Anlegen'}</button>` : `<button class="btn pri sm" data-bx="${n}">Kaufen</button>`}</div>`; }).join('')}</div>`;
+        wire(bd, '[data-t2]', 't2', n => { g.toggleExtra(n, EXTRAS[n].color); refresh(); }); wire(bd, '[data-bx]', 'bx', n => { if (g.buyExtra(n)) g.toggleExtra(n, EXTRAS[n].color); refresh(); });
+        for (const n of Object.keys(EXTRAS)) wire(bd, `[data-x${n}]`, 'x' + n, v => { g.setExtraColor(n, +v); refresh(); });
+      }
+    };
+    $('#wdTabs').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { st.tab = b.dataset.t; $('#wdTabs').querySelectorAll('button').forEach(x => x.classList.toggle('pri', x === b)); render(); }));
+    $('#wdSpin').addEventListener('click', e => { prev.spin = !prev.spin; e.target.textContent = prev.spin ? '⏸ Drehung' : '▶ Drehung'; });
+    head(); render();
   },
 
   // ------------------------------------------------------------------ Parkkarte

@@ -14,9 +14,9 @@ check('Start-Hub sichtbar', await ev(() => document.querySelectorAll('.tile').le
 const r1 = await ev(async () => { const a = __app; await a.ui.hubAction('free'); return [a.state, a.parkMode, a.park.def.name, a.park.pois.length, a.park.interactables.length]; });
 check('Freie Erkundung startet (Phantasialand, begehbar)', r1[0] === 'park' && r1[1] === 'walk' && r1[2] === 'Phantasialand', JSON.stringify(r1));
 check('POIs platziert (Restaurants/Hotels/Shows …)', r1[3] >= 20, 'n=' + r1[3]);
-const look = await ev(async () => { const a = __app; a.settings.look = true; a.applyQuality(); await new Promise(r => setTimeout(r, 1500)); const on = a.post.enabled; a.settings.look = false; a.applyQuality(); return [on, a.post.enabled]; });
-check('Vice-City-Look (Nachbearbeitung) schaltbar', look[0] === true && look[1] === false, JSON.stringify(look));
-const r2 = await ev(() => { const a = __app, it = a.park.interactables.find(i => i.kind === 'restaurant'); a.camera.position.set(it.x, 3, it.z); a.walk.pos.set(it.x, 3, it.z); a.game.update(0.1); const h = !!a.game.hint; a.game.interact(); const open = !document.querySelector('#panel').classList.contains('hide'); const w0 = a.game.S.wallet; document.querySelector('#pBody [data-i]').click(); return [h, open, w0 - a.game.S.wallet, a.game.S.stats.purchases]; });
+const look = await ev(async () => { const a = __app; a.settings.look = true; a.settings.ao = true; a.applyQuality(); await new Promise(r => setTimeout(r, 2500)); const on = a.post.enabled, ao = a.post.gtao.enabled; a.settings.look = false; a.settings.ao = false; a.applyQuality(); return [on, ao, a.post.enabled, !!a.env.iblRT]; });
+check('Vice-City-Look, Ambient Occlusion und Himmels-Beleuchtung schaltbar', look[0] === true && look[1] === true && look[2] === false && look[3] === true, JSON.stringify(look));
+const r2 = await ev(() => { const a = __app, it = a.park.interactables.find(i => i.kind === 'restaurant'); a.camera.position.set(it.x, 3, it.z); a.walk.pos.set(it.x, 3, it.z); a.game.update(0.1); const h = !!a.game.hint; a.game.interact(); const open = !document.querySelector('#panel').classList.contains('hide'); const sp0 = a.game.S.stats.spent; document.querySelector('#pBody [data-i]').click(); return [h, open, a.game.S.stats.spent - sp0, a.game.S.stats.purchases]; });
 check('E-Interaktion öffnet Speisekarte, Kauf bucht ab', r2[0] && r2[1] && r2[2] > 0 && r2[3] === 1, JSON.stringify(r2));
 const inv = await ev(() => { const a = __app, g = a.game, items = g.inventory(), first = items[0]; const eaten = first && first.kind !== 'shop' ? g.consume(first.name) : null; return [items.length, first && first.name, eaten, a.player.group.visible, a.park.trackBridges]; });
 check('Inventar enthält Kauf, Third-Person-Figur sichtbar, Brücken über Schienen', inv[0] >= 1 && inv[1] && inv[3] === true && inv[4] >= 1, JSON.stringify(inv));
@@ -28,6 +28,9 @@ const col = await ev(() => { const a = __app, w = a.park; a.ui.closePanel(); a.u
 await page.keyboard.down('ShiftLeft'); await page.keyboard.down('KeyW'); await page.waitForTimeout(3500); await page.keyboard.up('KeyW'); await page.keyboard.up('ShiftLeft');
 const inside = await ev(c => { const a = __app, p = a.walk.pos, cs = Math.cos(c.rot), sn = Math.sin(c.rot), dx = p.x - c.x, dz = p.z - c.z, lx = dx * cs - dz * sn, lz = dx * sn + dz * cs; return [Math.abs(lx) < c.hx - 0.05 && Math.abs(lz) < c.hz - 0.05, +Math.abs(lx).toFixed(1), +Math.abs(lz).toFixed(1)]; }, col);
 check('Kollision: Rennen durch Wand wird gestoppt', !inside[0], JSON.stringify([col.hx, col.hz, inside]));
+// Skins: kaufen, anziehen, Zubehör, Persistenz im Spielstand, Panel per Taste U
+const sk = await ev(() => { const a = __app, g = a.game; g.S.wallet = 1000; const ok = g.buySkin('ritter'), eq = g.wardrobe().skinId; const extras = g.lookNow().extras.map(e => e[0]); const owned = !!g.wardrobe().skins.ritter; const ok2 = g.buyPart('top', 5) && g.equipPart('top', 5); const snap = g.snapshot(); a.ui.openPanel('wardrobe'); const panel = !document.querySelector('#panel').classList.contains('hide') && document.querySelectorAll('#pBody .skin').length; a.ui.closePanel(); return [ok, eq, extras.join(','), owned, ok2, snap.wardrobe.skins.ritter === true && snap.wardrobe.look.outfit.top === 5, panel, g.S.wallet, a.player.view.extras.length]; });
+check('Skin-Shop: kaufen, anziehen (Helm+Umhang), Einzelteil, Spielstand enthält Look, Panel zeigt Skins', sk[0] && sk[1] === null === false && sk[2] === 'helmet,cape' && sk[3] && sk[4] && sk[5] && sk[6] >= 10 && sk[7] < 1000, JSON.stringify(sk));
 // Haus betreten: vor die Tür stellen, nach vorn laufen → man steht danach im Haus (Tür ist begehbar)
 const hb = await ev(() => { const a = __app, w = a.park, b = w.buildings.find(q => q.hollow && q.d); a.ui.closePanel(); a.ui.closeMap(); const fx = b.x + Math.sin(b.rot) * (b.d / 2 + 3), fz = b.z + Math.cos(b.rot) * (b.d / 2 + 3); a.camera.position.set(fx, 3, fz); a.setParkMode('walk'); a.walk.pos.set(fx, w.groundAt(fx, fz, 60) + 1.9, fz); a.walk.yaw = b.rot; return { x: b.x, z: b.z, d: b.d, w: b.w }; });
 await page.keyboard.down('KeyW'); await page.waitForFunction(b => { const p = __app.walk.pos; return Math.hypot(p.x - b.x, p.z - b.z) < b.d / 2 - 0.5; }, hb, { timeout: 60000 }).catch(() => {}); await page.keyboard.up('KeyW');
@@ -35,6 +38,8 @@ const hin = await ev(b => { const p = __app.walk.pos; return [Math.hypot(p.x - b
 check('Haus betreten: Spieler steht nach dem Laufen durch die Tür im Haus', hin[0] < hin[1] + 0.2, JSON.stringify(hin));
 const exitR = await ev(async () => { const a = __app, r = a.park.rides[0]; a.rideOn(r); const st = a.ride.sim.state, t0 = a.ride.sim.timer; return [st, Math.round(t0)]; });
 check('Einsteigen: Station mit langem Countdown (≥ 20 s)', exitR[0] === 'station' && exitR[1] >= 20, JSON.stringify(exitR));
+const up = await page.waitForFunction(() => __app.ride && __app.ride.train.upgraded === true, null, { timeout: 60000 }).then(() => true).catch(() => false);
+check('Fahrgäste im Zug werden zu Vice-City-Figuren (in der Nähe)', up);
 await page.keyboard.press('Space'); await page.waitForTimeout(400);
 const afterExit = await ev(() => [__app.state, __app.parkMode]);
 check('Leertaste = Aussteigen', afterExit[0] === 'park' && afterExit[1] === 'walk', JSON.stringify(afterExit));

@@ -119,7 +119,7 @@ export class UI {
     this.root.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x.dataset.t === t));
     this.curTab = t;
     const body = $('#mbody');
-    if (['hub', 'attr', 'hotels', 'food', 'photos', 'stats', 'saves', 'editor'].includes(t)) this.plTab(t, body);
+    if (['hub', 'attr', 'skins', 'hotels', 'food', 'photos', 'stats', 'saves', 'editor'].includes(t)) this.plTab(t, body);
     else if (t === 'custom') this.buildCustom(body);
     else if (t === 'db') this.buildDb(body);
     else if (t === 'parks') this.buildParks(body);
@@ -434,15 +434,15 @@ Am Ende wird die Strecke automatisch zur Station zurückgeführt.</pre>
         <label>Tageszyklus (automatisch)<br><select id="sAuto"><option value="0">Aus</option><option value="1">An (1 Spielstunde = 1 Minute)</option></select></label>
         <label>Onride-Fotos<br><select id="sPhoto"><option value="1">Automatisch</option><option value="0">Aus</option></select></label>
         <label>Grafikstil „Vice-City-Look“ (Bloom, Farbkorrektur)<br><select id="sLook"><option value="1">An</option><option value="0">Aus (schneller)</option></select></label>
-        <label>Spielerfarbe (Shirt)<br><input type="color" id="sCol" value="${s.playerColor || '#1e88e5'}"></label>
+        <label>Automatische Grafikanpassung bei niedriger FPS<br><select id="sAdp"><option value="1">An</option><option value="0">Aus</option></select></label>
         <label>Ambient Occlusion (Schattierung in Ecken, braucht starke GPU)<br><select id="sAO"><option value="0">Aus</option><option value="1">An</option></select></label>
         <label>Touch-Steuerung (Tablet/Handy)<br><select id="sTouch"><option value="1">An</option><option value="0">Aus</option></select></label>
       </div><div class="note">Qualitätsänderungen (Bäume, Besucher) gelten ab dem nächsten Parkwechsel.</div>${this.helpHtml()}
       <h3>Über dieses Spiel</h3><div class="note">Alle Modelle, Texturen und Geräusche entstehen zur Laufzeit im Browser (three.js, keine externen Assets). Streckenlayouts sind stilisierte Nachbildungen auf Basis von Höhe, Länge, Geschwindigkeit, Inversionen und Typ; Stammdaten sind gerundete Näherungswerte ohne Gewähr. Alle Markennamen gehören ihren Inhabern.</div></div>`;
     $('#sQ').value = s.quality; $('#sSh').value = s.shadows ? '1' : '0';
     $('#sLook').value = a.lookOn() ? '1' : '0'; $('#sLook').addEventListener('change', e => { s.look = e.target.value === '1'; a.saveSettings(); a.applyQuality(); });
-    $('#sCol').addEventListener('input', e => { s.playerColor = e.target.value; a.player.setColor(s.playerColor); a.saveSettings(); });
-    $('#sAO').value = s.ao ? '1' : '0'; $('#sAO').addEventListener('change', e => { s.ao = e.target.value === '1'; a.saveSettings(); a.applyQuality(); });
+    $('#sAO').value = a.aoOn() ? '1' : '0'; $('#sAO').addEventListener('change', e => { s.ao = e.target.value === '1'; a.saveSettings(); a.applyQuality(); });
+    $('#sAdp').value = s.adaptive === false ? '0' : '1'; $('#sAdp').addEventListener('change', e => { s.adaptive = e.target.value === '1'; a.saveSettings(); });
     $('#sAuto').value = s.autoTime ? '1' : '0'; $('#sPhoto').value = s.autoPhoto === false ? '0' : '1'; $('#sTouch').value = a.touch && a.touch.on ? '1' : '0';
     $('#sAuto').addEventListener('change', e => { s.autoTime = e.target.value === '1'; a.saveSettings(); });
     $('#sPhoto').addEventListener('change', e => { s.autoPhoto = e.target.value === '1'; a.saveSettings(); });

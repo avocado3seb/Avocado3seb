@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { ACHIEVEMENTS, TICKETS, POIS } from './pl_data.js';
 import { ZONES } from './phantasia.js';
+import { SKIN_SHOP, skinById, PART_PRICE, EXTRA_PRICE, defaultWardrobe } from './pl_skins.js';
 
 let NS = ''; // Namensraum je Konto → mehrere Spieler am selben Browser mischen ihre Spielstände nicht
 const KEY = 'ecs_pl_';
@@ -16,7 +17,7 @@ const ZONE_KEYS = ['klugheim', 'africa', 'rookburgh', 'mexico', 'fantasy', 'chin
 const fresh = () => ({
   v: 1, wallet: 300, ticket: null, mode: 'free',
   stats: { rides: 0, rideBy: {}, km: 0, time: 0, zones: {}, rests: {}, hotels: {}, purchases: 0, bookings: 0, designs: 0, flags: {}, spent: 0, entered: 0 },
-  bookings: [], inventory: {}, pos: null, hour: 15.5, weather: 'clear', winter: false, savedAt: 0, name: '',
+  bookings: [], inventory: {}, wardrobe: defaultWardrobe(), daily: '', pos: null, hour: 15.5, weather: 'clear', winter: false, savedAt: 0, name: '',
 });
 
 export class PLGame {
@@ -28,9 +29,10 @@ export class PLGame {
   }
 
   switchUser(name) { // beim Anmelden: lokale Daten dieses Kontos laden
-    NS = name ? name.toLowerCase().replace(/[^a-z0-9äöüß_.-]/g, '_') + '_' : '';
+    this._daily = false; NS = name ? name.toLowerCase().replace(/[^a-z0-9äöüß_.-]/g, '_') + '_' : '';
     this.unlocked = new Set(lsGet('ach', [])); this.photos = lsGet('photos', []); this.designs = lsGet('designs', []); this.rides = lsGet('rides', []);
     const auto = lsGet('auto', null); this.hasAuto = !!auto; this.S = fresh(); if (auto) { this.S = Object.assign(fresh(), auto); this.S.stats = Object.assign(fresh().stats, auto.stats); }
+    this.applyLook();
   }
   // ------------------------------------------------------------------ Speichern / Laden
   slotInfo(i) { const s = lsGet('slot' + i, null); return s ? { savedAt: s.savedAt, name: s.name, wallet: s.wallet, rides: s.stats.rides, km: s.stats.km } : null; }
@@ -48,11 +50,11 @@ export class PLGame {
     if (local && (local.savedAt || 0) > (d.S.savedAt || 0) && local.name === d.S.name) return;
     this.S = Object.assign(fresh(), d.S); this.S.stats = Object.assign(fresh().stats, d.S.stats);
     this.unlocked = new Set([...(d.ach || []), ...this.unlocked]); lsSet('ach', [...this.unlocked]); if (Array.isArray(d.designs) && d.designs.length >= this.designs.length) { this.designs = d.designs; lsSet('designs', this.designs); }
-    lsSet('auto', this.S); this.hasAuto = true;
+    lsSet('auto', this.S); this.hasAuto = true; this.applyLook();
   }
   load(slot) {
     const s = lsGet(slot === 'auto' ? 'auto' : 'slot' + slot, null); if (!s) return false;
-    this.S = Object.assign(fresh(), s); this.S.stats = Object.assign(fresh().stats, s.stats);
+    this.S = Object.assign(fresh(), s); this.S.stats = Object.assign(fresh().stats, s.stats); this.applyLook();
     const a = this.app; a.env.setTime(this.S.hour); a.env.setWeather(this.S.weather); a.ui.syncEnv?.();
     this.applyWorld(); return true;
   }
@@ -77,12 +79,12 @@ export class PLGame {
     const s = this.S.stats;
     return { rides: s.rides, rideBy: s.rideBy, coasterCount: COASTERS.filter(n => s.rideBy[n]).length, zoneCount: ZONE_KEYS.filter(k => s.zones[k]).length,
       restCount: Object.keys(s.rests).length, hotelCount: Object.keys(s.hotels).length, photos: this.photos.length, purchases: s.purchases, bookings: s.bookings,
-      designs: this.designs.length, km: s.km, flags: s.flags };
+      designs: this.designs.length, km: s.km, flags: s.flags, skins: Object.keys(this.wardrobe().skins).length };
   }
   checkAchievements(silent) {
     const d = this.derived();
     for (const [id, name, desc, test] of ACHIEVEMENTS) {
-      if (!this.unlocked.has(id) && test(d)) { this.unlocked.add(id); lsSet('ach', [...this.unlocked]); if (!silent) this.app.ui.toast('🏆 Erfolg: ' + name, 4000); }
+      if (!this.unlocked.has(id) && test(d)) { this.unlocked.add(id); lsSet('ach', [...this.unlocked]); if (!silent) { this.S.wallet += 40; this.app.ui.toast('🏆 Erfolg: ' + name + ' (+40 €)', 4500); } }
     }
   }
   onLap(r) {
@@ -105,10 +107,30 @@ export class PLGame {
       const pr = r.sim.progress;
       if (r.sim.state === 'run' && pr > 0.35 && pr < 0.4 && this.photoLap !== r.sim.lap + ':' + r.coaster.id && a.settings.autoPhoto !== false) { this.photoLap = r.sim.lap + ':' + r.coaster.id; this.photoReq = { caption: 'Onride-Foto · ' + r.coaster.name, auto: true }; }
     }
+    if (!this._daily && a.state !== 'menu') { this._daily = true; this.dailyBonus(); }
     this.achT -= dt; if (this.achT <= 0) { this.achT = 3; this.checkAchievements(); }
     this.autoT -= dt; if (this.autoT <= 0) { this.autoT = 30; if (a.state !== 'menu') this.autosave(); }
     this.updateInteraction(dt); this.updateNav(dt);
   }
+
+  // ------------------------------------------------------------------ Kleiderschrank & Skin-Shop
+  wardrobe() { const S = this.S; if (!S.wardrobe || !S.wardrobe.look) S.wardrobe = defaultWardrobe(); const W = S.wardrobe; W.skins = W.skins || { besucher: true }; W.parts = W.parts || {}; W.extras = W.extras || {}; return W; }
+  lookNow() { return this.wardrobe().look; }
+  partPrice(kind, i) { return (PART_PRICE[kind] || {})[i] ?? 0; }
+  ownsPart(kind, i) { return this.partPrice(kind, i) === 0 || !!this.wardrobe().parts[kind + ':' + i]; }
+  ownsExtra(n) { return !!this.wardrobe().extras[n]; }
+  spend(n) { if (this.S.wallet < n) { this.app.ui.toast('Nicht genug Geld'); return false; } this.S.wallet -= n; this.S.stats.spent += n; return true; }
+  applyLook() { this.app.applyLook && this.app.applyLook(); }
+  buySkin(id) { const sk = skinById(id), W = this.wardrobe(); if (!sk || W.skins[id]) return false; if (!this.spend(sk.price)) return false; W.skins[id] = true; this.app.ui.toast('👕 Skin gekauft: ' + sk.name); this.checkAchievements(); this.equipSkin(id); return true; }
+  equipSkin(id) { const sk = skinById(id), W = this.wardrobe(); if (!sk || !W.skins[id]) return false; W.skinId = id; W.look = JSON.parse(JSON.stringify(sk.look)); this.applyLook(); return true; }
+  buyPart(kind, i) { const W = this.wardrobe(), p = this.partPrice(kind, i); if (this.ownsPart(kind, i)) return true; if (!this.spend(p)) return false; W.parts[kind + ':' + i] = true; this.app.ui.toast('Gekauft für ' + this.money(p)); return true; }
+  equipPart(kind, i) { const W = this.wardrobe(); if (!this.ownsPart(kind, i)) return false; W.look.outfit[kind] = i; W.skinId = null; this.applyLook(); return true; }
+  setOutfitField(k, v) { const W = this.wardrobe(); W.look.outfit[k] = v; W.skinId = null; this.applyLook(); }
+  buyExtra(n) { const W = this.wardrobe(); if (W.extras[n]) return true; if (!this.spend(EXTRA_PRICE[n] || 30)) return false; W.extras[n] = true; this.app.ui.toast('Gekauft: ' + n); return true; }
+  toggleExtra(n, color) { const W = this.wardrobe(), ex = W.look.extras, i = ex.findIndex(e => e[0] === n); if (i >= 0) ex.splice(i, 1); else { if (!this.ownsExtra(n) && !this.skinHasExtra(n)) return false; ex.push([n, color ?? null]); } W.skinId = null; this.applyLook(); return true; }
+  skinHasExtra(n) { const W = this.wardrobe(); return Object.keys(W.skins).some(id => (skinById(id)?.look.extras || []).some(e => e[0] === n)); }
+  setExtraColor(n, color) { const W = this.wardrobe(), e = W.look.extras.find(x => x[0] === n); if (e) { e[1] = color; W.skinId = null; this.applyLook(); } }
+  dailyBonus() { const today = new Date().toDateString(); if (this.S.daily && this.S.daily !== today) { this.S.wallet += 100; this.app.ui.toast('🎁 Tagesbonus: +100 €', 4500); } this.S.daily = today; }
 
   // ------------------------------------------------------------------ Interaktion (E)
   updateInteraction(dt) {

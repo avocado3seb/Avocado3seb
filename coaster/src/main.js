@@ -18,6 +18,7 @@ import { Touch } from './touch.js';
 import { Post } from './post.js';
 import { Player } from './pl_player.js';
 import { Account } from './account.js';
+import { applyMaterialQuality } from './pl_quality.js';
 
 const LS = {
   get(k, d) { try { const v = localStorage.getItem('ecs_' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
@@ -59,11 +60,12 @@ class App {
     this.keys = new Set(); this.hudOn = true;
     this.menuOrbit = 0;
     this.camQ = new THREE.Quaternion(); this.camInit = false;
-    this.player = new Player(this.scene, this.settings.playerColor || '#1e88e5'); this.tp = { dist: 5.2 }; this.pface = 0; this.pspeed = 0;
+    this.tp = { dist: 5.2 }; this.pface = 0; this.pspeed = 0;
     this.headLight = new THREE.PointLight(0xffe2b0, 0, 24, 1.6); this.scene.add(this.headLight);
     this.net = new Net(this);
     this.account = new Account();
     this.game = new PLGame(this); this.editor = new Editor(this); this.noKeys = new Set();
+    this.player = new Player(this.scene, this.game.lookNow());
     this.ui = new UI(this);
     this.touch = new Touch(this);
     this.net.onChange = chat => this.ui.refreshNet(chat);
@@ -94,8 +96,26 @@ class App {
   }
   async logout() { await this.account.logout(); this.game.autosave(); this.ui.showLogin(); }
 
+  // Automatische Qualitätsanpassung: sinkt die Bildrate dauerhaft unter ~20 FPS, werden teure Effekte schrittweise abgeschaltet
+  perfGuard(raw) {
+    if (navigator.webdriver || this.settings.adaptive === false || this.state === 'menu' || this.paused || raw > 0.5) return;
+    const g = this._pg || (this._pg = { t: 0, n: 0, sum: 0, cool: 6 }); g.cool -= raw; if (g.cool > 0) return;
+    g.sum += raw; g.n++; g.t += raw; if (g.t < 3) return;
+    const avg = g.sum / g.n; g.t = g.sum = g.n = 0; if (avg <= 0.05) return; g.cool = 5; const s = this.settings; let msg = '';
+    if (this.aoOn()) { s.ao = false; msg = 'Ambient Occlusion aus'; }
+    else if (this.post.enabled && this.post.bloom.enabled) { this.post.noBloom = true; msg = 'Bloom aus'; }
+    else if (this.lookOn()) { s.look = false; msg = 'Vice-City-Look aus'; }
+    else if (s.quality === 'high') { s.quality = 'medium'; msg = 'Qualität: Mittel'; }
+    else if (s.shadows) { s.shadows = false; msg = 'Schatten aus'; }
+    else if (s.quality === 'medium') { s.quality = 'low'; msg = 'Qualität: Niedrig'; }
+    else return;
+    this.applyQuality(); this.ui.toast('⚙ Grafik automatisch angepasst (zu wenig FPS): ' + msg, 4500);
+  }
+
   // ------------------------------------------------------------------ Einstellungen
+  applyLook() { if (!this.player) return; this.player.setLook(this.game.lookNow()); if (this.net && this.net.active) this.net.lookDirty = true; }
   pp() { return this.state === 'park' && this.parkMode === 'walk' ? this.walk.pos : this.camera.position; } // Position der Spielerfigur (nicht der Kamera)
+  aoOn() { if (this.settings.ao !== undefined) return !!this.settings.ao; return this.settings.quality === 'high' && !matchMedia('(pointer: coarse)').matches && !navigator.webdriver; } // Standard: nur auf großen Geräten
   lookOn() { const q = new URLSearchParams(location.search); if (q.has('look')) return q.get('look') !== '0'; if (this.settings.look !== undefined) return !!this.settings.look; return !navigator.webdriver; } // Standard an (außer in automatisierten Tests)
   saveSettings() { this.settings.hour = this.env.hour; this.settings.weather = this.env.weatherName; LS.set('settings', this.settings); }
   applyQuality() {
@@ -103,7 +123,7 @@ class App {
     this.renderer.setPixelRatio(q === 'low' ? 0.75 : q === 'medium' ? Math.min(dpr, 1.25) : Math.min(dpr, 2));
     this.env.setShadows(this.settings.shadows && q !== 'low', q === 'high' ? 4096 : 2048);
     this.renderer.shadowMap.enabled = this.settings.shadows && q !== 'low';
-    this.post.setQuality(q, this.lookOn(), !!this.settings.ao);
+    this.post.setQuality(q, this.lookOn(), this.aoOn());
     this.resize();
   }
   resize() {
@@ -135,6 +155,7 @@ class App {
     this.replayExit(true);
     const world = name === 'Phantasialand' ? new PhantasiaWorld(def, this.env, { quality: this.settings.quality }) : new ParkWorld(def, this.env, { quality: this.settings.quality });
     this.scene.add(world.group); world.group.updateMatrixWorld(true);
+    try { const t0q = performance.now(); const nq = applyMaterialQuality(world.group, { terrain: world.terrainMesh, strength: 0.85 }); console.log(`[Grafik] ${nq} Materialien mit Normal Maps in ${(performance.now() - t0q).toFixed(0)} ms`); } catch (e) { console.warn('Normal Maps übersprungen', e); }
     this.park = world; this.ride = null; this.game.stopNav(); this.game.lapSeen.clear(); this.game.room = null;
     if (world.setWinter && this.game.S.winter) world.setWinter(true);
     this.ui.setPark(world);
@@ -269,6 +290,7 @@ class App {
       else if ((k === 'e' || k === 'E') && this.state === 'park' && this.parkMode === 'walk') this.game.interact();
       else if (k === 'k' || k === 'K') this.game.takePhoto('Foto');
       else if ((k === 'i' || k === 'I') && this.park && this.park.def.name === 'Phantasialand') this.ui.openPanel('inventory');
+      else if ((k === 'u' || k === 'U') && this.park && this.park.def.name === 'Phantasialand') this.ui.openPanel('wardrobe');
       else if ((k === 'g' || k === 'G') && this.state === 'ride') this.departNow();
       else if (k === 'Tab') { e.preventDefault(); if (this.state === 'ride') this.enterPark(); else if (this.state === 'park') { const r = this.park.rides[0]; if (r) this.enterRide(r); } }
       else if (k === 't' || k === 'T') { this.env.setTime(this.env.hour + 3); this.ui.root.querySelectorAll('#mTime,#hTime').forEach(x => x.value = this.env.hour); this.ui.toast('Uhrzeit ' + this.ui.clock(this.env.hour)); this.saveSettings(); }
@@ -581,7 +603,7 @@ class App {
   // ------------------------------------------------------------------ Hauptschleife
   loop() {
     requestAnimationFrame(() => this.loop());
-    let dt = Math.min(0.05, this.clock.getDelta());
+    const rawDt = this.clock.getDelta(); let dt = Math.min(0.05, rawDt); this.perfGuard(rawDt);
     if (!this.park) { return; }
     const online = this.net.active;
     const simDt = (this.paused && !online ? 0 : dt) * (online && !this.net.isHost ? 1 : this.timeScale);
@@ -593,6 +615,11 @@ class App {
     this.game.update(dt);
     this.updateCamera(dt);
     this.headLight.position.copy(this.camera.position); this.headLight.intensity = (this.state === 'ride' ? 14 : 0) * Math.min(1, (this.env.night || 0) * 1.3) + (this.state === 'park' && this.parkMode === 'walk' ? 5 : 0) * Math.min(1, (this.env.night || 0) * 1.3);
+    this.riderT = (this.riderT || 0) - dt; if (this.riderT <= 0 && this.state !== 'menu') { // Fahrgäste nahe der Kamera als Vice-City-Figuren
+      this.riderT = 0.6; const cp = this.camera.position;
+      for (const r of this.park.rides) { const d = Math.hypot(r.entrance.x - cp.x, r.entrance.z - cp.z), riding = this.state === 'ride' && this.ride === r; for (const set of r.sets || [{ train: r.train }]) { if (riding || d < 120) set.train.upgrade && set.train.upgrade(); else if (d > 230) set.train.downgrade && set.train.downgrade(); } }
+    }
+    this.env.setShadowSpan(this.state === 'park' && this.parkMode === 'walk' ? 115 : 170); // schärfere Schatten rund um die Spielerfigur
     this.env.update(dt, this.camera, this.state === 'ride' && this.ride ? this.camera.position : this.camera.position);
     // HUD
     if (this.state === 'ride' && this.ride) {
@@ -612,7 +639,7 @@ class App {
     }
     if (this.post.enabled) this.post.render(this.env.night || 0); else this.renderer.render(this.scene, this.camera);
     if (this.game.photoReq) this.game.capture(this.renderer);
-    this.uiT = (this.uiT || 0) - dt; if (this.uiT <= 0) { this.uiT = 0.4; this.ui.updateWallet(); this.touch.refresh(); }
+    const nowMs = performance.now(); if (nowMs - (this._uiN || 0) > 400) { this._uiN = nowMs; this.ui.updateWallet(); this.touch.refresh(); } // in echter Zeit, unabhängig von der Bildrate
   }
 }
 

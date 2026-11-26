@@ -6,6 +6,7 @@ import { Batch, hex, shade } from './batch.js';
 import { CATS } from './specs.js';
 import { poseAt, newPose } from './track.js';
 import { mulberry32, hashStr } from './gen.js';
+import { bakeRider } from './pl_char.js';
 
 const SKIN = [[0.96, 0.78, 0.64], [0.85, 0.65, 0.5], [0.62, 0.42, 0.3], [0.45, 0.3, 0.22]];
 const SHIRTS = ['#d83a3a', '#2f6fd6', '#f0c030', '#2fa860', '#f0f0f0', '#e0508a', '#ff8a2a', '#7a4cc0', '#222428', '#18b8c8'].map(hex);
@@ -112,11 +113,13 @@ function buildCar(spec, coaster, idx, count, rng) {
     body.box(x + 0.4, 0.22, (zmin + zmax) / 2, 0.1, 0.1, zmax - zmin, shade(acc, 1.1));
     for (const st of rs) body.box(x + 0.34, 0.1, st.z, 0.08, 0.3, 0.1, shade(acc, 0.9));
   }
-  // Fahrgäste
+  // Fahrgäste (einfache Figuren; in der Nähe werden sie durch Vice-City-Figuren ersetzt, siehe upgrade())
+  const info = [];
   for (const st of seats) {
-    if (rng() < 0.9) rider(riders, st, spec, rng, rng() < 0.55);
+    const on = rng() < 0.9, up = rng() < 0.55, seed = (rng() * 1e9) | 0; info.push({ st, on, up, seed });
+    if (on) rider(riders, st, spec, rng, up);
   }
-  return { body, riders, lights, seats };
+  return { body, riders, lights, seats, info };
 }
 
 export function createTrain(tr, coaster, cars, yOff) {
@@ -130,7 +133,7 @@ export function createTrain(tr, coaster, cars, yOff) {
   const carObjs = [];
   let seats = null;
   for (let k = 0; k < cars; k++) {
-    const { body, riders, lights, seats: sts } = buildCar(spec, coaster, k, cars, rng);
+    const { body, riders, lights, seats: sts, info } = buildCar(spec, coaster, k, cars, rng);
     seats = sts;
     const g = new THREE.Group();
     g.matrixAutoUpdate = false;
@@ -138,8 +141,9 @@ export function createTrain(tr, coaster, cars, yOff) {
     const mr = new THREE.Mesh(riders.build(), matRider); mr.castShadow = true; g.add(mr);
     if (!lights.empty) g.add(new THREE.Mesh(lights.build(), matLight));
     group.add(g);
-    carObjs.push({ g, riders: mr });
+    carObjs.push({ g, riders: mr, info });
   }
+  let upgraded = false;
   const m = new THREE.Matrix4(), pose = newPose();
   const fv = new THREE.Vector3(), uv = new THREE.Vector3(), rv = new THREE.Vector3();
   return {
@@ -151,6 +155,16 @@ export function createTrain(tr, coaster, cars, yOff) {
         m.makeBasis(fv, uv, rv); m.setPosition(pose.p[0], pose.p[1], pose.p[2]);
         carObjs[k].g.matrix.copy(m); carObjs[k].g.matrixWorldNeedsUpdate = true;
       }
+    },
+    get upgraded() { return upgraded; },
+    // Nähe: Fahrgäste als Vice-City-Figuren (feste Sitzpose, eingebacken) – spart Speicher, solange der Zug weit weg ist
+    upgrade() {
+      if (upgraded) return; upgraded = true;
+      for (const c of carObjs) { const b = new Batch(); for (const i of c.info) if (i.on) bakeRider(b, i.st, spec, mulberry32(i.seed), i.up); c.riders.geometry.dispose(); c.riders.geometry = b.build(); }
+    },
+    downgrade() {
+      if (!upgraded) return; upgraded = false;
+      for (const c of carObjs) { const b = new Batch(); for (const i of c.info) if (i.on) rider(b, i.st, spec, mulberry32(i.seed), i.up); c.riders.geometry.dispose(); c.riders.geometry = b.build(); }
     },
     hideRidersOf(k) { carObjs.forEach((c, i) => { c.riders.visible = i !== k; }); },
     showAll() { carObjs.forEach(c => { c.riders.visible = true; }); },

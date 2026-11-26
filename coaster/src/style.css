@@ -210,3 +210,12 @@ body.touch #mini { left: auto; right: 12px; bottom: auto; top: 64px; width: 110p
 #login { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse at center, rgba(20,34,60,.88), rgba(4,8,16,.96)); }
 #login .lbox { width: min(420px, 92vw); padding: 24px; display: flex; flex-direction: column; gap: 12px; background: var(--panel2); } #login h2 { margin: 0; }
 #login input { font-size: 16px; padding: 11px 12px; }
+
+/* Skin-Shop */
+.wdgrid { display: grid; grid-template-columns: 290px 1fr; gap: 14px; align-items: start; } .wdprev { padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; position: sticky; top: 0; background: var(--panel2); }
+.wdprev canvas { width: 260px; max-width: 100%; border-radius: 12px; background: radial-gradient(ellipse at 50% 90%, rgba(80,110,170,.45), rgba(14,22,40,.2) 70%); } .wdn { text-align: center; }
+.skingrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 10px; } .skin { padding: 8px; display: flex; flex-direction: column; gap: 5px; align-items: center; text-align: center; } .skin.on { border-color: var(--acc); }
+.skin img { width: 120px; height: 172px; object-fit: contain; background: rgba(255,255,255,.04); border-radius: 10px; } .skin .sn { font-size: 14px; } .skin .btn { width: 100%; }
+.wsec { margin-bottom: 12px; } .chips2 { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; } .swatches { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.sw { width: 24px; height: 24px; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); padding: 0; } .sw.on { border-color: #fff; box-shadow: 0 0 0 2px var(--acc); }
+@media (max-width: 900px) { .wdgrid { grid-template-columns: 1fr; } .wdprev { position: static; } }

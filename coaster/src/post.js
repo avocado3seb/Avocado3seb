@@ -35,7 +35,7 @@ export class Post {
     });
     this.composer.addPass(this.grade); this.composer.addPass(new OutputPass());
   }
-  setQuality(q, on, ao = false) { this.q = q; this.gtao.enabled = !!on && !!ao && q !== 'low'; this.enabled = !!on && q !== 'low'; this.bloom.enabled = q === 'high'; const s = q === 'high' ? 4 : q === 'medium' ? 2 : 0; for (const t of [this.composer.renderTarget1, this.composer.renderTarget2]) { t.samples = s; t.dispose(); } }
+  setQuality(q, on, ao = false) { this.q = q; this.gtao.enabled = !!on && !!ao && q !== 'low'; this.enabled = !!on && q !== 'low'; this.bloom.enabled = q === 'high' && !this.noBloom; const s = q === 'high' ? 4 : q === 'medium' ? 2 : 0; for (const t of [this.composer.renderTarget1, this.composer.renderTarget2]) { t.samples = s; t.dispose(); } }
   resize(w, h) { this.composer.setPixelRatio(this.renderer.getPixelRatio()); this.composer.setSize(w, h); }
   render(night) { this.grade.uniforms.uTime.value = (performance.now() * 0.001) % 100; this.grade.uniforms.uNight.value = night || 0; this.composer.render(); }
 }

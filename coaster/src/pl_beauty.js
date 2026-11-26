@@ -37,7 +37,7 @@ export function buildBeauty(world) {
   const hedges = new A.Inst(hedgeG, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, map: textures.grass() }), Math.round(700 * mult), G, { shadow: true });
   for (const e of mainEdges) {
     if (e.w < 8) continue;
-    for (let t = 14; t < e.L - 14; t += 5) { if (rng() < 0.18) continue; for (const side of [-1, 1]) { if (rng() < 0.35) continue; const [x, z, yaw] = sideOf(e, t, e.w / 2 + 0.9, side); if (!okSpot(x, z, 3) || nearNode(x, z, 9)) continue; const y = world.h(x, z), hh = R(0.8, 1.15); hedges.add(x, y, z, 0.8, hh, 5.2, yaw, '#' + new THREE.Color().setHSL(0.3 + R(-0.03, 0.03), 0.55, R(0.5, 0.75)).getHexString()); out.colliders.push({ x, z, hx: 0.5, hz: 2.6, rot: yaw, y0: y, y1: y + 1 }); } }
+    for (let t = 14; t < e.L - 14; t += 5) { if (rng() < 0.18) continue; for (const side of [-1, 1]) { if (rng() < 0.35) continue; const [x, z, yaw] = sideOf(e, t, e.w / 2 + 0.9, side); if (!okSpot(x, z, 3) || nearNode(x, z, 9)) continue; const y = world.h(x, z), hh = R(0.8, 1.15); hedges.add(x, y, z, 0.8, hh, 5.2, yaw, '#' + new THREE.Color().setHSL(0.3 + R(-0.03, 0.03), 0.55, R(0.36, 0.52)).getHexString()); out.colliders.push({ x, z, hx: 0.5, hz: 2.6, rot: yaw, y0: y, y1: y + 1 }); } }
   }
   hedges.done();
 

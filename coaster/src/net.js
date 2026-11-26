@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import Peer from 'peerjs';
 import { seatLayout } from './train.js';
+import { CharView, defaultLook } from './pl_char.js';
 
 const ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randCode = () => Array.from({ length: 5 }, () => ALPHA[Math.floor(Math.random() * ALPHA.length)]).join('');
@@ -31,20 +32,14 @@ function nameSprite(name, color) {
 class Remote {
   constructor(net, id, name, idx) {
     this.net = net; this.id = id; this.name = name; this.color = COLORS[idx % COLORS.length];
-    const g = this.group = new THREE.Group();
-    const col = new THREE.Color(this.color);
-    const m = (geo, c, y) => { const me = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: c, roughness: 0.8 })); me.position.y = y; me.castShadow = true; g.add(me); return me; };
-    m(new THREE.BoxGeometry(0.46, 0.66, 0.28), col, 1.05);
-    m(new THREE.BoxGeometry(0.34, 0.72, 0.22), 0x2a3042, 0.38);
-    m(new THREE.SphereGeometry(0.17, 8, 6), 0xe0b090, 1.55);
-    const arm = (x) => { const a = m(new THREE.BoxGeometry(0.1, 0.55, 0.1), col, 1.05); a.position.x = x; };
-    arm(-0.3); arm(0.3);
+    this.view = new CharView(defaultLook()); const g = this.group = this.view.root; this.lookKey = '';
     this.tag = nameSprite(name, this.color); this.tag.position.y = 2.15; g.add(this.tag);
-    this.kind = 'menu'; this.tp = new THREE.Vector3(); this.yaw = 0; this.ty = 0; this.first = true; this.ride = null;
+    this.kind = 'menu'; this.tp = new THREE.Vector3(); this.yaw = 0; this.ty = 0; this.first = true; this.ride = null; this.speed = 0; this.last = new THREE.Vector3();
     net.app.scene.add(g); g.visible = false;
   }
   apply(m) {
     this.kind = m.k;
+    if (m.o) { const k = JSON.stringify(m.o); if (k !== this.lookKey) { this.lookKey = k; try { this.view.setLook(m.o); } catch (e) { /* */ } } }
     if (m.k === 'ride') {
       const w = this.net.app.park;
       const r = w && w.rides[m.r];
@@ -64,7 +59,7 @@ class Remote {
     const seat = sl.seats.find(x => x.row === row && x.s === s) || sl.seats[0];
     const cobj = r.train.cars[Math.min(car, r.train.cars.length - 1)];
     cobj.g.add(this.group);
-    this.group.position.set(seat.x, -0.55, seat.z); this.group.rotation.set(0, Math.PI / 2, 0);
+    this.group.position.set(seat.x, -0.45, seat.z); this.group.rotation.set(0, Math.PI / 2, 0);
     this.ride = r; this.car = car; this.row = row; this.s = s;
   }
   detach() {
@@ -72,12 +67,14 @@ class Remote {
     this.net.app.scene.add(this.group); this.ride = null; this.first = true; this.group.rotation.set(0, 0, 0);
   }
   update(dt) {
-    if (this.ride) return;
-    const k = 1 - Math.exp(-12 * dt), p = this.group.position;
+    if (this.ride) { this.view.update(dt, { speed: 0, sit: true, hands: this.net.app.state === 'ride' && false }); return; }
+    const k = 1 - Math.exp(-12 * dt), p = this.group.position; this.last.copy(p);
     p.x += (this.tp.x - p.x) * k; p.y += (this.tp.y - p.y) * k; p.z += (this.tp.z - p.z) * k;
     let d = this.ty - this.yaw; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
     this.yaw += d * k; this.group.rotation.y = this.yaw;
     this.group.position.y += this.kind === 'walk' ? 0 : Math.sin(performance.now() / 400 + this.id) * 0.01;
+    const sp = this.last.distanceTo(p) / Math.max(dt, 1e-3); this.speed += (sp - this.speed) * Math.min(1, dt * 8);
+    this.view.update(dt, { speed: Math.min(5.6, this.speed * 0.62), jump: this.kind === 'fly' });
   }
   remove() { this.detach(); this.net.app.scene.remove(this.group); }
 }
@@ -280,7 +277,7 @@ export class Net {
     const now = performance.now(), real = Math.min(1, (now - (this._t || now)) / 1000); this._t = now; // Netz-Takte in echter Zeit
     for (const r of this.remotes.values()) r.update(dt);
     this.sendT -= real;
-    if (this.sendT <= 0) { this.sendT = 1 / SEND_HZ; const st = this.app.netState(); if (st) { st.t = 'p'; st.id = this.me.id; this.send(st); } }
+    if (this.sendT <= 0) { this.sendT = 1 / SEND_HZ; const st = this.app.netState(); if (st) { st.t = 'p'; st.id = this.me.id; this.sendN = (this.sendN || 0) + 1; if (this.lookDirty || this.sendN % 25 === 1) { st.o = this.app.game.lookNow(); this.lookDirty = false; } this.send(st); } }
     if (this.isHost && this.app.park) {
       this.snapT -= real; if (this.snapT <= 0) { this.snapT = 1 / SNAP_HZ; this.broadcast({ t: 'sim', a: this.snapshot() }); }
       this.envT -= real; if (this.envT <= 0) { this.envT = 2; this.broadcast({ t: 'env', ...this.envState() }); }

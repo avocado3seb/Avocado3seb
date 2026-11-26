@@ -87,6 +87,19 @@ export class Batch {
     }
   }
 
+  // beliebige Geometrie (mit Vertexfarben) mit Matrix einfügen – z. B. Vice-City-Figuren
+  addGeometry(geo, m) {
+    const p = geo.attributes.position, nr = geo.attributes.normal, c = geo.attributes.color, e = m.elements, b = this.n;
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+      this.pos.push(e[0] * x + e[4] * y + e[8] * z + e[12], e[1] * x + e[5] * y + e[9] * z + e[13], e[2] * x + e[6] * y + e[10] * z + e[14]);
+      const nx = nr.getX(i), ny = nr.getY(i), nz = nr.getZ(i); let tx = e[0] * nx + e[4] * ny + e[8] * nz, ty = e[1] * nx + e[5] * ny + e[9] * nz, tz = e[2] * nx + e[6] * ny + e[10] * nz; const l = Math.hypot(tx, ty, tz) || 1;
+      this.nor.push(tx / l, ty / l, tz / l); if (c) this.col.push(c.getX(i), c.getY(i), c.getZ(i)); else this.col.push(1, 1, 1);
+    }
+    const ix = geo.index; if (ix) for (let i = 0; i < ix.count; i++) this.idx.push(ix.getX(i) + b); else for (let i = 0; i < p.count; i++) this.idx.push(i + b);
+    this.n += p.count;
+  }
+
   build() {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));

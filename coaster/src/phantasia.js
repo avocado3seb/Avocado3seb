@@ -18,6 +18,7 @@ import { placePOIs } from './pl_pois.js';
 import { buildBeauty } from './pl_beauty.js';
 import { buildMedieval, buildAviation } from './pl_themes.js';
 import { buildTrackBridges, buildEntrances } from './pl_bridges.js';
+import { CharPool, visitorLooks, staffLook } from './pl_char.js';
 import { buildChina, buildMystery, buildBerlin, buildParking, buildAirship, buildLightStrings, buildWinterDecor } from './pl_zones2.js';
 
 const TAU = Math.PI * 2;
@@ -313,9 +314,9 @@ export class PhantasiaWorld extends ParkWorld {
     const trunkM = new THREE.MeshStandardMaterial({ color: 0x4a3524, roughness: 1 });
     const leafM = this.leafM = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 });
     const trunks = new A.Inst(trunkG, trunkM, 4200, G, { shadow: true });
-    const crowns = new A.Inst(crownG, leafM, 1800, G, { shadow: true });
+    const crowns = new A.Inst(crownG, leafM, 6200, G, { shadow: true });
     const cones1 = new A.Inst(coneG, leafM, 5200, G, { shadow: true });
-    const cones2 = new A.Inst(coneG, leafM, 5200, G);
+    const cones2 = new A.Inst(coneG, leafM, 9000, G);
     this.inst = { palm, bigleaf, fern, cactus, trunks, crowns, cones1, cones2 };
     const addRock = (x, y, z, s, col, collide = true, v = null) => {
       if (this.nearStation(x, z) && !(this._rockForce)) return;
@@ -327,9 +328,9 @@ export class PhantasiaWorld extends ParkWorld {
     const pick = a => a[Math.floor(this.rng() * a.length)];
     const pineAt = (x, y, z, s, dark = true) => {
       const h = 5 * s, col = new THREE.Color().setHSL(0.36 + this.R(-0.03, 0.03), this.R(0.35, 0.55), this.R(0.1, 0.2));
-      out.colliders.push({ x, z, r: 0.3 * s + 0.3, y0: y - 1, y1: y + 5 }); trunks.add(x, y, z, s * 0.6, h * 0.45, s * 0.6, 0, '#3a2a1c'); cones1.add(x, y + h * 0.2, z, 2.6 * s, 5.5 * s, 2.6 * s, this.R(0, TAU), col); cones2.add(x, y + h * 0.75, z, 1.9 * s, 4.4 * s, 1.9 * s, this.R(0, TAU), col);
+      out.colliders.push({ x, z, r: 0.3 * s + 0.3, y0: y - 1, y1: y + 5 }); trunks.add(x, y, z, s * 0.6, h * 0.45, s * 0.6, 0, '#3a2a1c'); cones1.add(x, y + h * 0.2, z, 2.6 * s, 5.5 * s, 2.6 * s, this.R(0, TAU), col); cones2.add(x, y + h * 0.75, z, 1.9 * s, 4.4 * s, 1.9 * s, this.R(0, TAU), col); cones2.add(x, y + h * 1.18, z, 1.2 * s, 3.2 * s, 1.2 * s, this.R(0, TAU), col.clone().offsetHSL(0, 0, 0.03));
     };
-    const leafyAt = (x, y, z, s) => { out.colliders.push({ x, z, r: 0.35 * s + 0.3, y0: y - 1, y1: y + 4 }); const col = new THREE.Color().setHSL(0.27 + this.R(-0.05, 0.05), this.R(0.4, 0.6), this.R(0.2, 0.32)); trunks.add(x, y, z, s * 0.7, 3.4 * s, s * 0.7, 0, '#4a3524'); crowns.add(x, y + 2.8 * s, z, 2.8 * s, 2.4 * s, 2.8 * s, this.R(0, TAU), col); };
+    const leafyAt = (x, y, z, s) => { out.colliders.push({ x, z, r: 0.35 * s + 0.3, y0: y - 1, y1: y + 4 }); const col = new THREE.Color().setHSL(0.27 + this.R(-0.05, 0.05), this.R(0.4, 0.6), this.R(0.2, 0.32)); trunks.add(x, y, z, s * 0.7, 3.4 * s, s * 0.7, 0, '#4a3524'); crowns.add(x, y + 2.8 * s, z, 2.8 * s, 2.4 * s, 2.8 * s, this.R(0, TAU), col); const c2 = col.clone().offsetHSL(this.R(-0.02, 0.02), 0.04, 0.05); crowns.add(x + this.R(-1, 1) * s, y + 3.7 * s, z + this.R(-1, 1) * s, 2.0 * s, 1.7 * s, 2.0 * s, this.R(0, TAU), c2); crowns.add(x + this.R(-1.3, 1.3) * s, y + 2.3 * s, z + this.R(-1.3, 1.3) * s, 1.7 * s, 1.5 * s, 1.7 * s, this.R(0, TAU), col.clone().offsetHSL(0, 0, -0.04)); };
     this.pineAt = pineAt; this.leafyAt = leafyAt;
 
     // ---------- Hauptplatz / Eingang: Fachwerk-Häuser
@@ -878,6 +879,14 @@ export class PhantasiaWorld extends ParkWorld {
     this.vHotels = this.pois.filter(p => p.kind === 'hotel'); this.vStages = this.pois.filter(p => p.kind === 'stage'); this.vWC = this.pois.filter(p => p.kind === 'wc');
     this.lotNode = this.nodes.findIndex(n => n.x === 0 && n.z === 500); this.groups = {}; this.simT = 0; this.statT = 0;
     this.thrill = new Set(['launch', 'hyper', 'inverted', 'floorless', 'dive', 'flying', 'wing', 'sitdown']);
+    // Nahe Besucher/Personal als echte Vice-City-Figuren (LOD), ferne bleiben instanziert
+    const looks = visitorLooks(this.rng, 44), sl = staffLook(), size = { low: 12, medium: 34, high: 56 }[this.quality] ?? 34;
+    this.charPool = new CharPool(this.group, size, 50);
+    this.people = [...this.vis.map((v, i) => ({ x: 0, z: 0, y: 0, yaw: 0, walking: false, speed: 1, sit: false, kid: i % 4 === 3, talk: false, hands: false, look: looks[i % looks.length] })), ...this.staff.map(() => ({ x: 0, z: 0, y: 0, yaw: 0, walking: false, speed: 1, sit: false, kid: false, talk: false, hands: false, look: sl }))];
+  }
+  hideVis(i) { // instanzierte Version verstecken, solange eine echte Figur sie darstellt
+    const Z = this._zeroM || (this._zeroM = new THREE.Matrix4().makeScale(0, 0, 0)), n = this.vis.length;
+    const set = i < n ? this.visMeshes : this.staffMeshes, k = i < n ? i : i - n; for (const m of set) m.setMatrixAt(k, Z);
   }
   showActive(p) { const h = this.env.hour; for (const [, times] of p.shows || []) for (const t of times) { const d = (h - t + 24) % 24; if (d < 0.9) return true; } return false; }
   pickGoal(v, i) {
@@ -947,6 +956,7 @@ export class PhantasiaWorld extends ParkWorld {
       const bob = v.mode === 'walk' ? Math.abs(Math.sin(v.ph)) * 0.06 : 0;
       q.setFromAxisAngle(up, v.yaw); pv.set(v.x, Math.max(0.05, this.h(v.x, v.z)) + 0.07 + bob, v.z); sc.set(kid, kid * (v.seated ? 0.78 : 1), kid);
       m.compose(pv, q, sc); iBody.setMatrixAt(i, m); iLegs.setMatrixAt(i, m); iHead.setMatrixAt(i, m);
+      const P = this.people[i]; P.x = v.x; P.z = v.z; P.y = pv.y - bob; P.yaw = v.yaw; P.walking = v.mode === 'walk'; P.speed = v.speed * kid; P.sit = !!v.seated; P.talk = v.mode === 'dwell' && i % 3 === 0; P.hands = !!(v.mode === 'dwell' && v.tgt && v.tgt.kind === 'stage' && v.tgt.poi && v.tgt.poi.active);
     }
     for (const mm of this.visMeshes) mm.instanceMatrix.needsUpdate = true;
     // Personal: pendelt zwischen Bereichen, "arbeitet" an Punkten
@@ -958,7 +968,10 @@ export class PhantasiaWorld extends ParkWorld {
       const A2 = N[s.a], B2 = N[s.b], L2 = Math.hypot(B2.x - A2.x, B2.z - A2.z) || 1, dx = (B2.x - A2.x) / L2, dz = (B2.z - A2.z) / L2;
       s.x = A2.x + dx * L2 * s.t - dz * s.off; s.z = A2.z + dz * L2 * s.t + dx * s.off; s.yaw = Math.atan2(dx, dz);
       q.setFromAxisAngle(up, s.yaw); pv.set(s.x, Math.max(0.05, this.h(s.x, s.z)) + 0.07, s.z); sc.set(1, 1, 1); m.compose(pv, q, sc); sb.setMatrixAt(i, m); sl.setMatrixAt(i, m); sh.setMatrixAt(i, m);
+      const P = this.people[this.vis.length + i]; P.x = s.x; P.z = s.z; P.y = pv.y; P.yaw = s.yaw; P.walking = s.dwell <= 0; P.speed = s.speed; P.talk = s.dwell > 0;
     }
+    if (this.charPool && this.camPos) this.charPool.update(dt, this.camPos, this.people, i => this.hideVis(i));
+    for (const mm of this.visMeshes) mm.instanceMatrix.needsUpdate = true;
     for (const mm of this.staffMeshes) mm.instanceMatrix.needsUpdate = true;
     if (this.statT > 2) {
       this.statT = 0; let inPark = 0; for (const v of this.vis) if (!(v.a === this.lotNode && v.mode === 'dwell')) inPark++; this.hist.inPark = inPark;
