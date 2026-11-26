@@ -2,6 +2,7 @@
 //  park.js – komplette Parkwelt: Bahnen platzieren, Wege, Gebäude, Wahrzeichen,
 //  Fahrgeschäfte, Bäume, Hügel, Besucher
 // ============================================================================
+import { visitorGeometries } from './pl_figures.js';
 import * as THREE from 'three';
 import { buildTrack } from './track.js';
 import { Sim } from './physics.js';
@@ -641,12 +642,10 @@ export class ParkWorld {
   // ------------------------------------------------------------------ Besucher
   buildVisitors() {
     const count = { low: 80, medium: 220, high: 420 }[this.quality] || 220;
-    const body = new THREE.BoxGeometry(0.42, 0.62, 0.26); body.translate(0, 1.05, 0);
-    const legs = new THREE.BoxGeometry(0.32, 0.72, 0.2); legs.translate(0, 0.38, 0);
-    const head = new THREE.SphereGeometry(0.15, 6, 5); head.translate(0, 1.55, 0);
-    const iBody = new THREE.InstancedMesh(body, new THREE.MeshStandardMaterial({ roughness: 0.9 }), count);
-    const iLegs = new THREE.InstancedMesh(legs, new THREE.MeshStandardMaterial({ color: 0x2a3042, roughness: 0.9 }), count);
-    const iHead = new THREE.InstancedMesh(head, new THREE.MeshStandardMaterial({ color: 0xe0b090, roughness: 0.8 }), count);
+    const { body, legs, head } = visitorGeometries();
+    const iBody = new THREE.InstancedMesh(body, new THREE.MeshStandardMaterial({ roughness: 0.9, vertexColors: true }), count);
+    const iLegs = new THREE.InstancedMesh(legs, new THREE.MeshStandardMaterial({ roughness: 0.9, vertexColors: true }), count);
+    const iHead = new THREE.InstancedMesh(head, new THREE.MeshStandardMaterial({ roughness: 0.8, vertexColors: true }), count);
     for (const m of [iBody, iLegs, iHead]) { m.frustumCulled = false; m.castShadow = true; this.group.add(m); }
     const vis = [];
     const hubN = 0;

@@ -53,7 +53,7 @@ export class UI {
     <div id="hud" class="hide">
       <div id="hTL" class="hudbox"><div class="n" id="hName"></div><div class="p" id="hPark"></div><div class="p hide" id="hNet" style="color:var(--acc2)"></div></div>
       <div id="chat" class="hide"><div id="chatLog"></div><input id="chatIn" maxlength="200" placeholder="Enter = Chat"></div>
-      <div id="hTR"><button class="btn sm" id="bPhoto" title="Foto (K)">📷</button><button class="btn sm" id="bMap">🗺 Karte</button><button class="btn sm" id="bPark">🏞 Park</button><button class="btn sm" id="bSnd">🔊</button><button class="btn sm" id="bHelp">❓</button><button class="btn sm" id="bMenu">☰ Menü</button></div>
+      <div id="hTR"><button class="btn sm rnd" id="bPhoto" title="Foto (K)">📷</button><button class="btn sm rnd" id="bMap" title="Parkkarte (M)">🗺</button><button class="btn sm rnd" id="bPark" title="Park erkunden">🏞</button><button class="btn sm rnd" id="bSnd" title="Ton">🔊</button><button class="btn sm rnd" id="bHelp" title="Steuerung">❓</button><button class="btn sm rnd" id="bMenu" title="Menü (Esc)">☰</button></div>
       <div id="hCams" class="hudbox"></div>
       <div id="hGauge" class="hudbox">
         <div class="m"><b id="gH">0</b><small>Höhe m</small></div>
@@ -432,10 +432,12 @@ Am Ende wird die Strecke automatisch zur Station zurückgeführt.</pre>
         <label>Lautstärke<br><input id="sVol" type="range" min="0" max="1" step="0.05" value="${s.vol}"></label>
         <label>Tageszyklus (automatisch)<br><select id="sAuto"><option value="0">Aus</option><option value="1">An (1 Spielstunde = 1 Minute)</option></select></label>
         <label>Onride-Fotos<br><select id="sPhoto"><option value="1">Automatisch</option><option value="0">Aus</option></select></label>
+        <label>Grafikstil „Vice-City-Look“ (Bloom, Farbkorrektur)<br><select id="sLook"><option value="1">An</option><option value="0">Aus (schneller)</option></select></label>
         <label>Touch-Steuerung (Tablet/Handy)<br><select id="sTouch"><option value="1">An</option><option value="0">Aus</option></select></label>
       </div><div class="note">Qualitätsänderungen (Bäume, Besucher) gelten ab dem nächsten Parkwechsel.</div>${this.helpHtml()}
       <h3>Über dieses Spiel</h3><div class="note">Alle Modelle, Texturen und Geräusche entstehen zur Laufzeit im Browser (three.js, keine externen Assets). Streckenlayouts sind stilisierte Nachbildungen auf Basis von Höhe, Länge, Geschwindigkeit, Inversionen und Typ; Stammdaten sind gerundete Näherungswerte ohne Gewähr. Alle Markennamen gehören ihren Inhabern.</div></div>`;
     $('#sQ').value = s.quality; $('#sSh').value = s.shadows ? '1' : '0';
+    $('#sLook').value = a.lookOn() ? '1' : '0'; $('#sLook').addEventListener('change', e => { s.look = e.target.value === '1'; a.saveSettings(); a.applyQuality(); });
     $('#sAuto').value = s.autoTime ? '1' : '0'; $('#sPhoto').value = s.autoPhoto === false ? '0' : '1'; $('#sTouch').value = a.touch && a.touch.on ? '1' : '0';
     $('#sAuto').addEventListener('change', e => { s.autoTime = e.target.value === '1'; a.saveSettings(); });
     $('#sPhoto').addEventListener('change', e => { s.autoPhoto = e.target.value === '1'; a.saveSettings(); });
@@ -462,6 +464,7 @@ Am Ende wird die Strecke automatisch zur Station zurückgeführt.</pre>
     $('#cross').classList.toggle('hide', true);
     if (mode !== 'ride') { $('#hCount').innerHTML = ''; }
     this.updateWallet(); if (this.app.touch) this.app.touch.refresh();
+    if (!menu && !this._miniShown) { this._miniShown = true; $('#mini').classList.remove('hide'); }
     $('#mBack').classList.toggle('hide', !this.app.canResume());
     if (menu) { this.renderRows && this.curTab === 'db' && this.renderRows(); }
   }
