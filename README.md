@@ -59,6 +59,9 @@ Menü → **Mehrspieler**: Raum erstellen (Freies Spiel kooperativ, Freies Spiel
 - **Mehrspieler:** bis zu 24 Spieler, Relevanz-Filter, Emotes, Geldgeschenke, Teleport zu Freunden, Einladungs-Link (`?join=CODE`), neuer Modus *King of the Hill*.
 - **Grafik:** Qualitätsstufen mit mehr Passanten/Verkehr, Filmlook (Vignette, Farbgebung, Korn) und GTAO-Ambient-Occlusion auf Ultra.
 
+- **Karte:** Kategorien-Filter (Reisen, Fahrzeuge, Immobilien, Freizeit, Dienste, Läden, Essen, Waffen), Suche, Symbole je Zoomstufe entzerrt, Beschriftungen ohne Überlappung, Touch-Gesten (ziehen, zoomen, tippen = GPS).
+- **Profil:** Name, Admin-Anmeldung und letzter Raum-Code bleiben im Browser gespeichert (Menü zeigt „Angemeldet als …“; Abmelden löscht alles).
+
 ## Inhalt
 
 - **Welt:** ~6,4 × 6,4 km. Downtown mit Wolkenkratzern, Ocean Drive (Art-déco, Strand, Pier mit Riesenrad), Sunset Hills (Villen), Westside, Hafen & Industrie, Flughafen, Stadion, Central Park, Golfclub, Umland mit Wäldern, Regenwald, Sumpf, Bergen, Windrädern, Bauernhöfen, Highways und **vier Privatinseln**.

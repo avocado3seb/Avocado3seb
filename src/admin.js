@@ -34,8 +34,9 @@ export class Admin {
     if (!silent) this.G.ui?.toast('🔑 Admin-Modus aktiviert – willkommen, Avocado3seb!', 6000);
     // Avocado-Pack gehört dem Admin
     if (this.G.eco) this.G.eco.packs.avocado = true;
+    this.G.ui?.updateProfile?.();
   }
-  logout() { this.on = false; this.G.admin = false; this.fly = false; try { localStorage.removeItem('vc_admin'); } catch (e) { /* ignore */ } }
+  logout() { this.on = false; this.G.admin = false; this.fly = false; try { localStorage.removeItem('vc_admin'); } catch (e) { /* ignore */ } this.G.ui?.updateProfile?.(); }
 
   setFly(v) { this.fly = !!v; const P = this.G.player; if (P.vehicle) P.exitVehicle(true); P.fly = this.fly; this.G.ui.toast(this.fly ? 'Flugmodus an – WASD, Leertaste hoch, Strg runter, Shift schnell' : 'Flugmodus aus'); }
   giveMoney(n) { n = Math.min(MAX_GIFT, Math.max(0, Math.floor(n))); this.G.player.addMoney(n, 'Admin'); this.G.ui.toast(`+${fmtMoney(n)}`); }
@@ -100,8 +101,9 @@ export class Admin {
       if (isAdminName(n) && !this.on) { const ok = await this.login(n, code.value); if (!ok) { msg.textContent = '⚠ Falscher Admin-Code – der Name „Avocado3seb“ ist geschützt.'; return; } }
       else if (isAdminName(n) && this.on) { G.settings.name = n; }
       else { if (this.on) this.logout(); G.settings.name = n; }
-      G.applySettings(); ui.toast('Profil gespeichert'); ui.closeModal();
+      G.applySettings(); ui.updateProfile(); ui.toast('Profil gespeichert – bleibt auch nach dem Neuladen erhalten'); ui.closeModal();
     } }, 'Speichern');
-    ui.modal('Profil', h('div', { class: 'body' }, h('h3', {}, 'Name'), name, code, msg, save, h('p', { class: 'd' }, 'Der Name „Avocado3seb“ ist reserviert und braucht den Admin-Code.')), { cash: false });
+    const out = h('button', { class: 'btn', style: { marginLeft: '8px' }, onClick: () => { this.logout(); G.settings.name = ''; G.applySettings(); ui.updateProfile(); ui.toast('Abgemeldet – Profil gelöscht'); ui.closeModal(); } }, 'Abmelden / Profil löschen');
+    ui.modal('Profil', h('div', { class: 'body' }, h('h3', {}, 'Name'), name, code, msg, save, out, h('p', { class: 'd' }, 'Der Name „Avocado3seb“ ist reserviert und braucht den Admin-Code.')), { cash: false });
   }
 }

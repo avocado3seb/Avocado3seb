@@ -22,6 +22,20 @@ export function h(tag, props = {}, ...kids) {
 }
 const TIPS = ['Tipp: Mit F steigst du in Fahrzeuge ein – auch in Boote, Flugzeuge und Helikopter.', 'Tipp: Gewitter erschrecken die Passanten – und machen die Straßen rutschig.', 'Tipp: Kaufe Immobilien, um Fahrzeuge in der Garage zu speichern.', 'Tipp: Ein Pay \'n\' Spray macht dich unsichtbar für die Polizei.', 'Tipp: Wer gut isst, regeneriert schneller Gesundheit.', 'Tipp: Content-Packs findest du im Handy-Menü (P).', 'Tipp: Drücke M für die interaktive Weltkarte und klicke, um ein GPS-Ziel zu setzen.'];
 
+
+// ---------- Karten-Kategorien ----------
+export const MAP_CATS = [
+  ['world', '🌍 Reisen & Natur', '#40c4ff'], ['vehicles', '🚘 Fahrzeuge', '#ffd740'], ['property', '🏠 Immobilien', '#69f0ae'], ['fun', '🎉 Freizeit', '#e040fb'],
+  ['service', '🛠 Dienste', '#26a69a'], ['shops', '🛍 Läden', '#42a5f5'], ['food', '🍔 Essen', '#ff9800'], ['guns', '🔫 Waffen', '#90a4ae'], ['mission', '🎯 Missionen', '#ffffff'],
+];
+const CAT_OF = { lift: 'world', skirent: 'world', skirace: 'world', safari: 'world', travel: 'world', plot: 'world', dealer: 'vehicles', boats: 'vehicles', aircraft: 'vehicles', fuel: 'vehicles', tune: 'vehicles', spray: 'vehicles', property: 'property',
+  casino: 'fun', club: 'fun', arcade: 'fun', raceStart: 'fun', cinema: 'fun', gym: 'fun', job: 'fun', workout: 'fun', atm: 'service', bank: 'service', hospital: 'service', police: 'service', school: 'service', builder: 'service', yt: 'service',
+  clothes: 'shops', barber: 'shops', jewel: 'shops', store: 'shops', supermarket: 'shops', pharmacy: 'shops', electronics: 'shops', phone: 'shops', furniture: 'shops', hardware: 'shops', tattoo: 'shops', pets: 'shops', flea: 'shops', gaming: 'shops', mall: 'shops',
+  food: 'food', mcd: 'food', guns: 'guns' };
+export const poiCat = (p) => CAT_OF[p.shop] || CAT_OF[p.kind] || 'shops';
+const CAT_PRIO = { world: 0, vehicles: 1, property: 2, fun: 3, service: 4, shops: 5, food: 6, guns: 7 };
+const CAT_COL = Object.fromEntries(MAP_CATS.map(([k, , c]) => [k, c]));
+
 export class UI {
   constructor(G) {
     this.G = G; this.root = document.getElementById('ui'); this.blocking = false; this.bubbles = []; this.modalEl = null; this.pauseEl = null; this.tab = 'map';
@@ -57,6 +71,7 @@ export class UI {
     R.append(this.loading, this.hud, this.bubbleLayer, this.barT, this.barB, this.bannerEl, this.fadeEl);
     this.loadTipT = setInterval(() => { this.loadTip.textContent = TIPS[Math.floor(Math.random() * TIPS.length)]; }, 2600);
   }
+  updateProfile() { if (!this.profileLine) return; const n = (this.G.settings.name || '').trim(); this.profileLine.textContent = n ? `👤 Angemeldet als ${n}${this.G.admin ? ' · 🔑 Admin' : ''} (wird gespeichert)` : '👤 Nicht angemeldet – unter „Profil / Admin“ Namen festlegen'; }
   setProgress(p, t) { this.loadBar.style.width = Math.round(p * 100) + '%'; if (t) this.loadTxt.textContent = t; }
   hideLoading() { clearInterval(this.loadTipT); this.loading.remove(); this.thumbs = new Thumbs(this.G); }
 
@@ -76,7 +91,8 @@ export class UI {
       btn('⚙  Einstellungen', () => this.settingsModal()),
       btn('🎮  Steuerung', () => this.helpModal()),
       btn('ℹ  Credits', () => this.creditsModal()), btn('⛶  Vollbild', () => G.touch?.fullscreen()), btn('📱  Touch-Steuerung an/aus', () => { G.settings.touch = G.touch?.on ? 'off' : 'on'; G.applySettings(); this.toast('Touch-Steuerung: ' + (G.touch?.on ? 'AN' : 'AUS')); })),
-      h('div', { class: 'foot' }, 'Alle Marken und Figuren sind fiktiv. Läuft komplett im Browser (WebGL).'));
+      h('div', { class: 'foot' }, (this.profileLine = h('div', { style: { marginBottom: '6px', fontSize: '13px', color: '#9fffe0' } })), 'Alle Marken und Figuren sind fiktiv. Läuft komplett im Browser (WebGL).'));
+    this.updateProfile();
     this.root.append(this.menu);
     G.env.time = 18.3; G.env.setWeather('clear', true); G.env.lockWeather = true;
     G.player.char.root.visible = false;
@@ -165,21 +181,41 @@ export class UI {
   // ---------- Tabs ----------
   tab_map(c) {
     const G = this.G; c.replaceChildren();
-    const cats = [['food', '🍔 Essen'], ['clothes', '👕 Mode'], ['guns', '🔫 Waffen'], ['property', '🏠 Immobilien'], ['dealer', '🚘 Autos'], ['fuel', '⛽ Tank/Tuning'], ['job', '💼 Jobs'], ['raceStart', '🏁 Rennen'], ['atm', '💵 ATM'], ['special', '⭐ Besonderes'], ['mission', '🎯 Missionen']];
-    const legend = h('div', { class: 'legend' }, cats.map(([k, l]) => h('span', { class: 'chip' + (this.legendOff.has(k) ? '' : ' on'), onClick: (e) => { if (this.legendOff.has(k)) this.legendOff.delete(k); else this.legendOff.add(k); e.target.classList.toggle('on'); } }, l)),
-      h('span', { class: 'chip', onClick: () => { G.waypoint = null; this.route = null; } }, '✖ GPS löschen'));
+    const chips = [];
+    const refreshChips = () => chips.forEach(([k, el]) => el.classList.toggle('on', !this.legendOff.has(k)));
+    const legend = h('div', { class: 'legend' },
+      h('span', { class: 'chip', onClick: () => { this.legendOff.clear(); refreshChips(); } }, '✔ Alle'),
+      h('span', { class: 'chip', onClick: () => { for (const [k] of MAP_CATS) this.legendOff.add(k); refreshChips(); } }, '✖ Keine'),
+      ...MAP_CATS.map(([k, l, col]) => { const el = h('span', { class: 'chip' + (this.legendOff.has(k) ? '' : ' on'), style: { borderLeft: '4px solid ' + col }, onClick: () => { if (this.legendOff.has(k)) this.legendOff.delete(k); else this.legendOff.add(k); refreshChips(); } }, l); chips.push([k, el]); return el; }),
+      h('span', { class: 'chip', onClick: () => { G.waypoint = null; this.route = null; } }, '🚩 GPS löschen'),
+      h('span', { class: 'chip', onClick: () => { const q = G.player.position; this.mapState.cx = q.x; this.mapState.cz = q.z; } }, '📍 Zu mir'));
+    const search = h('input', { type: 'search', class: 'mpfield', placeholder: '🔍 Ort suchen (z. B. Supermarkt, Tankstelle, Alpen …)', style: { width: '100%', margin: '0 0 8px' } });
+    const results = h('div', { class: 'legend' });
     const wrap = h('div', { class: 'mapwrap' }); const cv = h('canvas'); wrap.append(cv);
-    c.append(h('h2', {}, 'Interaktive Weltkarte'), legend, wrap, h('div', { class: 'row', style: { marginTop: '8px' } }, h('div', { class: 'd' }, 'Linksklick: GPS-Ziel setzen · Ziehen: verschieben · Mausrad: zoomen · Rechtsklick: Ziel löschen')));
+    c.append(h('h2', {}, 'Weltkarte'), search, results, legend, wrap, h('div', { class: 'row', style: { marginTop: '8px' } }, h('div', { class: 'd' }, 'Tippen/Klick: GPS-Ziel · Ziehen: verschieben · Mausrad/Zwei Finger: zoomen · Rechtsklick: Ziel löschen · Je weiter du hineinzoomst, desto mehr Orte erscheinen.')));
     const p = G.player.position;
-    this.mapState = { cx: p.x, cz: p.z, scale: 0.34, cv, drag: null };
+    this.mapState = { cx: p.x, cz: p.z, scale: 0.2, cv, drag: null, q: '' };
     const st = this.mapState;
+    search.addEventListener('input', () => {
+      st.q = search.value.trim().toLowerCase();
+      const hits = st.q ? G.world.pois.filter((q) => !q.hidden && !q.disabled && POI_ICONS[q.kind] && q.name && q.name.toLowerCase().includes(st.q)).sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z)).slice(0, 8) : [];
+      results.replaceChildren(...hits.map((q) => h('span', { class: 'chip on', onClick: () => { st.cx = q.x; st.cz = q.z; st.scale = Math.max(st.scale, 0.5); G.waypoint = { x: q.x, z: q.z }; this.routeT = 0; this.toast('GPS-Ziel: ' + q.name); } }, `${POI_ICONS[q.kind] || '📍'} ${q.name.slice(0, 28)} · ${Math.round(Math.hypot(q.x - p.x, q.z - p.z))} m`)));
+    });
     const resize = () => { cv.width = wrap.clientWidth * devicePixelRatio; cv.height = wrap.clientHeight * devicePixelRatio; };
     setTimeout(resize, 0); resize();
-    cv.addEventListener('wheel', (e) => { e.preventDefault(); st.scale = clamp(st.scale * (e.deltaY < 0 ? 1.15 : 0.87), 0.06, 2.2); });
+    const setGps = (clientX, clientY) => { const r = cv.getBoundingClientRect(); const dx = (clientX - r.left - r.width / 2) / st.scale, dz = (clientY - r.top - r.height / 2) / st.scale; G.waypoint = { x: st.cx + dx, z: st.cz + dz }; this.toast('GPS-Ziel gesetzt'); this.routeT = 0; };
+    cv.addEventListener('wheel', (e) => { e.preventDefault(); st.scale = clamp(st.scale * (e.deltaY < 0 ? 1.15 : 0.87), 0.05, 2.2); });
     cv.addEventListener('mousedown', (e) => { st.drag = { x: e.clientX, z: e.clientY, cx: st.cx, cz: st.cz, moved: false }; });
-    addEventListener('mouseup', st.up = (e) => { if (st.drag && !st.drag.moved && e.target === cv) { const r = cv.getBoundingClientRect(); const dx = (e.clientX - r.left - r.width / 2) / st.scale, dz = (e.clientY - r.top - r.height / 2) / st.scale; if (e.button === 2) { G.waypoint = null; this.route = null; } else { G.waypoint = { x: st.cx + dx, z: st.cz + dz }; this.toast('GPS-Ziel gesetzt'); this.routeT = 0; } } if (st.drag) st.drag = null; });
+    addEventListener('mouseup', st.up = (e) => { if (st.drag && !st.drag.moved && e.target === cv) { if (e.button === 2) { G.waypoint = null; this.route = null; } else setGps(e.clientX, e.clientY); } if (st.drag) st.drag = null; });
     cv.addEventListener('mousemove', (e) => { if (st.drag) { const dx = e.clientX - st.drag.x, dz = e.clientY - st.drag.z; if (Math.abs(dx) + Math.abs(dz) > 4) st.drag.moved = true; st.cx = st.drag.cx - dx / st.scale; st.cz = st.drag.cz - dz / st.scale; } });
     cv.addEventListener('contextmenu', (e) => e.preventDefault());
+    // Touch: ziehen, zwei Finger zoomen, tippen = GPS
+    let tp = null;
+    cv.addEventListener('touchstart', (e) => { e.preventDefault(); const t = [...e.touches]; tp = { n: t.length, x: t[0].clientX, y: t[0].clientY, cx: st.cx, cz: st.cz, moved: false, d: t.length > 1 ? Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY) : 0, s: st.scale }; }, { passive: false });
+    cv.addEventListener('touchmove', (e) => { e.preventDefault(); if (!tp) return; const t = [...e.touches];
+      if (t.length > 1) { const d = Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY); if (tp.d) st.scale = clamp(tp.s * d / tp.d, 0.05, 2.2); tp.moved = true; }
+      else { const dx = t[0].clientX - tp.x, dy = t[0].clientY - tp.y; if (Math.abs(dx) + Math.abs(dy) > 8) tp.moved = true; if (tp.moved && tp.n === 1) { st.cx = tp.cx - dx / st.scale; st.cz = tp.cz - dy / st.scale; } } }, { passive: false });
+    cv.addEventListener('touchend', (e) => { e.preventDefault(); if (tp && !tp.moved && tp.n === 1 && e.touches.length === 0) setGps(tp.x, tp.y); if (e.touches.length === 0) tp = null; }, { passive: false });
     this.drawFullMap();
   }
   drawFullMap() {
@@ -201,15 +237,32 @@ export class UI {
       ctx.font = `${size}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff'; ctx.fillText(txt, 0, 1); ctx.restore();
     };
     const range = o.full ? 1e9 : 260;
-    const full = !!o.full, vis = (kind) => { if (!full) return true; const cat = ['food', 'clothes', 'guns', 'property', 'dealer', 'fuel', 'job', 'raceStart', 'atm'].includes(kind) ? kind : (kind === 'tune' ? 'fuel' : kind === 'barber' || kind === 'jewel' || kind === 'store' ? 'clothes' : 'special'); return !this.legendOff.has(cat); };
+    const full = !!o.full, q = full ? (this.mapState?.q || '') : '';
     const px = G.player.position.x, pz = G.player.position.z;
+    // Sichtbare POIs je Zoomstufe: weit weg nur Wichtiges, nah heran alles
+    const zoomMax = full ? (s < 0.12 ? 1 : s < 0.2 ? 3 : s < 0.34 ? 5 : s < 0.6 ? 6 : 9) : 9;
+    const list = [];
     for (const p of G.world.pois) {
       if (p.disabled || p.hidden || (!full && Math.hypot(p.x - px, p.z - pz) > range)) continue;
-      if (!vis(p.kind)) continue;
-      const own = p.kind === 'property' && G.eco.owns(p.id);
-      let ic = POI_ICONS[p.kind]; if (!ic) continue;
-      if (p.kind === 'landmark') { if (!full || s < 0.25) continue; ctx.save(); ctx.translate(p.x, p.z); ctx.rotate(-rot); ctx.scale(1 / s, 1 / s); ctx.font = '11px sans-serif'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.shadowColor = '#000'; ctx.shadowBlur = 4; ctx.fillText(p.name, 0, 0); ctx.restore(); continue; }
-      icon(p.x, p.z, ic, full ? 15 : 14, own ? '#00a152' : 'rgba(20,10,40,.85)');
+      if (!POI_ICONS[p.kind]) continue;
+      if (p.kind === 'landmark') { if (full && s >= 0.1) list.push({ p, pr: -1, lm: true }); continue; }
+      const cat = poiCat(p); const own = p.kind === 'property' && G.eco.owns(p.id);
+      if (full && this.legendOff.has(cat)) continue;
+      const match = q && p.name.toLowerCase().includes(q);
+      if (q && !match) continue;
+      const pr = own ? -2 : (CAT_PRIO[cat] ?? 5);
+      if (full && !match && !own && pr >= zoomMax) continue;
+      list.push({ p, pr: match ? -3 : pr, cat, own, match });
+    }
+    list.sort((a, b) => a.pr - b.pr);
+    const cell = (full ? 30 : 22) / s, used = new Set(), lbls = [];
+    const labelFree = (x, z, w, dy = 0) => { if (!full) return true; const sx = (x - cx) * s + W / 2, sy = (z - cz) * s + H / 2 + dy; const r = [sx - w / 2 - 3, sy - 8, sx + w / 2 + 3, sy + 8]; for (const b of lbls) if (r[0] < b[2] && r[2] > b[0] && r[1] < b[3] && r[3] > b[1]) return false; lbls.push(r); return true; };
+    for (const { p, cat, own, lm, match } of list) {
+      const key = Math.floor(p.x / cell) + ',' + Math.floor(p.z / cell);
+      if (lm) { if (/^Stunt/.test(p.name) && s < 0.5) continue; if (!labelFree(p.x, p.z, p.name.length * 6.6)) continue; ctx.save(); ctx.translate(p.x, p.z); ctx.rotate(-rot); ctx.scale(1 / s, 1 / s); ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,10,25,.85)'; ctx.strokeText(p.name, 0, 0); ctx.fillText(p.name, 0, 0); ctx.restore(); continue; }
+      if (used.has(key) && !match && !own) continue; used.add(key);
+      icon(p.x, p.z, POI_ICONS[p.kind], full ? 15 : 14, own ? '#00a152' : CAT_COL[cat] ? CAT_COL[cat] + 'cc' : 'rgba(20,10,40,.85)');
+      if (full && (match || (s >= 0.6 && p.name)) && labelFree(p.x, p.z, Math.min(26, p.name.length) * 5.6, 20)) { ctx.save(); ctx.translate(p.x, p.z); ctx.rotate(-rot); ctx.scale(1 / s, 1 / s); ctx.font = '11px sans-serif'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,10,25,.9)'; const t = p.name.slice(0, 26); ctx.strokeText(t, 0, 20); ctx.fillText(t, 0, 20); ctx.restore(); }
     }
     if (!full || !this.legendOff.has('mission')) for (const m of G.mission?.blips?.() || []) icon(m.x, m.z, m.icon || '★', full ? 17 : 15, m.color || '#c79a1a');
     // Fahrzeuge in Besitz

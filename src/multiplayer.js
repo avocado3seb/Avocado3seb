@@ -294,11 +294,11 @@ export class Multiplayer {
   menu() {
     const ui = G.ui, S = G.settings;
     const name = h('input', { type: 'text', maxlength: 14, placeholder: 'Dein Name', value: S.name || '', class: 'mpfield' });
-    const code = h('input', { type: 'text', maxlength: 5, placeholder: 'CODE', class: 'mpfield mpcode', style: { textTransform: 'uppercase' } });
+    const code = h('input', { type: 'text', maxlength: 5, placeholder: 'CODE', class: 'mpfield mpcode', value: S.lastRoom || '', style: { textTransform: 'uppercase' } });
     const mode = h('select', { class: 'mpfield' }, h('option', { value: 'freeroam' }, 'Freies Spiel (kooperativ)'), h('option', { value: 'freepvp' }, 'Freies Spiel (PvP an)'), h('option', { value: 'deathmatch' }, 'Deathmatch (PvP, erster mit 20 Kills)'), h('option', { value: 'koth' }, 'King of the Hill (Hügel im Central Park halten)'));
     const msg = h('div', { class: 'd', style: { minHeight: '20px', margin: '8px 0' } }, 'Bis zu 24 Spieler · direkte Verbindung (WebRTC) über einen kostenlosen Vermittlungsserver (PeerJS).');
     const begin = (fn) => async () => {
-      const nm = (name.value || '').trim() || this.name(); S.name = nm; G.applySettings(); msg.textContent = 'Verbinde …';
+      const nm = (name.value || '').trim() || this.name(); S.name = nm; if ((code.value || '').trim()) S.lastRoom = code.value.trim().toUpperCase(); G.applySettings(); G.ui.updateProfile?.(); msg.textContent = 'Verbinde …';
       try {
         const c = await fn(nm);
         const wasMenu = G.mode === 'menu';
