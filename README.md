@@ -34,7 +34,7 @@ Empfohlen: aktueller Chrome/Edge/Firefox mit Hardware-Beschleunigung. Grafikqual
 
 ## Touch-Steuerung (Handy/Tablet)
 
-Auf Touch-Geräten erscheint automatisch eine Bildschirmsteuerung: Joystick links (Gehen/Lenken/Gas), Blickfläche rechts, kontextabhängige Tasten (Schießen, Zielen, Springen, Einsteigen, Gas/Bremse, Handbremse, Schub, Steigen/Sinken …) sowie ☰ Pause, 🗺 Karte, 📱 Handy, 💬 Chat und ⛶ Vollbild. Unter Einstellungen lässt sich die Touch-Steuerung auch erzwingen oder abschalten. Querformat und Vollbild empfohlen.
+Auf Touch-Geräten erscheint automatisch eine Bildschirmsteuerung: Joystick links (Gehen/Lenken/Gas), Blickfläche rechts, kontextabhängige Tasten (Schießen, Zielen, Springen, Einsteigen, Gas/Bremse, Handbremse, Schub, Steigen/Sinken …) sowie ☰ Pause, 🗺 Karte, 📱 Handy, 💬 Chat und ⛶ Vollbild. Neu: ⚡ Sprint-Umschalter, Flugmodus-Tasten (▲ ▼ ⚡), 😀 Emotes im Mehrspieler, automatische Aktivierung bei der ersten Berührung, Hinweis bei Hochformat und im Hauptmenü ein Schalter „📱 Touch-Steuerung an/aus“. Alle Läden, Minispiele, das Admin-Panel und die Backrooms sind per Touch bedienbar. Unter Einstellungen lässt sich die Touch-Steuerung auch erzwingen oder abschalten. Querformat und Vollbild empfohlen.
 
 ## Mehrspieler
 

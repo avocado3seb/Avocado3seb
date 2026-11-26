@@ -9,6 +9,11 @@ const BTN = {
   jump: { label: '⤒', key: 'Space', show: (c) => c.foot },
   interact: { label: 'E', key: 'KeyE', show: (c) => c.foot, tap: true },
   enter: { label: '🚗', key: 'KeyF', show: (c) => c.foot, tap: true },
+  sprint: { label: '⚡', key: 'ShiftLeft', toggle: true, show: (c) => c.foot && !c.fly },
+  flyUp: { label: '▲', key: 'Space', cls: 'big', show: (c) => c.foot && c.fly },
+  flyDn: { label: '▼', key: 'ControlLeft', show: (c) => c.foot && c.fly },
+  flyFast: { label: '⚡', key: 'ShiftLeft', toggle: true, show: (c) => c.foot && c.fly },
+  emote: { label: '😀', fn: 'emote', show: (c) => c.mp, tap: true },
   reload: { label: '↻', key: 'KeyR', show: (c) => c.foot && c.armed, tap: true },
   weapon: { label: '🔄', wheel: 1, show: (c) => c.foot, tap: true },
   // Fahrzeug
@@ -36,6 +41,10 @@ export class TouchControls {
     this.G = G; this.on = false; this.stick = null; this.lookId = null; this.btns = new Map(); this.ctx = {};
     this.build();
     this.apply();
+    // Erste Berührung schaltet die Touch-Steuerung automatisch ein (falls nicht ausdrücklich aus)
+    addEventListener('touchstart', () => { if (!this.on && (G.settings.touch || 'auto') === 'auto') { G.settings.touch = 'on'; this.apply(); } }, { once: false, passive: true });
+    this.rot = h('div', { class: 'trot' }, '📱 Bitte das Gerät quer halten (Querformat) und ⛶ Vollbild nutzen');
+    document.getElementById('ui').append(this.rot);
   }
   isTouchDevice() { return (window.matchMedia && matchMedia('(pointer: coarse)').matches) || navigator.maxTouchPoints > 0 || 'ontouchstart' in window; }
   apply() {
@@ -81,6 +90,7 @@ export class TouchControls {
         if (d.mouse !== undefined) { if (v) I.mpress(d.mouse); else I.mrelease(d.mouse); }
         if (d.axis !== undefined) { this.axisBtn = this.axisBtn || {}; this.axisBtn[id] = v ? d.axis : 0; }
         if (d.wheel && v) I.wheel += d.wheel;
+        if (d.fn === 'emote' && v) { this.emoteI = (this.emoteI || 0) + 1; G.mp?.emote(this.emoteI); }
       };
       bind(el, (t) => { act.touches.add(t.identifier); if (d.toggle) { set(!act.on); } else set(true); G.audio?.hover?.(); },
         (t) => { act.touches.delete(t.identifier); if (!d.toggle && act.touches.size === 0) { if (d.tap) setTimeout(() => set(false), 60); else set(false); } });
@@ -119,6 +129,7 @@ export class TouchControls {
     this.base.style.display = '';
     const w = P.weapons[P.weapon];
     const c = { foot: !v, veh: !!v, car: !!v && (v.kind === 'car' || v.kind === 'bike'), boat: !!v && v.kind === 'boat', plane: !!v && v.kind === 'plane', heli: !!v && v.kind === 'heli', air: !!v && (v.kind === 'plane' || v.kind === 'heli'), armed: P.weapon !== 'fist', poi: !!G.poiNear };
+    c.fly = !!P.fly; c.mp = !!G.mp?.active;
     for (const [id, a] of this.btns) { const s = !!a.d.show(c); a.el.style.display = s ? '' : 'none'; if (!s && a.on) { a.on = false; a.el.classList.remove('on'); if (a.d.key) G.input.release(a.d.key); if (a.d.mouse !== undefined) G.input.mrelease(a.d.mouse); if (a.d.axis !== undefined && this.axisBtn) this.axisBtn[id] = 0; } }
     // Gas / Bremse → analoge Achse (zusätzlich zum Joystick)
     const ab = this.axisBtn; const extra = ab ? Object.values(ab).reduce((s, x) => s + x, 0) : 0;

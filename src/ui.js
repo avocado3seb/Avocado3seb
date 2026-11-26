@@ -75,7 +75,7 @@ export class UI {
       btn('👤  Profil / Admin', () => G.adminPanel.profileModal()),
       btn('⚙  Einstellungen', () => this.settingsModal()),
       btn('🎮  Steuerung', () => this.helpModal()),
-      btn('ℹ  Credits', () => this.creditsModal()), btn('⛶  Vollbild', () => G.touch?.fullscreen())),
+      btn('ℹ  Credits', () => this.creditsModal()), btn('⛶  Vollbild', () => G.touch?.fullscreen()), btn('📱  Touch-Steuerung an/aus', () => { G.settings.touch = G.touch?.on ? 'off' : 'on'; G.applySettings(); this.toast('Touch-Steuerung: ' + (G.touch?.on ? 'AN' : 'AUS')); })),
       h('div', { class: 'foot' }, 'Alle Marken und Figuren sind fiktiv. Läuft komplett im Browser (WebGL).'));
     this.root.append(this.menu);
     G.env.time = 18.3; G.env.setWeather('clear', true); G.env.lockWeather = true;
