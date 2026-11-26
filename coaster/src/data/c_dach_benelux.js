@@ -18,7 +18,7 @@ export default [
   { park: 'Phantasialand', cc: 'DE', rows: [
     ['Taron', 'launch', 'Intamin', 2016, 30, 1400, 117, 90, 0, { tc: '#d86a1a', sc: '#2a2a30', tr: '#242830', trains: 2, area: 'Klugheim' }],
     ['F.L.Y.', 'flying', 'Vekoma', 2020, 44, 1030, 85, 150, 0, { tc: '#d01818', sc: '#4a3a30', tr: '#d01818', ta: '#f0e6c8', al: 'Fly Flying', trains: 2, area: 'Rookburgh' }],
-    ['Black Mamba', 'floorless', 'Bolliger & Mabillard', 2006, 30, 1200, 90, 150, 5, { tc: '#111114', sc: '#1a1a1e', tr: '#252528', trains: 2, area: 'Deep in Africa' }],
+    ['Black Mamba', 'inverted', 'Bolliger & Mabillard', 2006, 30, 1200, 90, 150, 5, { tc: '#111114', sc: '#1a1a1e', tr: '#252528', trains: 2, area: 'Deep in Africa' }],
     ['Colorado Adventure', 'minetrain', 'Vekoma', 1996, 21, 850, 65, 180, 0, { tc: '#8a5a2a', sc: '#5a3d22', area: 'Mexico' }],
     ['Winja\'s Fear', 'sitdown', 'Vekoma', 2002, 24, 500, 60, 80, 2, { tc: '#2c6a3a', sc: '#2a2a2a', area: 'Fantasy' }],
     ['Winja\'s Force', 'sitdown', 'Vekoma', 2002, 24, 500, 60, 80, 2, { tc: '#6a2c2c', sc: '#2a2a2a', area: 'Fantasy' }],

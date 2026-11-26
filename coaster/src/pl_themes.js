@@ -74,7 +74,7 @@ export function buildMedieval(world, key = 'klugheim', big = true) {
   }
   // Fachwerkhäuser entlang der Wege (mittelalterlicher Stil)
   const th = world.theme; let made = 0;
-  if (th) made = placeMany(world, key, big ? 12 : 8, 9, 3, (x, y, z, r4) => { const w = R(8, 12), d = R(7, 9), h = R(6, 10); world.makeBuilding(x, z, r4, w, d, h, th); const sw = Math.abs(Math.sin(r4)) > 0.5; out.colliders.push({ x, z, hx: sw ? d / 2 : w / 2, hz: sw ? w / 2 : d / 2, rot: 0, y0: 0, y1: h }); out.glow.push([x, 2.2, z, 1, 0.7, 0.35, 18]); });
+  if (th) made = placeMany(world, key, big ? 12 : 8, 9, 3, (x, y, z, r4) => { const w = R(8, 12), d = R(7, 9), h = R(6, 10); world.makeBuilding(x, z, r4, w, d, h, th); });
   // Marktstände mit Stoffdächern und Banner
   const awn = [0xc01a2a, 0x1a5ac0, 0xe0b020, 0x2a9a4a, 0x8a2aa0];
   placeMany(world, key, big ? 8 : 5, 5, 3, (x, y, z, rot) => {

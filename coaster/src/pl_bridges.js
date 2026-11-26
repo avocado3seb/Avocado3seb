@@ -55,3 +55,23 @@ export function buildTrackBridges(world) {
   }
   world.trackBridges = count;
 }
+
+// ---------------------------------------------------------------------------
+// Einladende Eingangsplätze an jeder Bahn: gepflasterter Platz, Torbogen im Themenstil, Laternen, Wegweiser
+export function buildEntrances(world) {
+  const out = world.out, G = world.group; world.plazas = [];
+  const paving = new THREE.MeshStandardMaterial({ map: A.tex.stone(), color: 0xe8e0d0, roughness: 1, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+  const trim = { klugheim: 0x3a3a3e, africa: 0x6a4a2a, rookburgh: 0x4a3a30, mexico: 0xa05a2a, fantasy: 0x8a5ac8, china: 0xb02020, mystery: 0x3a4a5a, berlin: 0x5a4a3a };
+  for (const r of world.rides) {
+    const e = r.entrance, dx = r.dir[0], dz = r.dir[1], px = e.x + dx * 10, pz = e.z + dz * 10, y = world.h(px, pz);
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(8.5, 28), paving); disc.rotation.x = -Math.PI / 2; disc.position.set(px, Math.max(0.1, y) + 0.14, pz); disc.receiveShadow = true; G.add(disc);
+    world.plazas.push({ x: px, z: pz, r: 9 });
+    const col = trim[r.zone] || 0x5a4a3a, m = new THREE.MeshStandardMaterial({ color: col, roughness: 0.7 }), rot = Math.atan2(dx, dz);
+    // Torbogen am Beginn der Schlange (zwei Pfosten + Balken + Schild)
+    const gx = e.x + dx * 3, gz = e.z + dz * 3, gy = world.h(gx, gz), g = new THREE.Group(); g.position.set(gx, gy, gz); g.rotation.y = rot; G.add(g);
+    for (const s of [-1, 1]) { A.box(g, 0.7, 5.2, 0.7, m, s * 3.2, 2.6, 0); const wx = gx + s * 3.2 * Math.cos(rot), wz = gz - s * 3.2 * Math.sin(rot); out.colliders.push({ x: wx, z: wz, r: 0.5, y0: gy - 1, y1: gy + 5 }); out.glow.push([wx, gy + 4.6, wz, 1, 0.7, 0.35, 20]); out.lights.push({ x: wx, y: gy + 4.4, z: wz, color: 0xffa050, int: 4, range: 11, flicker: 0.25 }); }
+    A.box(g, 7.6, 0.8, 0.8, m, 0, 5.4, 0);
+    const cv = document.createElement('canvas'); cv.width = 512; cv.height = 96; const c = cv.getContext('2d'); c.fillStyle = '#' + col.toString(16).padStart(6, '0'); c.fillRect(0, 0, 512, 96); c.strokeStyle = '#f0e0b0'; c.lineWidth = 5; c.strokeRect(5, 5, 502, 86); c.fillStyle = '#fff4d0'; c.font = '700 44px Georgia, serif'; c.textAlign = 'center'; c.fillText(r.coaster.name.slice(0, 22), 256, 62);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(6.8, 1.28), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv) })); sign.position.set(0, 6.4, 0.45); g.add(sign); const s2 = sign.clone(); s2.rotation.y = Math.PI; s2.position.z = -0.45; g.add(s2);
+  }
+}

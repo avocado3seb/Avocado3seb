@@ -346,7 +346,7 @@ export class Builder {
       case 'ROLL': this.rollTo(N(0, 0) * D2R, N(1, 20)); break;
       case 'HOME': { // Rückweg: Gerade bis hinter die Station, Wendekurve rechts, Bremsstrecke
         const bank = N(0, 45), brake = N(1, 30);
-        const xb = -26 - 0.15 * Math.max(10, this.z / 2);
+        const xb = Math.min(-26 - 0.15 * Math.max(10, this.z / 2), -(brake + 5)); // genug Anlauf, damit die Bremsstrecke VOR der Station endet (sonst Knick/Schleife am Bahnhof)
         if (this.x - xb > 1) this.straight(this.x - xb);
         const Rr = Math.max(14, this.z / 2);
         this.turn(180, Rr, bank);
