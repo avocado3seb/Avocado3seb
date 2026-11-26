@@ -17,6 +17,7 @@ import { EXTRA_ZONES, ZONE_OF_AREA } from './pl_data.js';
 import { placePOIs } from './pl_pois.js';
 import { buildBeauty } from './pl_beauty.js';
 import { buildMedieval, buildAviation } from './pl_themes.js';
+import { buildTrackBridges } from './pl_bridges.js';
 import { buildChina, buildMystery, buildBerlin, buildParking, buildAirship, buildLightStrings, buildWinterDecor } from './pl_zones2.js';
 
 const TAU = Math.PI * 2;
@@ -64,7 +65,7 @@ export class PhantasiaWorld extends ParkWorld {
     this.buildTerrainPL();
     this.buildPathMeshes();
     this.pois = placePOIs(this);
-    buildMedieval(this); buildAviation(this);
+    buildMedieval(this); buildMedieval(this, 'fantasy', false); buildAviation(this);
     this.buildZoneDecor();
     this.buildExtras();
     this.buildEffects();
@@ -788,6 +789,7 @@ export class PhantasiaWorld extends ParkWorld {
     for (const r of this.rides) this.interactables.push({ type: 'ride', ride: r, x: r.entrance.x, z: r.entrance.z, r: 16, name: r.coaster.name, kind: 'ride' });
     this.interactables.push({ type: 'gate', x: 0, z: 352, r: 16, name: 'Ticketscanner / Eingang', kind: 'gate' });
     for (const r of this.rides) this.makeQueueSign(r);
+    buildTrackBridges(this);
     buildBeauty(this);
     this.winter = false; this.hist = { inPark: 0, entered: 0 };
   }

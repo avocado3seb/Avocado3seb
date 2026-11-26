@@ -24,6 +24,10 @@ export const plUi = {
       <div id="navhud" class="hudbox hide"><div id="navArrow">➤</div><div><b id="navName"></b><div class="note" id="navDist"></div></div><button class="btn sm" id="navStop">✖</button></div>
       <div id="wallet" class="hudbox hide"></div>
       <div id="flash"></div>
+      <div id="login" class="hide"><div class="lbox card"><h2>🎡 Phantasialand Simulator</h2><div class="note">Melde dich mit Name und Passwort an. Dein Spielstand wird mit deinem Konto in der Cloud gesichert – auch für den Multiplayer.</div>
+        <input id="lgName" placeholder="Name (3–14 Zeichen)" maxlength="14" autocomplete="username"><input id="lgPw" type="password" placeholder="Passwort (mind. 6 Zeichen)" autocomplete="current-password">
+        <div class="btnrow"><button class="btn pri" id="lgIn">Anmelden</button><button class="btn blue" id="lgReg">Neu registrieren</button></div><div id="lgMsg" class="note"></div>
+        <div class="note">Das Passwort wird nur als Hash (PBKDF2) auf dem Server gespeichert. Nutze am besten kein Passwort, das du anderswo verwendest.</div></div></div>
       <div id="panel" class="hide"><div class="pbox card"><div class="phead"><b id="pTit"></b><button class="btn sm" id="pClose">✖ Schließen</button></div><div class="pbody" id="pBody"></div></div></div>
       <div id="bigmap" class="hide"><canvas id="bmC"></canvas>
         <div class="bmtop card"><input id="bmQ" placeholder="🔍 Suche (Bahn, Restaurant, Hotel …)"><div id="bmF" class="bmf"></div><button class="btn sm" id="bmX">✖ Schließen (M)</button></div>
@@ -33,8 +37,17 @@ export const plUi = {
     $('#navStop').addEventListener('click', () => this.app.game.stopNav());
     $('#bmX').addEventListener('click', () => this.closeMap());
     this.mapInit();
+    const doAuth = async kind => {
+      const msg = $('#lgMsg'), name = $('#lgName').value.trim(), pw = $('#lgPw').value; msg.style.color = 'var(--dim)'; msg.textContent = 'Einen Moment …';
+      try { await this.app.account.auth(kind, name, pw); await this.app.onLogin(); $('#lgPw').value = ''; } catch (e) { msg.style.color = 'var(--bad)'; msg.textContent = '✖ ' + (e.message === 'Failed to fetch' ? 'Server nicht erreichbar – Internetverbindung prüfen' : e.message); }
+    };
+    $('#lgIn').addEventListener('click', () => doAuth('login')); $('#lgReg').addEventListener('click', () => doAuth('register'));
+    $('#lgPw').addEventListener('keydown', e => { if (e.key === 'Enter') doAuth('login'); e.stopPropagation(); }); $('#lgName').addEventListener('keydown', e => { if (e.key === 'Enter') $('#lgPw').focus(); e.stopPropagation(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && this.modalOpen()) { this.closePanel(); this.closeMap(); e.stopPropagation(); } }, true);
   },
+  showLogin() { $('#login').classList.remove('hide'); this.modal = true; setTimeout(() => $('#lgName').focus(), 50); },
+  hideLogin() { $('#login').classList.add('hide'); this.modal = this.modalOpen(); },
+  refreshAccount() { if (this.curTab === 'hub') this.tab('hub'); },
   modalOpen() { return !$('#panel').classList.contains('hide') || !$('#bigmap').classList.contains('hide'); },
   setHint(t) { const h = $('#hint'); if (!h) return; if (t && !this.modalOpen()) { h.textContent = t; h.classList.remove('hide'); } else h.classList.add('hide'); },
   flash() { const f = $('#flash'); f.classList.add('on'); setTimeout(() => f.classList.remove('on'), 120); },
@@ -69,6 +82,15 @@ export const plUi = {
       body.querySelectorAll('[data-t]').forEach(b => b.addEventListener('click', () => { g.buyTicket(+b.dataset.t); this.renderPanel(); }));
       $('#gScan').addEventListener('click', () => { if (g.scanTicket()) this.closePanel(); });
       const pk = $('#gPocket'); if (pk) pk.addEventListener('click', () => { g.addMoney(100); this.renderPanel(); });
+      return;
+    }
+    if (kind === 'inventory') {
+      tit.textContent = '🎒 Inventar'; const items = g.inventory(), food = items.filter(x => x.kind !== 'shop'), souv = items.filter(x => x.kind === 'shop'), b = S.bookings;
+      const row = (x, eat) => `<div class="row2"><span>${esc(x.name)} <span class="chip">×${x.n}</span><div class="note">${esc(x.from || '')}${x.price ? ' · ' + eur(x.price) + ' pro Stück' : ''}</div></span>${eat ? `<button class="btn pri sm" data-eat="${esc(x.name)}">Verzehren</button>` : ''}</div>`;
+      body.innerHTML = `${wallet}<div class="note">🎟 Ticket: ${g.ticketOk() ? '<b style="color:var(--ok)">' + esc(S.ticket.type) + ' (heute gültig)</b>' : 'keins'} · 🛏 Buchungen: ${b.length}</div>
+        <h4>🍽 Essen &amp; Trinken</h4>${food.length ? `<div class="rows">${food.map(x => row(x, true)).join('')}</div>` : '<div class="note">Nichts dabei – kauf etwas in einem Restaurant oder Imbiss.</div>'}
+        <h4>🛍 Souvenirs</h4>${souv.length ? `<div class="rows">${souv.map(x => row(x, false)).join('')}</div>` : '<div class="note">Noch keine Souvenirs – schau in einen Shop.</div>'}`;
+      body.querySelectorAll('[data-eat]').forEach(bt => bt.addEventListener('click', () => { g.consume(bt.dataset.eat); this.renderPanel(); }));
       return;
     }
     if (kind === 'img') { tit.textContent = '📷 ' + esc(p.caption); body.innerHTML = `<img src="${p.src}" style="width:100%;border-radius:10px"><div class="note">${esc(p.t)}</div>`; return; }
@@ -128,6 +150,7 @@ export const plUi = {
       ['map', '🗺', 'Parkkarte', 'Zoom, Suche, Filter, Navigation'], ['hotels', '🏨', 'Hotels', 'Lobby, Zimmer, Buchung'],
       ['food', '🍽', 'Gastronomie', 'Restaurants, Imbisse, Shops'], ['photos', '📷', 'Fotoalbum', 'Fotos, gespeicherte Fahrten'],
       ['stats', '📊', 'Statistiken', 'Fahrten, Erfolge, Fortschritt'], ['editor', '🛠', 'Achterbahn-Editor', 'Eigene Bahn bauen und testen'],
+      ['inv', '🎒', 'Inventar', 'Gekauftes Essen und Souvenirs'], ['online', '🌐', 'Multiplayer', 'Mit Freunden im Park – Raum erstellen oder beitreten'],
       ['saves', '💾', 'Spielstände', '3 Slots + Autosave'], ['help', '⚙', 'Einstellungen', 'Grafik, Steuerung, Zeit, Wetter'],
     ];
     body.innerHTML = `<div class="hub"><div class="hubhead"><div><h1>Phantasialand <small>Simulator</small></h1><div class="note">Stilisierte, frei erkundbare Nachbildung – keine offizielle Anwendung. Namen/Preise/Menüs der Gastronomie sind Beispielangebote.</div></div>
@@ -135,8 +158,9 @@ export const plUi = {
       <div class="btnrow"><button class="btn sm" data-tm="9">🌄 Morgen</button><button class="btn sm" data-tm="13">☀ Mittag</button><button class="btn sm" data-tm="19.7">🌅 Sonnenuntergang</button><button class="btn sm" data-tm="23.5">🌙 Nacht</button></div>
       <div class="btnrow"><label class="note"><input type="checkbox" id="hubWin" ${S.winter ? 'checked' : ''}> ❄ Wintertraum</label><label class="note"><input type="checkbox" id="hubAuto" ${a.settings.autoTime ? 'checked' : ''}> ⏱ Tageszyklus</label>
       <select id="hubWeather"></select></div></div></div>
+      <div class="note" style="margin:-4px 0 10px">${a.account.token ? '👤 Angemeldet als <b>' + esc(a.account.name) + '</b> · <button class="btn sm" id="hubOut">Abmelden</button>' : '👤 Gastmodus (lokal)'}</div>
       <div class="hubgrid">${tiles.map(t => `<button class="tile" data-k="${t[0]}"><span class="ti">${t[1]}</span><b>${t[2]}</b><small>${t[3]}</small></button>`).join('')}</div>
-      <div class="btnrow" style="margin-top:12px">${au ? `<button class="btn blue" id="hubCont">⏯ Fortsetzen (Autosave · ${au.rides} Fahrten · ${new Date(au.savedAt).toLocaleString('de-DE')})</button>` : ''}<button class="btn" data-k="db">🌍 Alle Achterbahnen Europas</button><button class="btn" data-k="custom">➕ Eigene Bahn (JSON)</button><button class="btn" data-k="online">🌐 Online</button></div></div>`;
+      <div class="btnrow" style="margin-top:12px">${au ? `<button class="btn blue" id="hubCont">⏯ Fortsetzen (Autosave · ${au.rides} Fahrten · ${new Date(au.savedAt).toLocaleString('de-DE')})</button>` : ''}<button class="btn" data-k="db">🌍 Alle Achterbahnen Europas</button><button class="btn" data-k="custom">➕ Eigene Bahn (JSON)</button></div></div>`;
     const wsel = $('#hubWeather'); const W = a.env.constructor.WEATHERS || null; for (const o of document.querySelectorAll('#mWeather option')) wsel.insertAdjacentHTML('beforeend', `<option value="${o.value}">${o.textContent}</option>`); wsel.value = a.env.weatherName;
     const setT = h => { a.env.setTime(h); this.syncEnv(); a.saveSettings(); $('#hubClock').textContent = clock(h); $('#hubTime').value = h; };
     $('#hubTime').addEventListener('input', e => setT(+e.target.value)); setT(a.env.hour);
@@ -145,10 +169,12 @@ export const plUi = {
     $('#hubWin').addEventListener('change', e => a.setWinter(e.target.checked));
     $('#hubAuto').addEventListener('change', e => { a.settings.autoTime = e.target.checked; a.saveSettings(); this.toast(e.target.checked ? 'Tageszyklus an (ca. 24 min pro Tag)' : 'Tageszyklus aus'); });
     body.querySelectorAll('[data-k]').forEach(b => b.addEventListener('click', () => this.hubAction(b.dataset.k)));
+    const ho = $('#hubOut'); if (ho) ho.addEventListener('click', () => a.logout());
     const c = $('#hubCont'); if (c) c.addEventListener('click', async () => { a.audio.start(); g.load('auto'); });
   },
   async hubAction(k) {
     const a = this.app, g = a.game;
+    if (k === 'inv') return this.openPanel('inventory');
     if (['pl', 'attr', 'hotels', 'food', 'photos', 'stats', 'saves', 'editor', 'help', 'db', 'online', 'custom'].includes(k)) return this.tab(k);
     a.audio.start();
     if (k === 'play') { g.S.mode = 'play'; if (!g.S.stats.flags.started) { g.S.stats.flags.started = 1; } await a.phantasiaPlay(); }
@@ -271,7 +297,7 @@ export const plUi = {
     const M = this.map;
     $('#bmP').addEventListener('click', () => { M.scale = Math.min(6, M.scale * 1.4); this.mapDraw(); });
     $('#bmM').addEventListener('click', () => { M.scale = Math.max(0.12, M.scale / 1.4); this.mapDraw(); });
-    $('#bmC0').addEventListener('click', () => { const c = this.app.camera.position; M.x = c.x; M.z = c.z; this.mapDraw(); });
+    $('#bmC0').addEventListener('click', () => { const c = this.app.pp(); M.x = c.x; M.z = c.z; this.mapDraw(); });
     cv.addEventListener('wheel', e => { e.preventDefault(); const k = e.deltaY < 0 ? 1.15 : 1 / 1.15; this.mapZoomAt(e.offsetX, e.offsetY, k); }, { passive: false });
     const pts = new Map(); let pinch = 0;
     cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.offsetX, e.offsetY]); M.drag = { x: e.offsetX, y: e.offsetY, moved: 0 }; if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); } });
@@ -287,7 +313,7 @@ export const plUi = {
   openMap() {
     const a = this.app; if (!a.park || a.park.def.name !== 'Phantasialand') return this.toast('Die Parkkarte gibt es im Phantasialand-Modus');
     a.lockWanted = false; document.exitPointerLock?.(); this.closePanel();
-    $('#bigmap').classList.remove('hide'); const c = a.camera.position; this.map.x = c.x; this.map.z = c.z; this.map.sel = null; $('#bmI').classList.add('hide'); this.mapDraw(true); this.modal = true;
+    $('#bigmap').classList.remove('hide'); const c = a.pp(); this.map.x = c.x; this.map.z = c.z; this.map.sel = null; $('#bmI').classList.add('hide'); this.mapDraw(true); this.modal = true;
     this._mapT = setInterval(() => this.mapDraw(), 400);
   },
   closeMap(silent) { const m = $('#bigmap'); if (!m || m.classList.contains('hide')) return; m.classList.add('hide'); clearInterval(this._mapT); this.modal = this.modalOpen(); },
@@ -302,12 +328,14 @@ export const plUi = {
     const a = this.app, w = a.park, M = this.map, cv = $('#bmC'); if (!cv || $('#bigmap').classList.contains('hide') || !w) return;
     if (cv.width !== cv.clientWidth || cv.height !== cv.clientHeight) { cv.width = cv.clientWidth; cv.height = cv.clientHeight; }
     const g = cv.getContext('2d'), W = cv.width, H = cv.height, S = M.scale, X = x => W / 2 + (x - M.x) * S, Z = z => H / 2 + (z - M.z) * S;
-    g.fillStyle = '#10241a'; g.fillRect(0, 0, W, H);
-    for (const k in ZONES) { const zn = ZONES[k]; if (!zn.tint) continue; const gr = g.createRadialGradient(X(zn.x), Z(zn.z), 0, X(zn.x), Z(zn.z), zn.r * S); const c = zn.tint.map(v => Math.round(v * 255)); gr.addColorStop(0, `rgba(${c},.75)`); gr.addColorStop(1, `rgba(${c},0)`); g.fillStyle = gr; g.beginPath(); g.arc(X(zn.x), Z(zn.z), zn.r * S, 0, 7); g.fill(); }
-    g.lineCap = 'round'; g.strokeStyle = 'rgba(225,215,185,.85)'; g.lineWidth = Math.max(2, 5 * S);
-    for (const [i, j] of w.edges) { const A = w.nodes[i], B = w.nodes[j]; g.beginPath(); g.moveTo(X(A.x), Z(A.z)); g.lineTo(X(B.x), Z(B.z)); g.stroke(); }
-    for (const m of w.mini) { g.strokeStyle = m.ride.coaster.trackColor; g.lineWidth = Math.max(1.5, 2 * S); g.globalAlpha = .85; g.beginPath(); m.pts.forEach((p, i) => i ? g.lineTo(X(p[0]), Z(p[1])) : g.moveTo(X(p[0]), Z(p[1]))); g.closePath(); g.stroke(); g.globalAlpha = 1; }
-    if (S > 0.25) { g.font = `700 ${Math.round(Math.max(11, Math.min(20, 90 * S)))}px "Segoe UI",sans-serif`; g.textAlign = 'center'; for (const k in ZONES) { const zn = ZONES[k]; if (k === 'parking' && S < 0.3) continue; g.fillStyle = 'rgba(255,255,255,.55)'; g.fillText(zn.name.toUpperCase(), X(zn.x), Z(zn.z - zn.r * 0.55)); } }
+    const paper = g.createLinearGradient(0, 0, W, H); paper.addColorStop(0, '#efe4c2'); paper.addColorStop(1, '#e2d3a8'); g.fillStyle = paper; g.fillRect(0, 0, W, H);
+    g.strokeStyle = 'rgba(120,90,40,.10)'; g.lineWidth = 1; for (let x = (W / 2 - M.x * S) % 60; x < W; x += 60) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); } for (let y = (H / 2 - M.z * S) % 60; y < H; y += 60) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+    const ZC = { klugheim: '#b8b4a8', africa: '#6faa5a', rookburgh: '#c9a66a', mexico: '#e2a35a', fantasy: '#b58ad8', china: '#e07a7a', mystery: '#7a9ab8', berlin: '#a8c880', parking: '#c8c8c8' };
+    for (const k in ZONES) { const zn = ZONES[k]; if (!zn.tint) continue; const col = ZC[k] || '#a8c880'; const gr = g.createRadialGradient(X(zn.x), Z(zn.z), zn.r * S * 0.2, X(zn.x), Z(zn.z), zn.r * S); gr.addColorStop(0, col + 'e6'); gr.addColorStop(0.75, col + '99'); gr.addColorStop(1, col + '00'); g.fillStyle = gr; g.beginPath(); g.arc(X(zn.x), Z(zn.z), zn.r * S, 0, 7); g.fill(); }
+    g.lineCap = 'round';
+    for (const pass of [0, 1]) { g.strokeStyle = pass ? '#fffaf0' : 'rgba(92,66,34,.95)'; g.lineWidth = Math.max(2, 5 * S) + (pass ? 0 : Math.max(2, 2.2 * S)); for (const [i, j] of w.edges) { const A = w.nodes[i], B = w.nodes[j]; g.beginPath(); g.moveTo(X(A.x), Z(A.z)); g.lineTo(X(B.x), Z(B.z)); g.stroke(); } }
+    for (const m of w.mini) { for (const pass of [0, 1]) { g.strokeStyle = pass ? m.ride.coaster.trackColor : 'rgba(30,24,16,.9)'; g.lineWidth = Math.max(1.5, 2 * S) + (pass ? 0 : 1.6); g.beginPath(); m.pts.forEach((p, i) => i ? g.lineTo(X(p[0]), Z(p[1])) : g.moveTo(X(p[0]), Z(p[1]))); g.closePath(); g.stroke(); } }
+    if (S > 0.2) { g.textAlign = 'center'; g.font = `italic 700 ${Math.round(Math.max(12, Math.min(26, 110 * S)))}px Georgia, "Times New Roman", serif`; for (const k in ZONES) { const zn = ZONES[k]; if (k === 'parking' && S < 0.3) continue; g.lineWidth = 4; g.strokeStyle = 'rgba(255,250,235,.9)'; g.strokeText(zn.name, X(zn.x), Z(zn.z - zn.r * 0.5)); g.fillStyle = '#4a3418'; g.fillText(zn.name, X(zn.x), Z(zn.z - zn.r * 0.5)); } }
     // Route
     const nav = a.game.nav; if (nav && nav.route) { g.strokeStyle = '#ffd040'; g.lineWidth = Math.max(3, 7 * S); g.setLineDash([10, 8]); g.beginPath(); const rt = nav.route; rt.forEach((p, i) => i ? g.lineTo(X(p[0]), Z(p[1])) : g.moveTo(X(p[0]), Z(p[1]))); g.lineTo(X(nav.it.ax ?? nav.it.x), Z(nav.it.az ?? nav.it.z)); g.stroke(); g.setLineDash([]); }
     // Items
@@ -316,14 +344,16 @@ export const plUi = {
     for (const it of M.items) {
       const x = X(it.x), y = Z(it.z); if (x < -30 || y < -30 || x > W + 30 || y > H + 30) continue;
       const big = it.kind === 'ride' || it.kind === 'hotel' ? 15 : 12; const hit = M.q && it.name.toLowerCase().includes(M.q);
-      g.fillStyle = M.sel === it ? '#ffb020' : hit ? '#35c2ff' : 'rgba(8,14,26,.86)'; g.beginPath(); g.arc(x, y, big + 3, 0, 7); g.fill();
+      g.fillStyle = M.sel === it ? '#ffb020' : hit ? '#35c2ff' : '#fffaf0'; g.strokeStyle = '#5c4222'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, big + 3, 0, 7); g.fill(); g.stroke();
       g.font = `${big}px sans-serif`; g.fillText(ICON[it.kind], x, y + 1);
-      if (labelOn || it.kind === 'ride' && S > 0.4) { g.font = '600 12px "Segoe UI",sans-serif'; g.fillStyle = '#fff'; g.strokeStyle = 'rgba(0,0,0,.8)'; g.lineWidth = 3; g.strokeText(it.name, x, y + big + 12); g.fillText(it.name, x, y + big + 12); }
+      if (labelOn || it.kind === 'ride' && S > 0.4) { g.font = '700 12px Georgia, serif'; g.fillStyle = '#3a2a12'; g.strokeStyle = 'rgba(255,250,235,.95)'; g.lineWidth = 3; g.strokeText(it.name, x, y + big + 12); g.fillText(it.name, x, y + big + 12); }
     }
     // Spieler
-    const c = a.camera.position, e = new (a.camera.rotation.constructor)().setFromQuaternion(a.camera.quaternion, 'YXZ');
-    g.save(); g.translate(X(c.x), Z(c.z)); g.rotate(-e.y); g.fillStyle = '#35c2ff'; g.strokeStyle = '#fff'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, -13); g.lineTo(9, 10); g.lineTo(0, 5); g.lineTo(-9, 10); g.closePath(); g.fill(); g.stroke(); g.restore();
-    g.fillStyle = 'rgba(255,255,255,.7)'; g.font = '12px sans-serif'; g.textAlign = 'left'; g.fillText('Ziehen = verschieben · Mausrad/Pinch = Zoom · Klick = Details / Navigation', 14, H - 14);
+    const c = a.pp(), e = new (a.camera.rotation.constructor)().setFromQuaternion(a.camera.quaternion, 'YXZ');
+    g.save(); g.translate(X(c.x), Z(c.z)); g.rotate(-e.y); g.fillStyle = '#e8202e'; g.strokeStyle = '#fff'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(0, -13); g.lineTo(9, 10); g.lineTo(0, 5); g.lineTo(-9, 10); g.closePath(); g.fill(); g.stroke(); g.restore();
+    g.fillStyle = 'rgba(70,50,24,.9)'; g.font = 'italic 12px Georgia, serif'; g.textAlign = 'left'; g.fillText('Ziehen = verschieben · Mausrad/Pinch = Zoom · Klick = Details / Navigation', 14, H - 14);
+    g.textAlign = 'right'; g.font = 'italic 700 16px Georgia, serif'; g.fillText('PARKPLAN · Phantasialand', W - 18, H - 34); g.font = 'italic 11px Georgia, serif'; g.fillText('stilisierte Nachbildung – kein offizieller Plan', W - 18, H - 18);
+    g.save(); g.translate(W - 60, 130); g.strokeStyle = '#5c4222'; g.fillStyle = '#5c4222'; g.lineWidth = 2; g.beginPath(); g.arc(0, 0, 22, 0, 7); g.stroke(); g.beginPath(); g.moveTo(0, -20); g.lineTo(6, 4); g.lineTo(0, 0); g.lineTo(-6, 4); g.closePath(); g.fill(); g.font = 'bold 13px Georgia, serif'; g.textAlign = 'center'; g.fillText('N', 0, -27); g.restore();
   },
   mapClick(sx, sy) {
     const M = this.map, cv = $('#bmC'), W = cv.width, H = cv.height, S = M.scale, a = this.app;

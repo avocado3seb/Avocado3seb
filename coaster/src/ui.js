@@ -53,7 +53,7 @@ export class UI {
     <div id="hud" class="hide">
       <div id="hTL" class="hudbox"><div class="n" id="hName"></div><div class="p" id="hPark"></div><div class="p hide" id="hNet" style="color:var(--acc2)"></div></div>
       <div id="chat" class="hide"><div id="chatLog"></div><input id="chatIn" maxlength="200" placeholder="Enter = Chat"></div>
-      <div id="hTR"><button class="btn sm rnd" id="bPhoto" title="Foto (K)">📷</button><button class="btn sm rnd" id="bMap" title="Parkkarte (M)">🗺</button><button class="btn sm rnd" id="bPark" title="Park erkunden">🏞</button><button class="btn sm rnd" id="bSnd" title="Ton">🔊</button><button class="btn sm rnd" id="bHelp" title="Steuerung">❓</button><button class="btn sm rnd" id="bMenu" title="Menü (Esc)">☰</button></div>
+      <div id="hTR"><button class="btn sm rnd" id="bTouch" title="Touch-Steuerung an/aus">👆</button><button class="btn sm rnd" id="bPhoto" title="Foto (K)">📷</button><button class="btn sm rnd" id="bMap" title="Parkkarte (M)">🗺</button><button class="btn sm rnd" id="bPark" title="Park erkunden">🏞</button><button class="btn sm rnd" id="bSnd" title="Ton">🔊</button><button class="btn sm rnd" id="bHelp" title="Steuerung">❓</button><button class="btn sm rnd" id="bMenu" title="Menü (Esc)">☰</button></div>
       <div id="hCams" class="hudbox"></div>
       <div id="hGauge" class="hudbox">
         <div class="m"><b id="gH">0</b><small>Höhe m</small></div>
@@ -93,6 +93,7 @@ export class UI {
     $('#bMenu').addEventListener('click', () => app.showMenu());
     $('#bMap').addEventListener('click', () => app.openMapOrMini());
     $('#bPhoto').addEventListener('click', () => app.game.takePhoto('Foto'));
+    $('#bTouch').addEventListener('click', () => { const on = !app.touch.on; app.settings.touch = on; app.touch.setEnabled(on); app.saveSettings(); this.toast(on ? '👆 Touch-Steuerung an' : 'Touch-Steuerung aus'); });
     $('#rpSave').addEventListener('click', () => { if (app.replay && app.game.saveRide(app.replay.rec, app.ride)) this.toast('💾 Fahrt gespeichert (Fotoalbum → Gespeicherte Fahrten)'); });
     $('#bPark').addEventListener('click', () => app.toPark());
     $('#bSnd').addEventListener('click', () => { const on = app.audio.toggle(); $('#bSnd').textContent = on ? '🔊' : '🔇'; });
@@ -328,11 +329,11 @@ export class UI {
   buildOnline(body) {
     const app = this.app, net = app.net;
     const room = new URLSearchParams(location.search).get('room') || '';
-    const name = (app.settings.name || '').trim();
+    const name = ((app.account && app.account.name) || app.settings.name || '').trim(), locked = !!(app.account && app.account.token);
     body.innerHTML = `<div class="card page help"><h3 style="margin-top:0">🌐 Online-Modus</h3>
       <div class="note">Gemeinsam Parks erkunden und im selben Zug fahren – über einen kleinen WebSocket-Relay auf Cloudflare (Worker + Durable Object, kein Spielserver nötig – der Host betreibt die Simulation). Der Host bestimmt Park, Tageszeit und Wetter und betreibt die Bahnen; alle sehen dieselben Züge, Mitspieler erscheinen als Avatare oder sitzen im Zug. Chat: <kbd>Enter</kbd>.</div>
       <div class="form" id="onForm" style="margin-top:12px">
-        <label>Dein Name<br><input id="onName" maxlength="14" placeholder="Spieler" value="${esc(name)}"></label>
+        <label>Dein Name${locked ? ' (Konto)' : ''}<br><input id="onName" maxlength="14" placeholder="Spieler" value="${esc(name)}" ${locked ? 'readonly' : ''}></label>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
           <button class="btn pri" id="onHost">🏠 Raum eröffnen (Host)</button>
           <span style="color:var(--dim)">oder</span>
@@ -345,7 +346,7 @@ export class UI {
     $('#onHost').addEventListener('click', async () => {
       app.settings.name = $('#onName').value.trim(); app.saveSettings(); app.audio.start();
       $('#onMsg').textContent = 'Raum wird eröffnet …';
-      try { await net.host(app.settings.name || 'Host'); if (!app.park) await app.loadPark(Object.keys(app.db.parks)[0]); this.refreshNet(); } catch (e) { $('#onMsg').textContent = '✖ ' + e.message; }
+      try { await net.host(app.settings.name || 'Host'); await app.openPark('Phantasialand'); app.setParkMode('walk'); this.refreshNet(); } catch (e) { $('#onMsg').textContent = '✖ ' + e.message; }
     });
     $('#onJoin').addEventListener('click', async () => {
       app.settings.name = $('#onName').value.trim(); app.saveSettings(); app.audio.start();
@@ -433,11 +434,15 @@ Am Ende wird die Strecke automatisch zur Station zurückgeführt.</pre>
         <label>Tageszyklus (automatisch)<br><select id="sAuto"><option value="0">Aus</option><option value="1">An (1 Spielstunde = 1 Minute)</option></select></label>
         <label>Onride-Fotos<br><select id="sPhoto"><option value="1">Automatisch</option><option value="0">Aus</option></select></label>
         <label>Grafikstil „Vice-City-Look“ (Bloom, Farbkorrektur)<br><select id="sLook"><option value="1">An</option><option value="0">Aus (schneller)</option></select></label>
+        <label>Spielerfarbe (Shirt)<br><input type="color" id="sCol" value="${s.playerColor || '#1e88e5'}"></label>
+        <label>Ambient Occlusion (Schattierung in Ecken, braucht starke GPU)<br><select id="sAO"><option value="0">Aus</option><option value="1">An</option></select></label>
         <label>Touch-Steuerung (Tablet/Handy)<br><select id="sTouch"><option value="1">An</option><option value="0">Aus</option></select></label>
       </div><div class="note">Qualitätsänderungen (Bäume, Besucher) gelten ab dem nächsten Parkwechsel.</div>${this.helpHtml()}
       <h3>Über dieses Spiel</h3><div class="note">Alle Modelle, Texturen und Geräusche entstehen zur Laufzeit im Browser (three.js, keine externen Assets). Streckenlayouts sind stilisierte Nachbildungen auf Basis von Höhe, Länge, Geschwindigkeit, Inversionen und Typ; Stammdaten sind gerundete Näherungswerte ohne Gewähr. Alle Markennamen gehören ihren Inhabern.</div></div>`;
     $('#sQ').value = s.quality; $('#sSh').value = s.shadows ? '1' : '0';
     $('#sLook').value = a.lookOn() ? '1' : '0'; $('#sLook').addEventListener('change', e => { s.look = e.target.value === '1'; a.saveSettings(); a.applyQuality(); });
+    $('#sCol').addEventListener('input', e => { s.playerColor = e.target.value; a.player.setColor(s.playerColor); a.saveSettings(); });
+    $('#sAO').value = s.ao ? '1' : '0'; $('#sAO').addEventListener('change', e => { s.ao = e.target.value === '1'; a.saveSettings(); a.applyQuality(); });
     $('#sAuto').value = s.autoTime ? '1' : '0'; $('#sPhoto').value = s.autoPhoto === false ? '0' : '1'; $('#sTouch').value = a.touch && a.touch.on ? '1' : '0';
     $('#sAuto').addEventListener('change', e => { s.autoTime = e.target.value === '1'; a.saveSettings(); });
     $('#sPhoto').addEventListener('change', e => { s.autoPhoto = e.target.value === '1'; a.saveSettings(); });
