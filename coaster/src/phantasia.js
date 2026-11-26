@@ -15,6 +15,7 @@ import { Terrain, fbm } from './pl_terrain.js';
 import * as A from './pl_assets.js';
 import { EXTRA_ZONES, ZONE_OF_AREA } from './pl_data.js';
 import { placePOIs } from './pl_pois.js';
+import { buildBeauty } from './pl_beauty.js';
 import { buildChina, buildMystery, buildBerlin, buildParking, buildAirship, buildLightStrings, buildWinterDecor } from './pl_zones2.js';
 
 const TAU = Math.PI * 2;
@@ -29,11 +30,15 @@ export const ZONES = {
   berlin:    { name: 'Eingang & Hauptplatz', x: 0, z: 60, r: 140, tint: [0.3, 0.46, 0.22], fog: 1.0, fogCol: [0.75, 0.82, 0.9], amb: 1, desc: 'Eingangstor, Brunnenplatz und Hauptstraße' },
 };
 Object.assign(ZONES, EXTRA_ZONES);
+// Kompakter Park: Themenbereiche enger um den Hauptplatz gruppiert (Bahnen verschränken sich wie im Vorbild)
+function upNormals(g) { const n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) a[i * 3 + 1] = 1; g.setAttribute('normal', new THREE.BufferAttribute(a, 3)); }
+const SQ = 0.7;
+for (const k in ZONES) { if (k === 'berlin' || k === 'parking') continue; const z = ZONES[k]; z.x = Math.round(z.x * SQ); z.z = Math.round(60 + (z.z - 60) * SQ); z.r = Math.round(z.r * 0.85); }
 const AREA_KEY = ZONE_OF_AREA;
 const PLACE = { // Versatz der Bahn-Mitte zur Zonenmitte
-  'Taron': [0, -20], 'Black Mamba': [10, 20], 'F.L.Y.': [0, 0], 'Colorado Adventure': [0, 0],
-  "Winja's Fear": [-70, -60], "Winja's Force": [70, -60], 'Raik': [-60, 70], 'Crazy Bats': [80, 80],
-  'Chiapas': [40, 10], 'Talocan': [-30, 80], 'River Quest': [-30, 20], 'Mystery Castle': [60, 40], 'Maus au Chocolat': [-70, 90], 'Wakobato': [-10, -20], 'Feng Ju Palace': [20, -10],
+  'Taron': [0, -14], 'Black Mamba': [7, 14], 'F.L.Y.': [0, 0], 'Colorado Adventure': [0, 0],
+  "Winja's Fear": [-49, -42], "Winja's Force": [49, -42], 'Raik': [-42, 49], 'Crazy Bats': [56, 56],
+  'Chiapas': [28, 7], 'Talocan': [-21, 56], 'River Quest': [-21, 14], 'Mystery Castle': [42, 28], 'Maus au Chocolat': [-49, 63], 'Wakobato': [-7, -14], 'Feng Ju Palace': [14, -7],
 };
 
 export class PhantasiaWorld extends ParkWorld {
@@ -201,9 +206,18 @@ export class PhantasiaWorld extends ParkWorld {
       }
     };
     for (const [a, b, w] of this.edges) { const A_ = this.nodes[a], B_ = this.nodes[b]; seg(A_.x, A_.z, B_.x, B_.z, w); this.grid.mark(A_.x, A_.z, w / 2 + 2); const L = Math.hypot(B_.x - A_.x, B_.z - A_.z); for (let t = 0; t <= L; t += 4) this.grid.mark(A_.x + (B_.x - A_.x) * t / L, A_.z + (B_.z - A_.z) * t / L, w / 2 + 2.5); }
-    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
-    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: textures.paving(), roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, color: 0xc8c0b0 }));
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); upNormals(geo);
+    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: textures.paving(), side: THREE.DoubleSide, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, color: 0xffffff, emissive: 0x3a3428 }));
     mesh.receiveShadow = true; this.group.add(mesh);
+    { // dunkler Randstein / Bordüre unter dem Belag → Wege klar erkennbar
+      const bp = [], bi = [];
+      for (const [a_, b_, w_] of this.edges) {
+        const A_ = this.nodes[a_], B_ = this.nodes[b_], L = Math.hypot(B_.x - A_.x, B_.z - A_.z) || 1, n = Math.max(1, Math.round(L / 6)), dx = (B_.x - A_.x) / L, dz = (B_.z - A_.z) / L, hw = (w_ + 1.6) / 2; let prev = null;
+        for (let k = 0; k <= n; k++) { const x = A_.x + (B_.x - A_.x) * k / n, z = A_.z + (B_.z - A_.z) * k / n, y = Math.max(0.05, this.h(x, z)) + 0.05, i = bp.length / 3; bp.push(x - dz * hw, y, z + dx * hw, x + dz * hw, y, z - dx * hw); if (prev !== null) bi.push(prev, prev + 1, i + 1, prev, i + 1, i); prev = i; }
+      }
+      const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.Float32BufferAttribute(bp, 3)); bg.setIndex(bi); upNormals(bg);
+      const bm = new THREE.Mesh(bg, new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, color: 0x5a554e, roughness: 1, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 })); bm.receiveShadow = true; this.group.add(bm);
+    }
     // Hauptplatz
     const plaza = new THREE.Mesh(new THREE.CircleGeometry(48, 48), new THREE.MeshStandardMaterial({ map: textures.paving().clone(), roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
     plaza.material.map.repeat.set(8, 8); plaza.material.map.needsUpdate = true; plaza.rotation.x = -Math.PI / 2; plaza.position.set(0, 0.12, 60); plaza.receiveShadow = true; this.group.add(plaza);
@@ -754,9 +768,10 @@ export class PhantasiaWorld extends ParkWorld {
     // Interaktionspunkte
     this.interactables = [];
     for (const p of this.pois) this.interactables.push({ type: 'poi', poi: p, x: p.ax, z: p.az, r: p.kind === 'hotel' ? 9 : p.kind === 'stage' ? 10 : p.kind === 'restaurant' || p.kind === 'shop' ? 6 : 4.5, name: p.name, kind: p.kind });
-    for (const r of this.rides) this.interactables.push({ type: 'ride', ride: r, x: r.entrance.x, z: r.entrance.z, r: 9, name: r.coaster.name, kind: 'ride' });
+    for (const r of this.rides) this.interactables.push({ type: 'ride', ride: r, x: r.entrance.x, z: r.entrance.z, r: 16, name: r.coaster.name, kind: 'ride' });
     this.interactables.push({ type: 'gate', x: 0, z: 352, r: 16, name: 'Ticketscanner / Eingang', kind: 'gate' });
     for (const r of this.rides) this.makeQueueSign(r);
+    buildBeauty(this);
     this.winter = false; this.hist = { inPark: 0, entered: 0 };
   }
   spurMesh(spur) {
@@ -767,8 +782,8 @@ export class PhantasiaWorld extends ParkWorld {
       pos.push(A_.x + nx, ya, A_.z + nz, A_.x - nx, ya, A_.z - nz, B_.x - nx, yb, B_.z - nz, B_.x + nx, yb, B_.z + nz); uv.push(0, 0, 1, 0, 1, L / 3, 0, L / 3); idx.push(i, i + 1, i + 2, i, i + 2, i + 3);
     }
     if (!pos.length) return;
-    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
-    const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: textures.paving(), roughness: 1, color: 0xb8b0a0, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 })); m.receiveShadow = true; this.group.add(m);
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); upNormals(geo);
+    const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: textures.paving(), side: THREE.DoubleSide, roughness: 1, color: 0xb8b0a0, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 })); m.receiveShadow = true; this.group.add(m);
   }
   makeQueueSign(r) {
     const cv = document.createElement('canvas'); cv.width = 256; cv.height = 96; const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
@@ -781,7 +796,7 @@ export class PhantasiaWorld extends ParkWorld {
     const g = r.qs.cv.getContext('2d'), w = this.waitMinutes(r); g.clearRect(0, 0, 256, 96);
     g.fillStyle = 'rgba(10,14,24,.82)'; g.beginPath(); g.roundRect(2, 2, 252, 92, 14); g.fill(); g.strokeStyle = r.coaster.trackColor; g.lineWidth = 4; g.stroke();
     g.fillStyle = '#fff'; g.textAlign = 'center'; g.font = '700 22px "Segoe UI", sans-serif'; g.fillText(r.coaster.name.slice(0, 20), 128, 32);
-    g.fillStyle = w > 20 ? '#ff8a6a' : w > 8 ? '#ffd060' : '#7aff9a'; g.font = '800 34px "Segoe UI", sans-serif'; g.fillText(w + ' Min.', 128, 72); r.qs.tex.needsUpdate = true;
+    g.fillStyle = w > 20 ? '#ff8a6a' : w > 8 ? '#ffd060' : '#7aff9a'; g.font = '800 30px "Segoe UI", sans-serif'; g.fillText(w + ' Min. Wartezeit', 128, 64); g.fillStyle = '#ffffff'; g.font = '700 15px "Segoe UI", sans-serif'; g.fillText('E = Einsteigen (kostenlos)', 128, 86); r.qs.tex.needsUpdate = true;
   }
   routeTo(px, pz, target) {
     let a = 0, ad = 1e9; for (let i = 0; i < this.nodes.length; i++) { const d = Math.hypot(this.nodes[i].x - px, this.nodes[i].z - pz); if (d < ad) { ad = d; a = i; } }

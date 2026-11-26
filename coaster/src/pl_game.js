@@ -108,7 +108,7 @@ export class PLGame {
     a.ui.setHint(best ? this.hintText(best) : '');
   }
   hintText(it) {
-    const t = { restaurant: 'Speisekarte ansehen', stand: 'Speisekarte ansehen', shop: 'Shop ansehen', hotel: 'Rezeption', stage: 'Showzeiten', wc: 'Toiletten', ride: 'Fahrt starten', gate: 'Eintritt / Ticket', exitroom: 'Zimmer verlassen' }[it.kind] || 'Interagieren';
+    const t = { restaurant: 'Speisekarte ansehen', stand: 'Speisekarte ansehen', shop: 'Shop ansehen', hotel: 'Rezeption', stage: 'Showzeiten', wc: 'Toiletten', ride: 'Einsteigen', gate: 'Eintritt / Ticket', exitroom: 'Zimmer verlassen' }[it.kind] || 'Interagieren';
     let extra = ''; if (it.kind === 'ride') extra = ` · Wartezeit ${this.app.park.waitMinutes(it.ride)} Min.`;
     return `E – ${t}: ${it.name}${extra}`;
   }
@@ -117,7 +117,7 @@ export class PLGame {
     const a = this.app, S = this.S;
     if (it.type === 'exitroom') return this.exitRoom();
     if (it.type === 'ride') {
-      if (S.mode === 'play' && !this.ticketOk()) { a.ui.toast('Für Fahrten brauchst du ein gültiges Ticket – am Eingang scannen (E)', 4000); return; }
+      if (S.mode === 'play' && !this.ticketOk()) { a.ui.toast('Fahrten sind kostenlos – du brauchst nur das Eintrittsticket (Ticketscanner am Eingang, E)', 4500); return; }
       a.rideOn(it.ride); return;
     }
     if (it.type === 'gate') { a.ui.openPanel('gate'); return; }

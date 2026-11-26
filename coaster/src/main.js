@@ -498,7 +498,7 @@ class App {
     let fov = this.settings.fov * 0.9;
     if (this.parkMode === 'fly') this.moveFree(dt, this.free, true);
     else if (this.parkMode === 'walk') {
-      const f = this.walk, sp = (K.has('ShiftLeft') || K.has('ShiftRight') ? 9 : 4.2) * dt;
+      const f = this.walk, sp = (K.has('ShiftLeft') || K.has('ShiftRight') ? 17 : 8) * dt;
       const fwd = new THREE.Vector3(-Math.sin(f.yaw), 0, -Math.cos(f.yaw)), right = new THREE.Vector3(Math.cos(f.yaw), 0, -Math.sin(f.yaw));
       const mv = new THREE.Vector3();
       if (K.has('KeyW')) mv.add(fwd); if (K.has('KeyS')) mv.sub(fwd); if (K.has('KeyD')) mv.add(right); if (K.has('KeyA')) mv.sub(right);
@@ -513,7 +513,7 @@ class App {
       if (feet <= ground) { feet = ground; f.vy = 0; grounded = true; }
       if (grounded && (f.jump || K.has('Space'))) { f.vy = 6.6; feet += 0.02; }
       f.jump = false;
-      const bob = grounded && mv.lengthSq() ? Math.abs(Math.sin(performance.now() / (K.has('ShiftLeft') ? 170 : 250))) * 0.045 : 0;
+      const bob = grounded && mv.lengthSq() ? Math.abs(Math.sin(performance.now() / (K.has('ShiftLeft') ? 110 : 170))) * 0.045 : 0;
       f.pos.y = feet + 1.75; cam.position.set(f.pos.x, f.pos.y + bob, f.pos.z); cam.rotation.set(f.pitch, f.yaw, 0, 'YXZ');
       fov = this.walkFov;
     } else if (this.parkMode === 'bird') {
