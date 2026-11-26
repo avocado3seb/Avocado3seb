@@ -142,3 +142,7 @@ pre.code { background: rgba(0,0,0,.4); padding: 10px 12px; border-radius: 8px; f
 #chatLog { font-size: 13px; text-shadow: 0 1px 4px #000; padding: 0 4px 4px; pointer-events: none; }
 #chatLog div { margin: 2px 0; }
 #chatIn { width: 100%; background: rgba(8,14,26,.7); font-size: 13px; padding: 5px 9px; }
+
+#replay { left: 50%; bottom: 128px; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; padding: 8px 14px; width: min(620px, 90vw); border-color: var(--bad); }
+#replay input[type=range] { flex: 1; padding: 0; }
+#replay .note { color: var(--bad); font-weight: 800; letter-spacing: 2px; }

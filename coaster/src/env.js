@@ -127,15 +127,17 @@ export class Environment {
     const warm = new THREE.Color(1, 0.55, 0.28), white = new THREE.Color(1, 0.96, 0.9);
     this.sun.color.copy(white).lerp(warm, 1 - smooth(0.0, 0.5, e));
     this.sun.intensity = (3.6 * smooth(-0.02, 0.2, e)) * (1 - dark * 0.8) + this.flash * 3;
-    this.hemi.intensity = lerp(0.5, 1.05, day) * (1 - dark * 0.35) + this.flash * 1.5;
+    this.hemi.intensity = lerp(0.85, 1.05, day) * (1 - dark * 0.35) + this.flash * 1.5;
+    this.hemi.intensity *= (this.ambMul || 1); this.sun.intensity *= 0.5 + 0.5 * (this.ambMul || 1);
     this.hemi.color.setRGB(lerp(0.15, 0.7, day), lerp(0.2, 0.82, day), lerp(0.4, 1.0, day));
-    this.moon.intensity = (1 - day) * 1.4 * (1 - dark * 0.5);
+    this.moon.intensity = (1 - day) * 2.4 * (1 - dark * 0.5);
     this.moon.position.set(-this.sunDir.x * 300, Math.max(60, -this.sunDir.y * 300), -this.sunDir.z * 300);
     // Nebel
     const fogDay = new THREE.Color(0.74, 0.83, 0.93), fogDusk = new THREE.Color(0.95, 0.6, 0.4), fogNight = new THREE.Color(0.025, 0.035, 0.07), fogGray = new THREE.Color(0.55, 0.58, 0.62);
     const fc = fogNight.clone().lerp(fogDay, day).lerp(fogDusk, dusk * 0.7).lerp(fogGray.clone().multiplyScalar(lerp(0.15, 1, day)), Math.min(1, dark * 1.3));
     this.scene.fog.color.copy(fc);
-    this.scene.fog.density = 0.00034 * this.wCur.fog;
+    this.scene.fog.density = 0.00034 * this.wCur.fog * (this.fogMul || 1);
+    if (this.fogTint && this.fogTintAmt > 0) this.scene.fog.color.lerp(this.fogTint.clone().multiplyScalar(lerp(0.12, 1, day)), this.fogTintAmt);
     this.scene.background = null;
     // Sterne / Wolken
     this.stars.material.opacity = (1 - smooth(-0.25, 0.02, e)) * (1 - dark);

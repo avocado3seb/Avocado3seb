@@ -15,6 +15,20 @@ Läuft als zweite Seite des Vite-Projekts: `npm install && npm run dev` → http
 - **Datenbank**: Suche (Name/Park/Hersteller/Alias, auch „B&M“, „GCI“, „RMC“), Filter nach Land, Park, Typ, Tempo, Höhe, Inversionen, Favoriten; Sortierung nach Länge/Höhe/Tempo/…; Layout-Vorschau.
 - **Grafik**: Tag/Nacht, Sonnenuntergang, Sterne, Wolken, Wetter (Sonne, bewölkt, Regen, Gewitter, Nebel, Schnee), Schatten, Beleuchtung, prozedurale Texturen, Sound (Wind, Fahrt, Kettenlift, Regen, Donner).
 
+## Phantasialand-Modus (Menü → 🎡 Phantasialand)
+
+Eigene, handgebaute und begehbare Welt (stilisiert im Stil des Parks, **keine** Originalpläne, keine Original-Assets):
+
+- **Themenbereiche**: Klugheim (Nordisches Dorf, Felsschluchten, Fluss, Vulkan mit Lava und Rauch – Taron), Deep in Africa (Dschungel, Lagune, drei Wasserfälle, Hängebrücken, Hütten, Lodge – Black Mamba), Rookburgh (Backstein-Industrie, Schlote, Rohrbrücken – F.L.Y.), Mexico (Canyons, Adobe, Kakteen – Colorado Adventure), Fantasy (Märchenhäuser – Winja's Fear/Force, Raik, Crazy Bats), Eingangstor und Hauptplatz. Die Zuordnung der Bahnen zu den Bereichen ist nach bestem Wissen.
+- **Frei begehbar**: `WASD`, Maus (Klick fängt die Maus ein), `Leertaste` springen, `Mausrad` zoomen, `Esc` Menü, `Shift` rennen. Gelände mit Hügeln, Fluss und See, Kollision mit Felsen, Bäumen und Gebäuden, begehbare Brücken, **betretbare Gebäude** (Gasthäuser in Klugheim, Lodge in Afrika, mit Innenraum und Licht). Keine unsichtbaren Wände – nur sichtbare Hindernisse.
+- **Bahnen**: Taron (Multi-Launch, 2 Beschleunigungsphasen), Black Mamba (Inverted, hängende Sitze, freie Beine, Loop/Korkenzieher), F.L.Y. (Flying), Colorado Adventure, Winja's Fear, Winja's Force, Raik, Crazy Bats – je mit eigener Umgebung, Zug, Station und Strecke. Automatisches Streckentheming: Fels-Tunnel und Schluchten (Klugheim, Mexico, Afrika), Beinahe-Treffer (Säulen/Stämme knapp neben der Bahn), dichte Bepflanzung direkt an der Strecke, Rohrbrücken in Rookburgh.
+- **Kameras**: First-Person, erster/letzter Sitz, Außenkamera, Verfolger, Drohne, freie Kamera, **Stationskamera**; **Zugauswahl** (Taron/Black Mamba/F.L.Y. haben 2 Züge, `[` `]`); **Replay** der letzten Fahrt (`V`, Pause/Scrub/Tempo, beliebige Kamera); **Vogelperspektive** pro Themenbereich.
+- **Auswahl**: Bildkarten mit Name, Bereich und Daten, Suche und Favoriten, Freie-Erkundung-Button.
+- **Nacht**: frei einstellbare Uhrzeit, Sonnenuntergang, Sterne; leuchtende Fenster, Laternen/Fackeln (dynamische Lichter in der Nähe), beleuchtete Schienen, leuchtende Wasserfälle und Lagune, glühender Vulkan, Industrie-Licht in Rookburgh, Dschungelfackeln, Tunnel-Beleuchtung, Scheinwerfer an der Fahrt, Bodennebel je Themenbereich.
+- Besucher laufen über das Wegenetz, Riesenrad/Karussell/Freifallturm sind animiert.
+
+**Ehrlich gesagt**: Das ist eine stilisierte Nachbildung mit Platzhalter-Geometrie (Low-Poly), keine fotorealistische oder maßstabsgetreue Kopie des Parks. Streckenverläufe sind aus Höhe, Länge, Tempo, Inversionen und typischen Elementen abgeleitet.
+
 ## Online-Modus (Mehrspieler)
 
 Menü → **🌐 Online**. Direkt von Browser zu Browser über WebRTC (PeerJS), es ist kein eigener Spielserver nötig (Signalisierung über den öffentlichen PeerJS-Broker).

@@ -28,6 +28,7 @@ export function buildDatabase(custom = []) {
     const c = {
       id, name, park, cc, cat: CATS[cat] ? cat : 'sitdown', maker, year, h, len, v, dur, inv,
       trackColor: ex.tc || pal[0], supportColor: ex.sc || pal[1], trainColor: ex.tr || ex.tc || pal[0], trainAccent: ex.ta || ex.sc || pal[1],
+      trains: ex.trains || 1, area: ex.area || '',
       alias: ((ex.al || '') + ' ' + (/Bolliger/.test(maker) ? 'B&M BM' : '') + (/Great Coasters/.test(maker) ? ' GCI' : '') + (/Rocky Mountain/.test(maker) ? ' RMC' : '') + (/Custom Coasters/.test(maker) ? ' CCI' : '')).trim(), custom,
       layout: ex.layout || LAYOUTS[name + '@' + park] || LAYOUTS[name] || null,
     };

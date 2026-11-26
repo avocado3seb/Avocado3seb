@@ -9,6 +9,13 @@ import { textures, signTexture } from './textures.js';
 
 const WOOD = [0.52, 0.36, 0.2], WOOD_D = [0.4, 0.27, 0.15];
 
+export function railOffsets(spec) {
+  const style = spec.style, inverted = style === 'inv';
+  if (inverted) return { railOff: spec.clearance - 0.45, gauge: 0.55 };
+  if (style === 'small') return { railOff: -0.85, gauge: 0.55 };
+  return { railOff: -1.0, gauge: style === 'box' ? 0.75 : 0.72 };
+}
+
 export function buildCoasterMesh(tr, coaster, opts = {}) {
   const spec = CATS[coaster.cat] || CATS.sitdown;
   const style = spec.style;

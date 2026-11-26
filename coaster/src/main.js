@@ -11,6 +11,7 @@ import { AudioFx } from './audio.js';
 import { CATS } from './specs.js';
 import { seatLayout } from './train.js';
 import { Net } from './net.js';
+import { PhantasiaWorld, ZONES } from './phantasia.js';
 
 const LS = {
   get(k, d) { try { const v = localStorage.getItem('ecs_' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
@@ -47,10 +48,11 @@ class App {
     this.outside = { pos: new THREE.Vector3(), idx: -1, timer: 0, side: 1 };
     this.seat = { car: -1, row: 0, s: -1 };
     this.chase = { pos: new THREE.Vector3(), init: false };
-    this.visIdx = 0;
+    this.visIdx = 0; this.walkFov = 72; this.bird = { zone: 'klugheim', a: 0.6, r: 230, h: 170 }; this.rec = null; this.lastRec = null; this.replay = null; this.lockWanted = false;
     this.keys = new Set(); this.hudOn = true;
     this.menuOrbit = 0;
     this.camQ = new THREE.Quaternion(); this.camInit = false;
+    this.headLight = new THREE.PointLight(0xffe2b0, 0, 24, 1.6); this.scene.add(this.headLight);
     this.net = new Net(this);
     this.ui = new UI(this);
     this.net.onChange = chat => this.ui.refreshNet(chat);
@@ -100,13 +102,16 @@ class App {
     if (this.park) { this.scene.remove(this.park.group); this.park.dispose(); this.park = null; }
     const def = this.db.parks[name];
     const t0 = performance.now();
-    const world = new ParkWorld(def, this.env, { quality: this.settings.quality });
+    this.env.fogMul = 1; this.env.ambMul = 1; this.env.fogTint = null; this.env.fogTintAmt = 0;
+    this.replayExit(true);
+    const world = name === 'Phantasialand' ? new PhantasiaWorld(def, this.env, { quality: this.settings.quality }) : new ParkWorld(def, this.env, { quality: this.settings.quality });
     this.scene.add(world.group); world.group.updateMatrixWorld(true);
     this.park = world; this.ride = null;
     this.ui.setPark(world);
     LS.set('lastPark', name);
     this.free.pos.set(0, 140, world.gate.z + 220); this.free.yaw = -Math.PI / 2; this.free.pitch = -0.28;
-    this.walk.pos.set(world.gate.x, 1.75, world.gate.z - 12); this.walk.yaw = -Math.PI / 2; this.walk.pitch = 0;
+    this.walk.pos.set(world.gate.x, 1.75, world.gate.z - 12); this.walk.yaw = world.groundAt ? 0 : -Math.PI / 2; this.walk.pitch = 0; this.walk.vy = 0;
+    if (world.groundAt) { this.free.pos.set(0, 120, world.gate.z + 120); this.free.yaw = 0; this.free.pitch = -0.4; }
     console.log(`[Park] ${name}: ${world.rides.length} Bahnen in ${(performance.now() - t0).toFixed(0)} ms`);
     return world;
   }
@@ -115,6 +120,7 @@ class App {
   canResume() { return !!this.ride || (this.park && this.state === 'menu' && this.prevState && this.prevState !== 'menu'); }
   showMenu() {
     if (this.state !== 'menu') this.prevState = this.state;
+    this.lockWanted = false; document.exitPointerLock?.();
     this.state = 'menu'; this.audio.update(0.016, 0, 'menu', false, 0); this.ui.setMode('menu');
   }
   resume() { if (this.prevState === 'ride' && this.ride) this.enterRide(this.ride); else if (this.park) this.enterPark(); }
@@ -140,7 +146,7 @@ class App {
   enterRide(r, fresh = false) {
     this.state = 'ride'; this.ride = r; this.coaster = r.coaster;
     if (fresh) { if (!this.net.active) { r.sim.reset(0); r.sim.timer = 6; r.sim.dispatch = 9; } this.camMode = this.camMode === 'free' ? 'fp' : this.camMode; this.seat = { car: -1, row: 0, s: -1 }; this.look.yaw = this.look.pitch = 0; this.outside.idx = -1; this.chase.init = false; }
-    this.ui.setMode('ride'); this.ui.setRide(r.coaster); this.ui.setCam(this.camMode); this.camInit = false;
+    this.ui.setMode('ride'); this.ui.setRide(r.coaster); this.ui.setTrains(r); this.ui.setCam(this.camMode); this.camInit = false;
     this.setCamera(this.camMode, true);
     this.ui.toast(`${r.coaster.name} – ${r.coaster.park}`);
   }
@@ -152,9 +158,10 @@ class App {
   }
   setParkMode(m) {
     this.parkMode = m; this.camInit = false;
-    if (m === 'walk') { this.walk.pos.set(this.camera.position.x, 1.75, this.camera.position.z); this.walk.yaw = this.free.yaw; }
-    if (m === 'fly') { this.free.pos.copy(this.camera.position); }
-    this.ui.toast(m === 'fly' ? 'Flug-Modus · WASD, Q/E, Shift' : m === 'walk' ? 'Geh-Modus · WASD, Shift = rennen' : 'Besucher beobachten · N = nächster');
+    if (m === 'walk') { const cp = this.camera.position; this.walk.pos.set(cp.x, (this.park.groundAt ? this.park.groundAt(cp.x, cp.z, 60) : 0) + 1.75 + 0.2, cp.z); this.walk.yaw = this.free.yaw; this.walk.vy = 0; this.walk.pitch = 0; this.ui.toast('Klicken = Maus einfangen · WASD laufen · Leertaste springen · Mausrad zoomen · Esc Menü', 5000); }
+    if (m === 'fly') { this.free.pos.copy(this.camera.position); const e = new THREE.Euler().setFromQuaternion(this.camera.quaternion, 'YXZ'); this.free.yaw = e.y; this.free.pitch = e.x; }
+    if (m === 'bird') this.camInit = false;
+    this.ui.toast(m === 'fly' ? 'Flug-Modus · WASD, Q/E, Shift' : m === 'bird' ? 'Vogelperspektive · Mausrad = Abstand, WASD = frei fliegen' : m === 'walk' ? 'Geh-Modus · WASD, Shift = rennen' : 'Besucher beobachten · N = nächster');
   }
   setCamera(id, silent) {
     if (this.state !== 'ride') { if (id === 'free') this.setParkMode('fly'); return; }
@@ -180,11 +187,12 @@ class App {
   bindInput() {
     const c = this.canvas;
     let drag = false, lx = 0, ly = 0;
-    c.addEventListener('pointerdown', e => { drag = true; lx = e.clientX; ly = e.clientY; c.setPointerCapture(e.pointerId); this.audio.start(); });
+    c.addEventListener('pointerdown', e => { if (this.state === 'park' && this.parkMode === 'walk' && !document.pointerLockElement) { this.lockWanted = true; c.requestPointerLock?.(); } drag = true; lx = e.clientX; ly = e.clientY; c.setPointerCapture(e.pointerId); this.audio.start(); });
     c.addEventListener('pointerup', e => { drag = false; });
     c.addEventListener('pointermove', e => {
-      if (!drag) return;
-      const dx = e.clientX - lx, dy = e.clientY - ly; lx = e.clientX; ly = e.clientY;
+      if (!drag && document.pointerLockElement !== c) return;
+      const locked = document.pointerLockElement === c;
+      const dx = locked ? e.movementX : e.clientX - lx, dy = locked ? e.movementY : e.clientY - ly; lx = e.clientX; ly = e.clientY;
       const s = 0.0042 * this.settings.sens;
       this.look.idle = 0;
       if (this.state === 'ride') {
@@ -199,9 +207,12 @@ class App {
     c.addEventListener('wheel', e => {
       e.preventDefault();
       if (this.state === 'ride' && this.camMode === 'drone') this.drone.dist = clamp(this.drone.dist * (1 + Math.sign(e.deltaY) * 0.1), 8, 160);
+      else if (this.state === 'park' && this.parkMode === 'walk') this.walkFov = clamp(this.walkFov + Math.sign(e.deltaY) * 4, 28, 95);
+      else if (this.state === 'park' && this.parkMode === 'bird') { this.bird.r = clamp(this.bird.r * (1 + Math.sign(e.deltaY) * 0.1), 60, 700); this.bird.h = clamp(this.bird.h * (1 + Math.sign(e.deltaY) * 0.1), 40, 600); }
       else if (this.state === 'park' || this.camMode === 'free') this.free.speed = clamp(this.free.speed * (1 - Math.sign(e.deltaY) * 0.12), 8, 600);
       else this.zoom = clamp((this.zoom || 0) + Math.sign(e.deltaY) * 4, -25, 30);
     }, { passive: false });
+    document.addEventListener('pointerlockchange', () => { if (!document.pointerLockElement && this.lockWanted && this.state === 'park' && this.parkMode === 'walk') { this.lockWanted = false; this.showMenu(); } });
     window.addEventListener('keydown', e => {
       if (e.target.id === 'chatIn') { if (e.key === 'Enter') { this.net.sendChat(e.target.value); e.target.value = ''; e.target.blur(); } else if (e.key === 'Escape') e.target.blur(); e.stopPropagation(); return; }
       if (e.key === 'Enter' && this.net.active && this.state !== 'menu') { e.preventDefault(); document.getElementById('chatIn')?.focus(); return; }
@@ -210,7 +221,9 @@ class App {
       const k = e.key;
       if (k === 'Escape') { if (this.state === 'menu') { if (this.canResume()) this.resume(); } else this.showMenu(); e.preventDefault(); return; }
       if (this.state === 'menu') return;
-      if (/^[1-7]$/.test(k) && this.state === 'ride') this.setCamera(CAM_LIST[+k - 1][0]);
+      if (/^[1-8]$/.test(k) && this.state === 'ride') this.setCamera(CAM_LIST[+k - 1][0]);
+      else if ((k === 'v' || k === 'V') && this.state === 'ride') this.replay ? this.replayExit() : this.replayStart();
+      else if ((k === '[' || k === ']') && this.state === 'ride') this.selectTrain(this.ride.sets ? (this.ride.sets.findIndex(x => x.sim === this.ride.sim) + 1) % this.ride.sets.length : 0);
       else if (k === 'c' || k === 'C') { if (this.state === 'ride') { const i = CAM_LIST.findIndex(x => x[0] === this.camMode); this.setCamera(CAM_LIST[(i + 1) % CAM_LIST.length][0]); } }
       else if (k === 'p' || k === 'P') { this.paused = !this.paused; this.ui.toast(this.paused ? 'Pause' : 'Weiter'); }
       else if (k === 'm' || k === 'M') this.ui.toggleMini();
@@ -222,6 +235,8 @@ class App {
       else if (k === 'n' || k === 'N') { this.visIdx = (this.visIdx + 1 + Math.floor(Math.random() * 7)) % (this.park ? this.park.vis.length : 1); }
       else if (e.code === 'Space') {
         e.preventDefault();
+        if (this.replay) { this.replay.playing = !this.replay.playing; return; }
+        if (this.state === 'park' && this.parkMode === 'walk') { this.walk.jump = true; return; }
         if (this.state === 'ride' && this.ride.sim.state === 'station') { if (this.net.active && !this.net.isHost) this.net.send({ t: 'dispatch', r: this.park.rides.indexOf(this.ride) }); else this.ride.sim.timer = Math.min(this.ride.sim.timer, 0.3); }
         this.look.yaw = this.look.pitch = 0;
       } else if (this.state === 'ride' && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.code)) {
@@ -238,6 +253,52 @@ class App {
     });
     window.addEventListener('keyup', e => this.keys.delete(e.code));
     window.addEventListener('blur', () => this.keys.clear());
+  }
+
+  // ------------------------------------------------------------------ Replay / Zugauswahl / Vogelperspektive
+  recordTick(dt) {
+    const r = this.ride; if (!r || this.replay || this.state !== 'ride') return;
+    const s = r.sim;
+    if (s.state === 'run') {
+      if (!this.rec || this.rec.sim !== s || this.rec.done) this.rec = { ride: r, sim: s, acc: 0, samples: [], done: false };
+      this.rec.acc += dt;
+      while (this.rec.acc >= 1 / 30) { this.rec.acc -= 1 / 30; if (this.rec.samples.length < 6000) this.rec.samples.push([s.s, s.v, s.g.vert, s.g.lat]); }
+    } else if (s.state === 'station' && this.rec && this.rec.sim === s && !this.rec.done && this.rec.samples.length > 30) { this.rec.done = true; this.lastRec = this.rec; }
+  }
+  replayStart() {
+    const r = this.ride; if (!r) return;
+    const rec = (this.lastRec && this.lastRec.sim === r.sim) ? this.lastRec : (this.rec && this.rec.sim === r.sim && this.rec.samples.length > 30 ? this.rec : null);
+    if (!rec) { this.ui.toast('Noch keine Aufzeichnung – erst eine Fahrt fahren (Replay: V)', 3500); return; }
+    const sim = r.sim;
+    this.replay = { rec, t: 0, playing: true, speed: 1, saved: { s: sim.s, v: sim.v, state: sim.state, timer: sim.timer, lap: sim.lap, arriving: sim.arriving, a: sim.a } };
+    r.replayHook = () => this.replayApply();
+    this.ui.replayShow(true); this.ui.toast('Replay – Leertaste Pause · V beenden · Kamera frei wählbar (1–8)', 4000);
+  }
+  replayApply() {
+    const rp = this.replay; if (!rp) return;
+    const sm = rp.rec.samples, n = sm.length;
+    if (rp.playing) { rp.t += this._dt * 30 * rp.speed; if (rp.t >= n - 1) { rp.t = n - 1; rp.playing = false; } }
+    if (rp.t < 0) rp.t = 0;
+    const i = Math.min(n - 2, Math.floor(rp.t)), f = rp.t - i, a = sm[i], b = sm[i + 1] || a, sim = this.ride.sim;
+    sim.s = a[0] + (b[0] - a[0]) * f; sim.v = a[1] + (b[1] - a[1]) * f; sim.g.vert = a[2] + (b[2] - a[2]) * f; sim.g.lat = a[3] + (b[3] - a[3]) * f;
+    sim.state = 'run'; sim.arriving = sim.s >= sim.tr.L; this.ui.replayUpdate(rp.t / Math.max(1, n - 1), rp.playing);
+  }
+  replayExit(silent) {
+    const rp = this.replay; if (!rp) return;
+    const r = this.ride; if (r) { r.replayHook = null; Object.assign(r.sim, rp.saved); }
+    this.replay = null; this.ui.replayShow(false); if (!silent) this.ui.toast('Live');
+  }
+  selectTrain(i) {
+    const r = this.ride; if (!r || !r.sets || !r.sets[i]) return;
+    if (this.replay) this.replayExit(true);
+    r.train.showAll(); r.sim = r.sets[i].sim; r.train = r.sets[i].train; this.updateRiderVisibility(); this.ui.setTrains(r); this.camInit = false;
+    this.ui.toast('Zug ' + (i + 1) + ' ausgewählt');
+  }
+  birdsEye(zone) { this.bird.zone = zone; this.bird.r = 230; this.bird.h = 170; if (this.state !== 'park') this.enterPark(); this.parkMode = 'bird'; this.camInit = false; this.ui.toast('Vogelperspektive – ' + ZONES[zone].name); }
+  async phantasia(mode) {
+    await this.openPark('Phantasialand');
+    const g = this.park.gate; this.camera.position.set(g.x, 3, g.z - 14); this.free.yaw = 0; this.free.pitch = 0;
+    if (mode === 'walk') this.setParkMode('walk'); else if (mode === 'bird') this.birdsEye('klugheim'); else this.setParkMode('fly');
   }
 
   // ------------------------------------------------------------------ Online
@@ -358,6 +419,18 @@ class App {
       cam.lookAt(tmp.b);
       const dist = cam.position.distanceTo(W.p);
       targetFov = clamp(Math.atan(10 / Math.max(10, dist)) * 2 * 180 / Math.PI, 12, 70);
+    } else if (mode === 'station') {
+      const tr = r.track, sl = tr.stationLen || 28;
+      this.worldPose(r, sl * 0.5, W);
+      const pos = tmp.a.copy(W.p).addScaledVector(W.r, 8.5).addScaledVector(W.t, -3);
+      pos.y = Math.max(W.p.y + 2.3, this.park.groundAt ? this.park.groundAt(pos.x, pos.z, 60) + 2.3 : 2.3);
+      cam.position.copy(pos);
+      this.worldPose(r, sim.s - sim.spacing * sim.cars * 0.5, tmp.c2 || (tmp.c2 = { p: new THREE.Vector3(), t: new THREE.Vector3(), u: new THREE.Vector3(), r: new THREE.Vector3() }));
+      const trainP = tmp.c2.p, far = trainP.distanceTo(W.p);
+      tmp.b.copy(W.p).add(tmp.c.set(0, 1.2, 0));
+      if (far > 12 && far < 160) tmp.b.copy(trainP); // fährt der Zug vorbei, folgt der Blick
+      if (!this._stLook) this._stLook = tmp.b.clone(); this._stLook.lerp(tmp.b, damp(6, dt)); cam.lookAt(this._stLook);
+      targetFov = 58;
     } else if (mode === 'free') {
       this.moveFree(dt, this.free, true);
     }
@@ -383,12 +456,29 @@ class App {
     let fov = this.settings.fov * 0.9;
     if (this.parkMode === 'fly') this.moveFree(dt, this.free, true);
     else if (this.parkMode === 'walk') {
-      const f = this.walk, sp = (K.has('ShiftLeft') ? 9 : 3.6) * dt;
+      const f = this.walk, sp = (K.has('ShiftLeft') || K.has('ShiftRight') ? 9 : 4.2) * dt;
       const fwd = new THREE.Vector3(-Math.sin(f.yaw), 0, -Math.cos(f.yaw)), right = new THREE.Vector3(Math.cos(f.yaw), 0, -Math.sin(f.yaw));
-      if (K.has('KeyW')) f.pos.addScaledVector(fwd, sp); if (K.has('KeyS')) f.pos.addScaledVector(fwd, -sp);
-      if (K.has('KeyD')) f.pos.addScaledVector(right, sp); if (K.has('KeyA')) f.pos.addScaledVector(right, -sp);
-      f.pos.y = 1.75 + Math.abs(Math.sin(performance.now() / 260)) * ((K.has('KeyW') || K.has('KeyS')) ? 0.04 : 0);
-      cam.position.copy(f.pos); cam.rotation.set(f.pitch, f.yaw, 0, 'YXZ');
+      const mv = new THREE.Vector3();
+      if (K.has('KeyW')) mv.add(fwd); if (K.has('KeyS')) mv.sub(fwd); if (K.has('KeyD')) mv.add(right); if (K.has('KeyA')) mv.sub(right);
+      if (mv.lengthSq()) mv.normalize().multiplyScalar(sp);
+      f.pos.add(mv);
+      const feetY0 = f.pos.y - 1.75;
+      if (w.collide) w.collide(f.pos, 0.42, feetY0);
+      let feet = f.pos.y - 1.75; const ground = w.groundAt ? w.groundAt(f.pos.x, f.pos.z, feet + 0.6) : 0;
+      f.vy = (f.vy || 0) - 20 * dt; feet += f.vy * dt;
+      let grounded = false;
+      if (feet <= ground) { feet = ground; f.vy = 0; grounded = true; }
+      if (grounded && (f.jump || K.has('Space'))) { f.vy = 6.6; feet += 0.02; }
+      f.jump = false;
+      const bob = grounded && mv.lengthSq() ? Math.abs(Math.sin(performance.now() / (K.has('ShiftLeft') ? 170 : 250))) * 0.045 : 0;
+      f.pos.y = feet + 1.75; cam.position.set(f.pos.x, f.pos.y + bob, f.pos.z); cam.rotation.set(f.pitch, f.yaw, 0, 'YXZ');
+      fov = this.walkFov;
+    } else if (this.parkMode === 'bird') {
+      const b = this.bird, zn = (ZONES && ZONES[b.zone]) || { x: 0, z: 0 };
+      b.a += dt * 0.07;
+      if (K.has('KeyW') || K.has('KeyA') || K.has('KeyS') || K.has('KeyD')) { this.free.pos.copy(cam.position); const e = new THREE.Euler().setFromQuaternion(cam.quaternion, 'YXZ'); this.free.yaw = e.y; this.free.pitch = e.x; this.parkMode = 'fly'; }
+      else { cam.position.set(zn.x + Math.cos(b.a) * b.r, b.h, zn.z + Math.sin(b.a) * b.r); cam.lookAt(zn.x, 8, zn.z); }
+      fov = 62;
     } else {
       const v = w.vis[this.visIdx % w.vis.length], fx = Math.sin(v.yaw), fz = Math.cos(v.yaw);
       const want = new THREE.Vector3(v.x - fx * 4.2, 2.3, v.z - fz * 4.2);
@@ -406,8 +496,11 @@ class App {
     const online = this.net.active;
     const simDt = (this.paused && !online ? 0 : dt) * (online && !this.net.isHost ? 1 : this.timeScale);
     this.net.update(dt);
+    if (this.park.setCam) this.park.setCam(this.camera.position);
+    this._dt = dt; this.recordTick(dt);
     this.park.update(dt, simDt);
     this.updateCamera(dt);
+    this.headLight.position.copy(this.camera.position); this.headLight.intensity = (this.state === 'ride' ? 14 : 0) * Math.min(1, (this.env.night || 0) * 1.3) + (this.state === 'park' && this.parkMode === 'walk' ? 5 : 0) * Math.min(1, (this.env.night || 0) * 1.3);
     this.env.update(dt, this.camera, this.state === 'ride' && this.ride ? this.camera.position : this.camera.position);
     // HUD
     if (this.state === 'ride' && this.ride) {

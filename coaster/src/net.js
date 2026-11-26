@@ -221,12 +221,13 @@ export class Net {
 
   update(dt) {
     if (!this.active) return;
+    const now = performance.now(), real = Math.min(1, (now - (this._t || now)) / 1000); this._t = now; // Netz-Takte in echter Zeit
     for (const r of this.remotes.values()) r.update(dt);
-    this.sendT -= dt;
+    this.sendT -= real;
     if (this.sendT <= 0) { this.sendT = 1 / SEND_HZ; const st = this.app.netState(); if (st) { st.t = 'p'; st.id = this.me.id; this.send(st); } }
     if (this.isHost && this.app.park) {
-      this.snapT -= dt; if (this.snapT <= 0) { this.snapT = 1 / SNAP_HZ; this.broadcast({ t: 'sim', a: this.snapshot() }); }
-      this.envT -= dt; if (this.envT <= 0) { this.envT = 2; this.broadcast({ t: 'env', ...this.envState() }); }
+      this.snapT -= real; if (this.snapT <= 0) { this.snapT = 1 / SNAP_HZ; this.broadcast({ t: 'sim', a: this.snapshot() }); }
+      this.envT -= real; if (this.envT <= 0) { this.envT = 2; this.broadcast({ t: 'env', ...this.envState() }); }
     }
   }
 }

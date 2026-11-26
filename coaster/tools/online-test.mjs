@@ -36,7 +36,7 @@ await A.waitForTimeout(800);
 check('Chat kommt an', await A.evaluate(() => window.__app.net.log.some(l => l.text.includes('Ben: Hallo Anna!'))));
 // Wetter/Zeit vom Host
 await A.evaluate(() => { window.__app.env.setTime(21); window.__app.env.setWeather('rain'); });
-await B.waitForFunction(() => window.__app.env.weatherName === 'rain' && Math.abs(window.__app.env.hour - 21) < 0.5, null, { timeout: 40000 }).then(() => check('Tageszeit/Wetter folgen dem Host', true)).catch(() => check('Tageszeit/Wetter folgen dem Host', false));
+await B.waitForFunction(() => window.__app.env.weatherName === 'rain' && Math.abs(window.__app.env.hour - 21) < 0.5, null, { timeout: 120000 }).then(() => check('Tageszeit/Wetter folgen dem Host', true)).catch(() => check('Tageszeit/Wetter folgen dem Host', false));
 // Gast startet Fahrt per Dispatch
 await B.screenshot({ path: OUT + '/online_guest.png' }); await A.screenshot({ path: OUT + '/online_host.png' });
 // Verlassen

@@ -4,6 +4,7 @@
 import { CATS, COUNTRIES } from './specs.js';
 import { WEATHERS } from './env.js';
 import { getTrack } from './park.js';
+import { ZONES } from './phantasia.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -14,7 +15,7 @@ const tlabel = cat => (CATS[cat] ? CATS[cat].label : cat);
 
 export const CAM_LIST = [
   ['fp', 'First-Person (Zugmitte)'], ['front', 'Erster Sitz'], ['rear', 'Letzter Sitz'],
-  ['outside', 'Außenkamera (TV)'], ['chase', 'Verfolger'], ['drone', 'Drohne'], ['free', 'Freie Kamera'],
+  ['outside', 'Außenkamera (TV)'], ['chase', 'Verfolger'], ['drone', 'Drohne'], ['free', 'Freie Kamera'], ['station', 'Stationskamera'],
 ];
 
 export class UI {
@@ -35,6 +36,7 @@ export class UI {
         <div class="tabs">
           <button class="tab on" data-t="db">🎢 Datenbank</button>
           <button class="tab" data-t="parks">🏰 Parks</button>
+          <button class="tab" data-t="pl">🎡 Phantasialand</button>
           <button class="tab" data-t="online">🌐 Online</button>
           <button class="tab" data-t="custom">➕ Eigene Bahn</button>
           <button class="tab" data-t="help">⚙ Hilfe &amp; Einstellungen</button>
@@ -66,6 +68,7 @@ export class UI {
         <label>⏱ <select id="hSpeed"><option value="1">1×</option><option value="0.5">0,5×</option><option value="2">2×</option><option value="4">4×</option></select></label>
       </div>
       <div id="hCount"></div>
+      <div id="replay" class="hudbox hide"><button class="btn sm" id="rpPlay">⏸</button><input id="rpBar" type="range" min="0" max="1000" value="0"><select id="rpSpeed"><option value="0.25">0,25×</option><option value="0.5">0,5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select><button class="btn sm" id="rpLive">⏹ Live</button><span class="note">REPLAY</span></div>
       <div id="toast"></div>
       <div id="park" class="hudbox hide"><h4 id="pTitle"></h4><div class="modes"><button class="btn sm" data-m="fly">✈ Fliegen</button><button class="btn sm" data-m="walk">🚶 Gehen</button><button class="btn sm" data-m="visitor">👥 Besucher</button></div><div class="list" id="pList"></div></div>
       <div id="mini" class="hudbox hide"><canvas id="miniC" width="260" height="260"></canvas></div>
@@ -93,6 +96,11 @@ export class UI {
     $('#bHelp').addEventListener('click', () => this.toggleHelp());
     // Kameraliste
     const cams = $('#hCams');
+    const tr = document.createElement('div'); tr.id = 'hTrain'; tr.className = 'hide'; tr.style.cssText = 'display:flex;gap:6px;padding:6px 4px 0;border-top:1px solid var(--line);margin-top:4px;align-items:center;font-size:12px;color:var(--dim)'; cams.appendChild(tr);
+    $('#rpPlay').addEventListener('click', () => { if (app.replay) app.replay.playing = !app.replay.playing; });
+    $('#rpBar').addEventListener('input', e => { if (app.replay) { app.replay.playing = false; app.replay.t = e.target.value / 1000 * (app.replay.rec.samples.length - 1); } });
+    $('#rpSpeed').addEventListener('change', e => { if (app.replay) app.replay.speed = +e.target.value; });
+    $('#rpLive').addEventListener('click', () => app.replayExit());
     CAM_LIST.forEach(([id, label], i) => { const b = document.createElement('button'); b.dataset.c = id; b.innerHTML = `<b>${i + 1}</b>${label}`; b.addEventListener('click', () => app.setCamera(id)); cams.appendChild(b); });
     $('#park').querySelectorAll('.modes button').forEach(b => b.addEventListener('click', () => app.setParkMode(b.dataset.m)));
     $('#miniC').addEventListener('click', e => this.miniClick(e));
@@ -108,6 +116,7 @@ export class UI {
     const body = $('#mbody');
     if (t === 'db') this.buildDb(body);
     else if (t === 'parks') this.buildParks(body);
+    else if (t === 'pl') this.buildPL(body);
     else if (t === 'online') this.buildOnline(body);
     else if (t === 'custom') this.buildCustom(body);
     else this.buildHelp(body);
@@ -179,7 +188,7 @@ export class UI {
     $('#tbody').innerHTML = list.map(c => `<tr class="row ${this.sel && this.sel.id === c.id ? 'sel' : ''}" data-id="${c.id}">
       <td>${fav.has(c.id) ? '★' : ''}</td>
       <td><span class="dot" style="background:${c.trackColor}"></span><b>${esc(c.name)}</b></td><td>${esc(c.park)}</td><td>${flag(c.cc)} ${cname(c.cc)}</td>
-      <td><span class="chip">${tlabel(c.cat)}</span></td><td class="num">${fmt(c.h)} m</td><td class="num">${fmt(c.len)} m</td><td class="num">${fmt(c.v)}</td><td class="num">${c.inv}</td><td class="num">${c.year}</td></tr>`).join('') ||
+      <td><span class="chip">${tlabel(c.cat)}</span></td><td class="num">${fmt(c.h)} m</td><td class="num">${fmt(c.len)} m</td><td class="num">${fmt(c.v)}</td><td class="num">${c.inv}</td><td class="num">${c.year || '–'}</td></tr>`).join('') ||
       '<tr><td colspan="10" style="padding:30px;text-align:center;color:var(--dim)">Keine Treffer – Filter anpassen.</td></tr>';
     const byId = new Map(this.app.db.coasters.map(c => [c.id, c]));
     $('#tbody').querySelectorAll('tr.row').forEach(tr => {
@@ -195,7 +204,7 @@ export class UI {
       <div><h2>${esc(c.name)}</h2><div class="sub">${esc(c.park)} · ${flag(c.cc)} ${cname(c.cc)} · ${tlabel(c.cat)}</div></div>
       <div class="stats">
         <div class="stat"><b>${fmt(c.h)} m</b><small>Höhe</small></div><div class="stat"><b>${fmt(c.len)} m</b><small>Länge</small></div><div class="stat"><b>${fmt(c.v)} km/h</b><small>Tempo</small></div>
-        <div class="stat"><b>${c.inv}</b><small>Inversionen</small></div><div class="stat"><b>${Math.floor(c.dur / 60)}:${String(c.dur % 60).padStart(2, '0')}</b><small>Dauer</small></div><div class="stat"><b>${c.year}</b><small>Eröffnung</small></div>
+        <div class="stat"><b>${c.inv}</b><small>Inversionen</small></div><div class="stat"><b>${Math.floor(c.dur / 60)}:${String(c.dur % 60).padStart(2, '0')}</b><small>Dauer</small></div><div class="stat"><b>${c.year || '–'}</b><small>Eröffnung</small></div>
       </div>
       <div class="kv"><span>Hersteller</span><span>${esc(c.maker)}</span><span>Zug</span><span>${CATS[c.cat].cars} Wagen · ${CATS[c.cat].cars * (CATS[c.cat].rows || 1) * CATS[c.cat].across} Plätze</span><span>Streckenlayout</span><span>${c.layout ? 'handgebaut' : 'automatisch erzeugt'} (stilisiert)</span></div>
       <canvas id="pvTop" width="440" height="200"></canvas>
@@ -243,6 +252,71 @@ export class UI {
       <div class="acts"><button class="btn blue" data-p="${esc(p.name)}">🏞 Park erkunden</button></div></div>`).join('')}</div></div>`;
     body.querySelectorAll('button[data-p]').forEach(b => b.addEventListener('click', () => this.app.openPark(b.dataset.p)));
   }
+
+  // ------------------------------------------------------------------ Phantasialand
+  plThumb(c, zone) {
+    const cv = document.createElement('canvas'); cv.width = 360; cv.height = 170; const g = cv.getContext('2d');
+    const pal = { klugheim: ['#2a3340', '#6a7584', '#3a4048'], africa: ['#12331c', '#2f6a35', '#1a3a20'], rookburgh: ['#3a302c', '#8a5a3a', '#2a2422'], mexico: ['#e8a860', '#c2683a', '#8a4a2a'], fantasy: ['#7ab8e8', '#9a6ad0', '#4a8a4a'] }[zone] || ['#4a6a8a', '#6a8a6a', '#3a5a3a'];
+    const sky = g.createLinearGradient(0, 0, 0, 170); sky.addColorStop(0, pal[0]); sky.addColorStop(1, pal[1]); g.fillStyle = sky; g.fillRect(0, 0, 360, 170);
+    // Hintergrund-Silhouetten
+    g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.moveTo(0, 130); for (let x = 0; x <= 360; x += 12) g.lineTo(x, 100 + Math.sin(x * 0.05 + zone.length) * 18 + Math.sin(x * 0.17) * 8); g.lineTo(360, 170); g.lineTo(0, 170); g.fill();
+    if (zone === 'klugheim') { g.fillStyle = '#ff6a20'; g.globalAlpha = .8; g.beginPath(); g.arc(290, 80, 10, 0, 7); g.fill(); g.globalAlpha = 1; }
+    const tr = getTrack(c), hm = Math.max(1, tr.bounds.maxY);
+    g.strokeStyle = c.trackColor; g.lineWidth = 3; g.lineJoin = 'round'; g.beginPath();
+    for (let i = 0; i < tr.N; i += 2) { const x = 14 + i / tr.N * 332, y = 148 - tr.P[i * 3 + 1] / hm * 95; i ? g.lineTo(x, y) : g.moveTo(x, y); }
+    g.stroke(); g.strokeStyle = 'rgba(255,255,255,.25)'; g.lineWidth = 1; g.stroke();
+    g.fillStyle = pal[2]; g.fillRect(0, 148, 360, 22);
+    for (let x = 6; x < 360; x += 18) { g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.moveTo(x, 148); g.lineTo(x + 7, 132 - (x * 7 % 14)); g.lineTo(x + 14, 148); g.fill(); }
+    g.fillStyle = 'rgba(8,14,26,.72)'; g.fillRect(0, 0, 360, 30); g.fillStyle = '#fff'; g.font = '700 16px "Segoe UI", sans-serif'; g.fillText(c.name, 10, 20);
+    return cv;
+  }
+  buildPL(body) {
+    const app = this.app, db = app.db, park = db.parks['Phantasialand'];
+    body.innerHTML = `<div class="card page" id="plPage"><div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">
+      <div style="flex:1;min-width:300px"><h3 style="margin:0 0 4px;font-size:22px">🎡 Phantasialand <span class="chip">Brühl · Deutschland</span></h3>
+      <div class="note">Handgebaute, begehbare Nachbildung im Stil des Parks (stilisiert, nicht maßstabsgetreu): Klugheim, Deep in Africa, Rookburgh, Mexico und Fantasy mit Felsen, Schluchten, Vulkan, Wasserfällen, Brücken, begehbaren Gebäuden, Nebel und Nachtbeleuchtung. Die Zuordnung der Bahnen zu den Themenbereichen ist nach bestem Wissen.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn pri" id="plWalk">🚶 Freie Erkundung (Laufen)</button><button class="btn blue" id="plFly">✈ Fliegen</button><button class="btn" id="plNight">🌙 Nacht (23:30)</button><button class="btn" id="plDusk">🌅 Sonnenuntergang (19:40)</button><button class="btn" id="plNoon">☀ Mittag (13:00)</button></div>
+      <div style="margin-top:10px" class="note">🦅 Vogelperspektive: ${Object.entries(ZONES).filter(([k]) => k !== 'berlin').map(([k, z]) => `<button class="btn sm" data-bz="${k}">${z.name}</button>`).join(' ')}</div></div>
+      <div style="min-width:240px"><label class="note">🕒 Uhrzeit <span id="plClock"></span><br><input id="plTime" type="range" min="0" max="24" step="0.1" style="width:240px"></label></div></div>
+      <div class="filters" style="padding:12px 0"><label class="search" style="grid-column:span 2">Suche<input id="plQ" placeholder="Bahn, Themenbereich …"></label><label>&nbsp;<button class="btn sm" id="plFav">☆ Nur Favoriten</button></label></div>
+      <div class="pgrid" id="plGrid"></div></div>`;
+    const st = { q: '', fav: false };
+    const render = () => {
+      const q = st.q.toLowerCase(), grid = $('#plGrid'); grid.innerHTML = '';
+      const list = park.coasters.filter(c => (!st.fav || app.favs.has(c.id)) && (!q || (c.name + ' ' + c.area + ' ' + c.maker + ' ' + c.alias + ' ' + tlabel(c.cat)).toLowerCase().includes(q)));
+      for (const c of list) {
+        const zone = { 'Klugheim': 'klugheim', 'Deep in Africa': 'africa', 'Rookburgh': 'rookburgh', 'Mexico': 'mexico', 'Fantasy': 'fantasy' }[c.area] || 'fantasy';
+        const el = document.createElement('div'); el.className = 'card pcard'; el.style.padding = '0'; el.style.overflow = 'hidden';
+        const th = this.plThumb(c, zone); th.style.cssText = 'width:100%;display:block'; el.appendChild(th);
+        const inf = document.createElement('div'); inf.style.cssText = 'padding:10px 12px;display:flex;flex-direction:column;gap:6px';
+        inf.innerHTML = `<div><b style="font-size:16px">${esc(c.name)}</b> <span class="chip">${esc(c.area || '–')}</span></div><div class="note">${tlabel(c.cat)} · ${esc(c.maker)} · ${c.year || '–'}<br>${fmt(c.h)} m hoch · ${fmt(c.len)} m · ${fmt(c.v)} km/h · ${c.inv} Inv. · ${(c.trains || 1)} Zug/Züge</div>
+          <div class="acts"><button class="btn pri" data-r="1">▶ Fahren</button><button class="btn blue" data-v="1">👁 Ansehen</button><button class="btn" data-f="1">${app.favs.has(c.id) ? '★' : '☆'}</button></div>`;
+        el.appendChild(inf);
+        inf.querySelector('[data-r]').addEventListener('click', () => app.openRide(c));
+        inf.querySelector('[data-v]').addEventListener('click', async () => { await app.openPark('Phantasialand'); const r = app.park.rides.find(x => x.coaster.id === c.id); if (r) app.flyTo(r); });
+        inf.querySelector('[data-f]').addEventListener('click', () => { app.toggleFav(c.id); render(); });
+        grid.appendChild(el);
+      }
+      if (!list.length) grid.innerHTML = '<div class="note" style="padding:20px">Keine Treffer.</div>';
+    };
+    render();
+    $('#plQ').addEventListener('input', e => { st.q = e.target.value; render(); });
+    $('#plFav').addEventListener('click', e => { st.fav = !st.fav; e.target.textContent = st.fav ? '★ Nur Favoriten' : '☆ Nur Favoriten'; render(); });
+    $('#plWalk').addEventListener('click', () => app.phantasia('walk'));
+    $('#plFly').addEventListener('click', () => app.phantasia('fly'));
+    const setT = h => { app.env.setTime(h); this.syncEnv(); app.saveSettings(); $('#plClock').textContent = this.clock(h); $('#plTime').value = h; };
+    $('#plNight').addEventListener('click', () => setT(23.5)); $('#plDusk').addEventListener('click', () => setT(19.7)); $('#plNoon').addEventListener('click', () => setT(13));
+    $('#plTime').addEventListener('input', e => setT(+e.target.value)); setT(app.env.hour);
+    body.querySelectorAll('[data-bz]').forEach(b => b.addEventListener('click', async () => { await app.openPark('Phantasialand'); app.birdsEye(b.dataset.bz); }));
+  }
+  setTrains(r) {
+    const el = $('#hTrain'); if (!el) return;
+    if (!r || !r.sets || r.sets.length < 2) { el.classList.add('hide'); return; }
+    el.classList.remove('hide'); el.innerHTML = 'Zug: ' + r.sets.map((s, i) => `<button class="btn sm ${s.sim === r.sim ? 'pri' : ''}" data-t="${i}">${i + 1}</button>`).join('') + ' <span style="margin-left:4px">[ ]</span>';
+    el.querySelectorAll('button').forEach(b => b.addEventListener('click', () => this.app.selectTrain(+b.dataset.t)));
+  }
+  replayShow(on) { $('#replay').classList.toggle('hide', !on); }
+  replayUpdate(f, playing) { $('#rpBar').value = Math.round(f * 1000); $('#rpPlay').textContent = playing ? '⏸' : '▶'; }
 
   // ------------------------------------------------------------------ Online
   buildOnline(body) {
@@ -323,13 +397,15 @@ Am Ende wird die Strecke automatisch zur Station zurückgeführt.</pre>
   helpHtml() {
     return `<div class="two">
       <div><h3>Fahren</h3><table>
-        <tr><td><kbd>1</kbd>–<kbd>7</kbd></td><td>Kamera: First-Person · Erster Sitz · Letzter Sitz · Außen · Verfolger · Drohne · Frei</td></tr>
+        <tr><td><kbd>1</kbd>–<kbd>8</kbd></td><td>Kamera: First-Person · Erster Sitz · Letzter Sitz · Außen · Verfolger · Drohne · Frei · Station</td></tr>
+        <tr><td><kbd>V</kbd></td><td>Replay der letzten Fahrt (Leertaste = Pause) · <kbd>[</kbd> <kbd>]</kbd> Zug wechseln</td></tr>
         <tr><td><kbd>C</kbd></td><td>Kamera weiterschalten</td></tr>
         <tr><td><kbd>Maus ziehen</kbd></td><td>Umschauen / Drohne drehen</td></tr>
         <tr><td><kbd>Mausrad</kbd></td><td>Zoom / Drohnen-Abstand</td></tr>
         <tr><td><kbd>Leertaste</kbd></td><td>Abfahrt sofort · Blick zentrieren</td></tr>
         <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Sitzplatz links/rechts · <kbd>↑</kbd> <kbd>↓</kbd> Wagen vor/zurück</td></tr>
-        <tr><td><kbd>W A S D</kbd> <kbd>Q E</kbd></td><td>Freie Kamera / Fliegen / Gehen (<kbd>Shift</kbd> schneller)</td></tr></table></div>
+        <tr><td><kbd>W A S D</kbd> <kbd>Q E</kbd></td><td>Freie Kamera / Fliegen / Gehen (<kbd>Shift</kbd> schneller)</td></tr>
+        <tr><td>Gehen</td><td>Klick = Maus einfangen · Maus = Umsehen · <kbd>Leertaste</kbd> springen · <kbd>Mausrad</kbd> zoomen · <kbd>Esc</kbd> Menü</td></tr></table></div>
       <div><h3>Allgemein</h3><table>
         <tr><td><kbd>P</kbd></td><td>Pause</td></tr><tr><td><kbd>M</kbd></td><td>Minikarte</td></tr><tr><td><kbd>Tab</kbd></td><td>Park-Ansicht (Erkunden)</td></tr>
         <tr><td><kbd>T</kbd></td><td>Tageszeit weiter · <kbd>R</kbd> Wetter weiter</td></tr><tr><td><kbd>H</kbd></td><td>HUD aus/an</td></tr>
@@ -368,6 +444,7 @@ Am Ende wird die Strecke automatisch zur Station zurückgeführt.</pre>
     $('#park').classList.toggle('hide', mode !== 'park');
     $('#bPark').classList.toggle('hide', mode === 'park');
     $('#cross').classList.toggle('hide', true);
+    if (mode !== 'ride') { $('#hCount').innerHTML = ''; }
     $('#mBack').classList.toggle('hide', !this.app.canResume());
     if (menu) { this.renderRows && this.curTab === 'db' && this.renderRows(); }
   }

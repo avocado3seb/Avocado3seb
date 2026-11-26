@@ -56,7 +56,7 @@ const THEMES = {
 const matCache = {};
 const stdMat = (key, make) => matCache[key] || (matCache[key] = make());
 
-function gableGeometry(w, d, h) {
+export function gableGeometry(w, d, h) {
   // Satteldach, Firstrichtung entlang x
   const hw = w / 2, hd = d / 2, o = 0.5;
   const p = [
@@ -703,7 +703,7 @@ export class ParkWorld {
 
   // ------------------------------------------------------------------ Update
   update(dt, simDt = dt) {
-    for (const r of this.rides) { r.sim.step(simDt); r.train.update(r.sim); }
+    for (const r of this.rides) { if (r.replayHook) r.replayHook(); else r.sim.step(simDt); r.train.update(r.sim); }
     for (const a of this.anims) a(dt);
     this.updateVisitors(dt);
   }
