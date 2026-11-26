@@ -170,9 +170,9 @@ pre.code { background: rgba(0,0,0,.4); padding: 10px 12px; border-radius: 8px; f
 .hub { flex: 1; overflow: auto; padding: 14px 24px 24px; }
 .hubhead { display: flex; justify-content: space-between; gap: 18px; flex-wrap: wrap; align-items: flex-start; margin-bottom: 14px; }
 .hubhead h1 { margin: 0; font-size: 38px; letter-spacing: .5px; } .hubhead h1 small { font-size: 16px; color: var(--acc); font-weight: 600; }
-.hubenv { padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
+.hubenv { backdrop-filter: none; background: rgba(12,20,36,.94); padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
 .hubgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
-.tile { text-align: left; background: linear-gradient(160deg, rgba(30,46,76,.85), rgba(14,22,40,.88)); border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 4px; transition: .15s; backdrop-filter: blur(6px); min-height: 118px; }
+.tile { text-align: left; background: linear-gradient(160deg, rgba(30,46,76,.94), rgba(14,22,40,.95)); border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 4px; transition: .15s; min-height: 118px; }
 .tile:hover { transform: translateY(-3px); border-color: var(--acc); box-shadow: 0 8px 24px rgba(0,0,0,.4); }
 .tile .ti { font-size: 32px; } .tile b { font-size: 18px; } .tile small { color: var(--dim); font-size: 12px; line-height: 1.35; }
 .tile[data-k="play"] { background: linear-gradient(160deg, #c2790a, #6a3a05); } .tile[data-k="free"] { background: linear-gradient(160deg, #1c7ab0, #0e3a5a); }

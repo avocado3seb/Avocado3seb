@@ -67,7 +67,7 @@ class App {
     this.clock = new THREE.Clock(); this.miniT = 0;
     this._pose = newPose();
     // Startpark laden
-    const qs = new URLSearchParams(location.search), joining = qs.has('room') || qs.has('peerhost'); // beim Beitreten: leichten Park laden, der Host bestimmt den Park
+    const qs = new URLSearchParams(location.search), joining = qs.has('room') || qs.has('peerhost') || qs.has('light'); // beim Beitreten: leichten Park laden, der Host bestimmt den Park
     const startPark = joining ? 'Europa-Park' : LS.get('lastPark', 'Phantasialand');
     this.loadPark(this.db.parks[startPark] ? startPark : Object.keys(this.db.parks)[0]).then(() => { this.ui.loading(false); this.showMenu(); if (new URLSearchParams(location.search).get('room')) this.ui.tab('online'); });
     this.loop();

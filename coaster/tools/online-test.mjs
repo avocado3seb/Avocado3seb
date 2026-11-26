@@ -2,7 +2,7 @@
 import { createRequire } from 'module'; import { execSync } from 'child_process';
 const require = createRequire(import.meta.url); const { chromium } = require(execSync('npm root -g').toString().trim() + '/playwright');
 const BASE = process.env.BASE || 'http://127.0.0.1:5173/coaster/index.html';
-const Q = process.env.TRANSPORT === 'peer' ? '?peerhost=127.0.0.1&peerport=9000&peerpath=/' : (process.env.RELAY ? '?relay=' + encodeURIComponent(process.env.RELAY) : ''); // Standard: Cloudflare-Relay; TRANSPORT=peer: lokaler PeerServer
+const Q = process.env.TRANSPORT === 'peer' ? '?peerhost=127.0.0.1&peerport=9000&peerpath=/' : (process.env.RELAY ? '?light=1&relay=' + encodeURIComponent(process.env.RELAY) : '?light=1'); // Standard: Cloudflare-Relay; TRANSPORT=peer: lokaler PeerServer
 const OUT = process.argv[2] || '.';
 const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader', '--disable-features=WebRtcHideLocalIpsWithMdns'] });
 const errs = []; let fails = 0;
