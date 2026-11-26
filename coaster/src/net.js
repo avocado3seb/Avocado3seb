@@ -99,6 +99,7 @@ export class Net {
     return o;
   }
   relayBase() { const q = new URLSearchParams(location.search); if (q.get('relay')) return q.get('relay').replace(/\/$/, ''); return q.get('peerhost') ? null : RELAY; }
+  tokenQ() { const t = this.app.account && this.app.account.token; return t ? '&token=' + encodeURIComponent(t) : ''; }
   get transport() { return this.relayBase() ? 'Cloudflare-Relay' : 'WebRTC (PeerJS)'; }
   setStatus(s) { this.status = s; this.onChange(); }
 
@@ -127,14 +128,14 @@ export class Net {
       this.leave(true); this.me.name = name; this.me.id = 0; let tries = 0, settled = false;
       const open = () => {
         const code = randCode(); this.code = code; let ws;
-        try { ws = this.rws = new WebSocket(`${base}/room/${code}?role=host`); } catch (e) { this.setStatus('Fehler: ' + e.message); reject(e); return; }
+        try { ws = this.rws = new WebSocket(`${base}/room/${code}?role=host${this.tokenQ()}`); } catch (e) { this.setStatus('Fehler: ' + e.message); reject(e); return; }
         const rc = new Map(); this._rc = rc;
         const timer = setTimeout(() => { if (!settled) { settled = true; try { ws.close(); } catch (e) { /* */ } this.rws = null; this.setStatus('Fehler: Relay nicht erreichbar'); reject(new Error('Relay nicht erreichbar')); } }, 15000);
         ws.onmessage = ev => {
           let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
           if (m.r === 'taken') { clearTimeout(timer); try { ws.close(); } catch (e) { /* */ } if (tries++ < 5) open(); else { settled = true; reject(new Error('Kein freier Raumcode')); } return; }
           if (m.r === 'hosting') { clearTimeout(timer); settled = true; this.mode = 'host'; this.setStatus('Raum offen'); this.chatLine('Raum ' + code + ' geöffnet – Mitspieler können beitreten.', '#ffd54f'); this.app.onNetStart(); resolve(code); return; }
-          if (m.r === 'open') { const cid = m.c, conn = { open: true, _cid: cid, send: d => { if (ws.readyState === 1) ws.send(JSON.stringify({ to: cid, d })); }, close: () => { conn.open = false; } }; rc.set(cid, conn); return; }
+          if (m.r === 'open') { const cid = m.c, conn = { open: true, _cid: cid, _user: m.u || '', send: d => { if (ws.readyState === 1) ws.send(JSON.stringify({ to: cid, d })); }, close: () => { conn.open = false; } }; rc.set(cid, conn); return; }
           if (m.r === 'close') { const conn = rc.get(m.c); if (conn) { conn.open = false; rc.delete(m.c); this.drop(conn); } return; }
           if (m.c !== undefined) { const conn = rc.get(m.c); if (conn) this.onHostData(conn, m.d); }
         };
@@ -153,7 +154,7 @@ export class Net {
     if (m.t === 'hello') {
       if (this.conns.size >= MAX_PLAYERS - 1) { conn.send({ t: 'full' }); setTimeout(() => conn.close(), 200); return; }
       const id = this.nextId++; conn._pid = id; this.conns.set(id, conn);
-      const nm = String(m.name || 'Spieler').slice(0, 14);
+      const nm = String(conn._user || m.name || 'Spieler').slice(0, 14); // angemeldeter Name vom Server hat Vorrang
       conn.send({ t: 'welcome', id, players: [{ id: 0, name: this.me.name }, ...[...this.remotes.values()].map(r => ({ id: r.id, name: r.name }))], park: this.app.park ? this.app.park.def.name : '', rides: this.app.park ? this.app.park.rides.map(r => r.coaster.id) : [], env: this.envState() });
       this.addRemote(id, nm); this.broadcast({ t: 'join', id, name: nm }, id);
       this.chatLine('➜ ' + nm + ' ist beigetreten', '#69f0ae'); this.app.ui.toast(nm + ' ist beigetreten');
@@ -202,7 +203,7 @@ export class Net {
     return new Promise((resolve, reject) => {
       this.leave(true); this.me.name = name; code = code.trim().toUpperCase(); let done = false, ws;
       const fail = msg => { if (done) return; done = true; this.setStatus(msg); try { ws && ws.close(); } catch (x) { /* */ } this.gws = null; this.hostConn = null; this.mode = 'off'; reject(new Error(msg)); };
-      try { ws = this.gws = new WebSocket(`${base}/room/${encodeURIComponent(code)}?role=guest`); } catch (e) { fail('Fehler: ' + e.message); return; }
+      try { ws = this.gws = new WebSocket(`${base}/room/${encodeURIComponent(code)}?role=guest${this.tokenQ()}`); } catch (e) { fail('Fehler: ' + e.message); return; }
       const timer = setTimeout(() => fail('Zeitüberschreitung – Raum nicht gefunden'), 30000);
       const conn = this.hostConn = { open: false, send: m => { if (ws.readyState === 1) ws.send(JSON.stringify(m)); }, close: () => { try { ws.close(); } catch (e) { /* */ } } };
       ws.onopen = () => { conn.open = true; ws.send(JSON.stringify({ t: 'hello', name })); };

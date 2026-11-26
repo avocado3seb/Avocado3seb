@@ -16,6 +16,8 @@ export const ATTRACTIONS = [
   ['Talocan', 'family', 'Mexico', 'ST LIFT:24:65:3 DROP:24:75 TR:180:16:30 HILL:3:40 HOME:16:30', '#c8802a', 'Turm-Fahrt (stilisiert)'],
   ['Maus au Chocolat', 'darkride', 'Berlin', 'ST DRV:2.2 S:12 TR:90:12:15 TL:90:12:15 TR:90:12:15 TL:90:12:15 TR:180:14:15 HOME:14:20', '#8a5a3a', 'Darkride (stilisiert)'],
   ['Wakobato', 'family', 'Fantasy', 'ST LIFT:10:25:2.2 DROP:10:35 TR:180:16:35 HILL:3:40 HOME:16:30', '#d870b8', 'Familienfahrt (stilisiert)'],
+  ['Geister Rikscha', 'darkride', 'Berlin', 'ST DRV:2.2 S:14 TR:90:12:15 TL:90:12:15 TR:90:12:15 TL:90:12:15 TR:180:14:15 HOME:14:20', '#6a8a6a', 'Darkride (stilisiert)'],
+  ['Hollywood Tour', 'darkride', 'Berlin', 'ST DRV:2.4 S:16 TL:90:14:15 TR:90:14:15 TL:90:14:15 TR:90:14:15 TR:180:16:15 HOME:16:20', '#c8a030', 'Darkride (stilisiert)'],
   ['Feng Ju Palace', 'darkride', 'China Town', 'ST DRV:2.2 S:12 TR:90:12:15 TL:90:12:15 TR:90:12:15 TL:90:12:15 TR:180:14:15 HOME:14:20', '#c8202e', 'Darkride (stilisiert)'],
 ];
 

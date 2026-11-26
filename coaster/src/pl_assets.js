@@ -131,7 +131,7 @@ export function box(parent, w, h, d, mat, x, y, z) { const m = new THREE.Mesh(ne
 function uvScale(geo, sx, sy) { const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * sx, uv.getY(i) * sy); return geo; }
 
 // Wände mit Türöffnung (vorne = +z), Dicke t
-export function wallSet(g, w, d, h, t, mat, door = true, cols = null, ox = 0, oz = 0, rot = 0) {
+export function wallSet(g, w, d, h, t, mat, door = true, cols = null, ox = 0, oz = 0, rot = 0, yb = 0) { // yb = Bodenhöhe → Kollisionshöhen in Weltkoordinaten
   const parts = [];
   const add = (cx, cz, sx, sz, hh = h, y0 = 0) => {
     const m = new THREE.Mesh(uvScale(new THREE.BoxGeometry(sx, hh, sz), Math.max(sx, sz) / 3, hh / 3), mat); m.position.set(cx, y0 + hh / 2, cz); m.castShadow = m.receiveShadow = true; g.add(m); parts.push([cx, cz, sx, sz, y0, y0 + hh]);
@@ -144,7 +144,7 @@ export function wallSet(g, w, d, h, t, mat, door = true, cols = null, ox = 0, oz
     for (const [cx, cz, sx, sz, y0, y1] of parts) {
       // lokale -> Welt (Rotation um Y, three: x' = x cos + z sin, z' = -x sin + z cos)
       const wx = ox + cx * c + cz * s, wz = oz - cx * s + cz * c;
-      cols.push({ x: wx, z: wz, hx: sx / 2, hz: sz / 2, rot, y0, y1 });
+      cols.push({ x: wx, z: wz, hx: sx / 2, hz: sz / 2, rot, y0: y0 + yb, y1: y1 + yb });
     }
   }
 }
@@ -158,7 +158,50 @@ export function windowsOn(g, w, d, h, n, litMat, y = null) {
   }
 }
 
+// ---------------------------------------------------------------- Begehbare Häuser (Tür, Innenraum, Möbel, Licht)
+export function hollow(g, x, y, z, rot, w, d, h, wallMat, o, env, out) {
+  const c = Math.cos(rot), s = Math.sin(rot), wc = (lx, lz) => [x + lx * c + lz * s, z - lx * s + lz * c];
+  if (out.flatten) { out.flatten(x, z, w / 2 + 1.2, d / 2 + 1.2, rot, y); const [fx, fz] = wc(0, d / 2 + 2.2); out.flatten(fx, fz, 2.2, 2.2, rot, y, 4); } // Gelände eben + Vorplatz an der Tür
+  wallSet(g, w, d, h, 0.35, wallMat, true, out.colliders, x, z, rot, y);
+  const fcol = o.floor || '#6a4a2a', floorM = M('hfl' + fcol, () => new THREE.MeshStandardMaterial({ map: tex.planks(fcol), roughness: 1 }));
+  const dark = M('hdk', () => new THREE.MeshStandardMaterial({ color: 0x24160d, roughness: 0.9 })), wood = M('hwd', () => new THREE.MeshStandardMaterial({ map: tex.planks('#7a5632'), roughness: 0.95 }));
+  box(g, w - 0.5, 0.12, d - 0.5, floorM, 0, 0.06, 0).castShadow = false;
+  box(g, w + 0.5, 0.45, d + 0.5, M('hplinth', () => new THREE.MeshStandardMaterial({ map: tex.stone(), roughness: 1 })), 0, 0.1, 0);
+  for (const sx of [-1, 1]) box(g, 0.16, 2.3, 0.42, dark, sx * 1.08, 1.15, d / 2); box(g, 2.4, 0.16, 0.42, dark, 0, 2.3, d / 2);
+  const hinge = new THREE.Group(); hinge.position.set(-1.0, 0, d / 2 + 0.05); hinge.rotation.y = -1.15; hinge.add(box(new THREE.Group(), 0.1, 0.1, 0.1, dark, 0, 0, 0)); g.add(hinge); box(hinge, 1.0, 2.1, 0.07, dark, 0.5, 1.05, 0);
+  const top = o.ceil === false ? h : Math.min(h, 3.4);
+  if (o.ceil !== false && h > 3.9) box(g, w - 0.5, 0.15, d - 0.5, M('hceil', () => new THREE.MeshStandardMaterial({ color: 0xd8c8a8, roughness: 1 })), 0, 3.4, 0);
+  const lampM = new THREE.MeshStandardMaterial({ color: 0xffe0a0, emissive: 0xffb060, emissiveIntensity: 0 }); env.registerLamp(lampM); const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 6), lampM); lamp.position.set(0, top - 0.55, 0); g.add(lamp);
+  const [lx, lz] = wc(0, 0); out.lights.push({ x: lx, y: y + top - 0.55, z: lz, color: o.lamp || 0xffb060, int: 7, range: 14, flicker: 0.12, inside: true }); out.glow.push([lx, y + top - 0.55, lz, 1, 0.7, 0.35, 24]);
+  const col = (ax, az, hx, hz, h1) => { const [px, pz] = wc(ax, az); out.colliders.push({ x: px, z: pz, hx, hz, rot, y0: y, y1: y + h1 }); };
+  const kind = o.kind || 'home', rugM = M('hrug' + (o.rug || 0), () => new THREE.MeshStandardMaterial({ color: o.rug || 0x8a2a2a, roughness: 1 }));
+  if (kind === 'home') {
+    box(g, w * 0.42, 0.03, d * 0.34, rugM, 0, 0.14, d * 0.05);
+    box(g, 1.7, 0.08, 0.95, wood, -w * 0.2, 0.8, -d * 0.12); for (const [a, b] of [[-0.7, -0.35], [0.7, -0.35], [-0.7, 0.35], [0.7, 0.35]]) box(g, 0.08, 0.76, 0.08, wood, -w * 0.2 + a, 0.4, -d * 0.12 + b); col(-w * 0.2, -d * 0.12, 0.95, 0.55, 0.9);
+    for (const sx of [-1, 1]) { const st = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.5, 8), wood); st.position.set(-w * 0.2 + sx * 0.5, 0.35, -d * 0.12 + 0.85); g.add(st); }
+    box(g, w * 0.55, 1.9, 0.4, wood, w * 0.05, 1.05, -d / 2 + 0.55); for (let k = 0; k < 9; k++) box(g, 0.22, 0.3 + (k % 3) * 0.1, 0.2, new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL((k * 0.17) % 1, 0.5, 0.5) }), w * 0.05 - w * 0.24 + k * w * 0.06, 0.65 + (k % 2) * 0.7, -d / 2 + 0.7); col(w * 0.05, -d / 2 + 0.55, w * 0.28, 0.25, 2);
+    box(g, 1.9, 0.4, 1.0, wood, w / 2 - 1.4, 0.35, -d / 2 + 1.0); box(g, 1.8, 0.2, 0.9, new THREE.MeshStandardMaterial({ color: 0xe8e4dc, roughness: 1 }), w / 2 - 1.4, 0.65, -d / 2 + 1.0); box(g, 0.5, 0.15, 0.7, new THREE.MeshStandardMaterial({ color: 0xc8d8e8 }), w / 2 - 0.7, 0.8, -d / 2 + 1.0); col(w / 2 - 1.4, -d / 2 + 1.0, 1, 0.55, 0.9);
+  } else if (kind === 'hall') { // Fabrikhalle
+    const metal = M('iron', () => new THREE.MeshStandardMaterial({ color: 0x3a3e44, roughness: 0.55, metalness: 0.7 }));
+    for (let k = 0; k < 4; k++) { const mx = -w / 2 + 3 + k * (w - 6) / 3, mz = -d / 2 + 2.4; box(g, 2.6, 2.2, 2.0, metal, mx, 1.2, mz); box(g, 0.5, 0.5, 0.1, new THREE.MeshBasicMaterial({ color: k % 2 ? 0xff7a20 : 0x30ff80 }), mx, 1.8, mz + 1.05); col(mx, mz, 1.4, 1.1, 2.3); }
+    for (let k = 0; k < 5; k++) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1.0, 10), M('hbarrel', () => new THREE.MeshStandardMaterial({ color: 0x6a3a22, roughness: 0.8 }))); b.position.set(w / 2 - 1.4, 0.55, -d / 4 + k * 1.1); g.add(b); col(w / 2 - 1.4, -d / 4 + k * 1.1, 0.5, 0.5, 1.1); }
+    box(g, 4, 0.12, 1.2, wood, -w / 4, 0.95, d / 5); for (const sx of [-1, 1]) box(g, 0.12, 0.9, 1.0, wood, -w / 4 + sx * 1.8, 0.45, d / 5); col(-w / 4, d / 5, 2.1, 0.7, 1);
+  } else if (kind === 'hut') { // Lagerfeuer + Matten
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.16, 6, 10), M('hstone', () => new THREE.MeshStandardMaterial({ color: 0x5a5a58, roughness: 1 }))); ring.rotation.x = Math.PI / 2; ring.position.set(0, 0.2, 0); g.add(ring);
+    const fire = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.7, 7), new THREE.MeshBasicMaterial({ color: 0xff7a1a })); fire.position.set(0, 0.55, 0); g.add(fire); col(0, 0, 0.8, 0.8, 0.5);
+    for (const a of [0.9, 2.6, 4.4]) { const m = box(g, 1.4, 0.05, 0.8, rugM, Math.cos(a) * w * 0.28, 0.14, Math.sin(a) * d * 0.28); m.rotation.y = a; }
+    box(g, 0.9, 1.0, 0.5, wood, 0, 0.5, -d / 2 + 0.5); col(0, -d / 2 + 0.5, 0.5, 0.3, 1.1);
+  }
+  return { top };
+}
+// Blumenkästen unter den Fensterreihen (Optik)
+export function flowerBoxes(g, w, d, n, y = 1.2) {
+  const boxM = M('fbox', () => new THREE.MeshStandardMaterial({ color: 0x5a3a22, roughness: 1 })), leaf = M('fleaf', () => new THREE.MeshStandardMaterial({ color: 0x3a7a2a, roughness: 1 }));
+  for (let k = 0; k < n; k++) { const fx = -w / 2 + (k + 0.5) * w / n; box(g, 1.0, 0.25, 0.34, boxM, fx, y, d / 2 + 0.2); box(g, 0.9, 0.14, 0.28, leaf, fx, y + 0.2, d / 2 + 0.2); for (let j = 0; j < 5; j++) { const f = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 5), new THREE.MeshBasicMaterial({ color: [0xff4a6a, 0xffd23a, 0xffffff, 0xc05aff][(k + j) % 4] })); f.position.set(fx - 0.36 + j * 0.18, y + 0.34, d / 2 + 0.2); g.add(f); } }
+}
+
 export function nordicHouse(rng, x, y, z, rot, opts = {}, env, out) {
+  opts = { ...opts, enter: true }; // alle Häuser begehbar
   const w = opts.w || 8 + rng() * 5, d = opts.d || 6 + rng() * 3, h = opts.h || 3.2 + rng() * 1.2;
   const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot;
   const wood = M('nwood', () => new THREE.MeshStandardMaterial({ map: tex.planks('#3c2a1c'), roughness: 0.95 }));
@@ -166,7 +209,7 @@ export function nordicHouse(rng, x, y, z, rot, opts = {}, env, out) {
   const roofMat = opts.turf ? M('turf', () => new THREE.MeshStandardMaterial({ map: textures.grass(), color: 0x6f8a4a, roughness: 1, side: THREE.DoubleSide })) : M('slate', () => new THREE.MeshStandardMaterial({ map: tex.slate(), roughness: 0.8, side: THREE.DoubleSide }));
   const win = M('win', () => { const m = new THREE.MeshStandardMaterial({ map: tex.window(), emissive: 0xffa040, emissiveMap: tex.window(), emissiveIntensity: 0.4, roughness: 0.6 }); env.registerLamp(m); m.userData.base = 0.35; return m; });
   const base = box(g, w + 0.4, 1.0, d + 0.4, stone, 0, 0.1, 0); base.geometry = uvScale(new THREE.BoxGeometry(w + 0.4, 1.4, d + 0.4), (w + d) / 4, 0.5); base.position.y = -0.3;
-  if (opts.enter) wallSet(g, w, d, h, 0.3, wood, true, out.colliders, x, z, rot); else { box(g, w, h, d, new THREE.MeshStandardMaterial({ map: (() => { const t = tex.planks('#3c2a1c').clone(); t.repeat.set(w / 4, h / 3); t.needsUpdate = true; return t; })(), roughness: 0.95 }), 0, h / 2, 0); out.colliders.push({ x, z, hx: w / 2, hz: d / 2, rot, y0: 0, y1: h }); }
+  if (opts.enter) wallSet(g, w, d, h, 0.3, wood, true, out.colliders, x, z, rot, y); else { box(g, w, h, d, new THREE.MeshStandardMaterial({ map: (() => { const t = tex.planks('#3c2a1c').clone(); t.repeat.set(w / 4, h / 3); t.needsUpdate = true; return t; })(), roughness: 0.95 }), 0, h / 2, 0); out.colliders.push({ x, z, hx: w / 2, hz: d / 2, rot, y0: 0, y1: h }); }
   const rh = Math.min(w, d) * 0.62;
   const roof = new THREE.Mesh(gableGeometry(w, d, rh), roofMat); roof.position.y = h; roof.castShadow = true; g.add(roof);
   // Drachenköpfe am Giebel
@@ -203,12 +246,11 @@ export function africanHut(rng, x, y, z, rot, opts, env, out) {
   const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot;
   const wall = M('clay', () => new THREE.MeshStandardMaterial({ map: tex.adobe(), color: 0xd8b48a, roughness: 1 }));
   const thatch = M('thatch', () => new THREE.MeshStandardMaterial({ map: tex.thatch(), roughness: 1, side: THREE.DoubleSide }));
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.05, h, 14), wall); body.position.y = h / 2; body.castShadow = true; g.add(body);
+  const hs = r * 1.75; hollow(g, x, y, z, rot, hs, hs, h, wall, { kind: 'hut', floor: '#7a5a3a', rug: 0xc07a2a, ceil: false, lamp: 0xff9a40 }, env, out);
   const roof = new THREE.Mesh(new THREE.ConeGeometry(r * 1.55, h * 0.95, 14), thatch); roof.position.y = h + h * 0.4; roof.castShadow = true; g.add(roof);
-  const door = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 1.6), new THREE.MeshStandardMaterial({ color: 0x1a0f08 })); door.position.set(0, 0.8, r + 0.01); g.add(door);
   const lamp = new THREE.MeshStandardMaterial({ color: 0x331a08, emissive: 0xff8a30, emissiveIntensity: 0 }); env.registerLamp(lamp);
-  const w = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), lamp); w.position.set(r * 0.7, 1.4, r * 0.7); w.lookAt(r * 2, 1.4, r * 2); g.add(w);
-  out.world.add(g); out.colliders.push({ x, z, r: r + 0.3, y0: 0, y1: h });
+  const w = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), lamp); w.position.set(r * 0.85, 1.4, r * 0.88 + 0.05); w.lookAt(r * 2, 1.4, r * 2.6); g.add(w);
+  out.world.add(g);
   out.glow.push([x + Math.sin(rot) * r, y + 1.6, z + Math.cos(rot) * r, 1, 0.55, 0.2, 18]);
   out.lights.push({ x: x + Math.sin(rot) * (r + 1), y: y + 2, z: z + Math.cos(rot) * (r + 1), color: 0xff8a30, int: 3.5, range: 9, flicker: 0.35 });
 }
@@ -246,7 +288,7 @@ export function industrial(rng, x, y, z, rot, env, out, opts = {}) {
   const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot;
   const brickT = tex.brick(rng() < 0.5 ? [140, 60, 44] : [110, 90, 80]).clone(); brickT.repeat.set(w / 5, h / 5); brickT.needsUpdate = true;
   const brick = new THREE.MeshStandardMaterial({ map: brickT, roughness: 0.95 });
-  const body = box(g, w, h, d, brick, 0, h / 2, 0);
+  hollow(g, x, y, z, rot, w, d, h, brick, { kind: 'hall', floor: '#4a4a48', ceil: false, lamp: 0xff9040 }, env, out);
   const metal = M('iron', () => new THREE.MeshStandardMaterial({ color: 0x3a3e44, roughness: 0.55, metalness: 0.7 }));
   // Sheddach
   const teeth = Math.floor(w / 6);
@@ -259,8 +301,7 @@ export function industrial(rng, x, y, z, rot, env, out, opts = {}) {
   const ring = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.18, 6, 14), metal); ring.rotation.x = Math.PI / 2; ring.position.set(cx, ch, -d / 2 + 2); g.add(ring);
   // Rohre
   for (let k = 0; k < 2; k++) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, w * 0.9, 8), metal); p.rotation.z = Math.PI / 2; p.position.set(0, h - 1 - k * 1.2, d / 2 + 0.7); g.add(p); }
-  const door = box(g, 3.4, 4, 0.2, metal, 0, 2, d / 2 + 0.05);
-  out.world.add(g); out.colliders.push({ x, z, hx: w / 2, hz: d / 2, rot, y0: 0, y1: h });
+  out.world.add(g);
   const c = Math.cos(rot), s = Math.sin(rot);
   out.smoke.push({ x: x + cx * c + (-d / 2 + 2) * s, y: y + ch, z: z - cx * s + (-d / 2 + 2) * c, kind: 'smoke' });
   out.lights.push({ x: x + (d / 2 + 2) * s, y: y + 5, z: z + (d / 2 + 2) * c, color: 0xff9040, int: 6, range: 18, flicker: 0.1 });
@@ -271,13 +312,13 @@ export function adobe(rng, x, y, z, rot, env, out, opts = {}) {
   const w = opts.w || 7 + rng() * 5, d = opts.d || 6 + rng() * 3, h = 3 + rng() * 1.5;
   const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot;
   const t = tex.adobe().clone(); t.repeat.set(w / 4, h / 3); t.needsUpdate = true;
-  box(g, w, h, d, new THREE.MeshStandardMaterial({ map: t, color: [0xe6c090, 0xe0a070, 0xd8d0b0][Math.floor(rng() * 3)], roughness: 1 }), 0, h / 2, 0);
+  hollow(g, x, y, z, rot, w, d, h, new THREE.MeshStandardMaterial({ map: t, color: [0xe6c090, 0xe0a070, 0xd8d0b0][Math.floor(rng() * 3)], roughness: 1 }), { kind: 'home', floor: '#9a6a3a', rug: 0xc84a2a, lamp: 0xffa040 }, env, out);
   box(g, w + 0.5, 0.35, d + 0.5, M('adb2', () => new THREE.MeshStandardMaterial({ color: 0x8a5a30, roughness: 1 })), 0, h + 0.15, 0);
   for (let k = 0; k < 4; k++) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, d + 1.2, 6), M('beam', () => new THREE.MeshStandardMaterial({ color: 0x5a3a20 }))); b.rotation.x = Math.PI / 2; b.position.set(-w / 2 + 1 + k * (w - 2) / 3, h - 0.5, 0); g.add(b); }
   const win = M('awin', () => { const m = new THREE.MeshStandardMaterial({ color: 0x221510, emissive: 0xffa040, emissiveIntensity: 0.3 }); env.registerLamp(m); return m; });
   windowsOn(g, w, d, h, 2, win, 1.9);
-  box(g, 1.5, 2.2, 0.1, M('adoor', () => new THREE.MeshStandardMaterial({ color: 0x3a6a7a })), 0, 1.1, d / 2 + 0.05);
-  out.world.add(g); out.colliders.push({ x, z, hx: w / 2, hz: d / 2, rot, y0: 0, y1: h });
+  flowerBoxes(g, w, d, 2, 1.0);
+  out.world.add(g);
   const c = Math.cos(rot), s = Math.sin(rot);
   out.glow.push([x + (d / 2 + 0.5) * s, y + 2, z + (d / 2 + 0.5) * c, 1, 0.65, 0.3, 16]);
 }
@@ -286,11 +327,11 @@ export function fairyHouse(rng, x, y, z, rot, env, out) {
   const w = 6 + rng() * 3, d = 6 + rng() * 2, h = 4 + rng() * 2;
   const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot;
   const col = new THREE.Color().setHSL(rng(), 0.55, 0.62), roofC = new THREE.Color().setHSL(rng(), 0.6, 0.4);
-  box(g, w, h, d, new THREE.MeshStandardMaterial({ color: col, roughness: 0.8 }), 0, h / 2, 0);
+  hollow(g, x, y, z, rot, w, d, h, new THREE.MeshStandardMaterial({ color: col, roughness: 0.8 }), { kind: 'home', floor: '#b08a5a', rug: 0x7a3aa0, lamp: 0xffd080 }, env, out);
   const cone = new THREE.Mesh(new THREE.ConeGeometry(Math.max(w, d) * 0.78, h * 0.9, 8), new THREE.MeshStandardMaterial({ color: roofC, roughness: 0.6 })); cone.position.y = h + h * 0.4; cone.castShadow = true; g.add(cone);
   const win = M('fwin', () => { const m = new THREE.MeshStandardMaterial({ color: 0x221510, emissive: 0xffd080, emissiveIntensity: 0.3 }); env.registerLamp(m); return m; });
-  windowsOn(g, w, d, h, 2, win, 2.2);
-  out.world.add(g); out.colliders.push({ x, z, hx: w / 2, hz: d / 2, rot, y0: 0, y1: h });
+  windowsOn(g, w, d, h, 2, win, 2.2); flowerBoxes(g, w, d, 2, 1.3);
+  out.world.add(g);
   const c = Math.cos(rot), s = Math.sin(rot);
   out.glow.push([x + (d / 2 + 0.5) * s, y + 2.4, z + (d / 2 + 0.5) * c, 1, 0.85, 0.5, 18]);
 }

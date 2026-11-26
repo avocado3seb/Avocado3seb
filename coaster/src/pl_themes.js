@@ -41,10 +41,10 @@ function box(g, w, h, d, mat, x, y, z) { const m = new THREE.Mesh(new THREE.BoxG
 function cloth(color, w = 1.6, h = 2.6) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), std(color, { side: THREE.DoubleSide })); return m; }
 
 // ============================================================== Mittelalter (Klugheim)
-export function buildMedieval(world) {
+export function buildMedieval(world, key = 'klugheim', big = true) {
   const out = world.out, R = (a, b) => world.R(a, b), G = world.group;
   const stone = std(0xffffff, { map: A.tex.stone(), roughness: 1 }), roofM = std(0x7a2a22), wood = std(0x5a3d26), dark = std(0x3a3a40);
-  const S = 21, spot = findSpot(world, 'klugheim', S + 8, 4.5) || findSpot(world, 'klugheim', S + 4, 7);
+  const S = big ? 21 : 15, spot = findSpot(world, key, S + 8, 4.5) || findSpot(world, key, S + 4, 7);
   if (spot) {
     const [cx, cz, by] = spot, hub = { x: 0, z: 60 }, rot = Math.round(Math.atan2(hub.x - cx, hub.z - cz) / (Math.PI / 2)) * (Math.PI / 2);
     const g = new THREE.Group(); g.position.set(cx, by, cz); g.rotation.y = rot; G.add(g);
@@ -70,14 +70,14 @@ export function buildMedieval(world) {
     // Brunnen im Hof + Fackeln
     const well = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.6, 1.1, 12), stone); well.position.set(-6, 0.55, 4); g.add(well); col(-6, 4, 1.6, 1.6, 1.2); { const [wx, wz] = toWorld(cx, cz, rot, -6, 4); out.colliders.pop(); out.colliders.push({ x: wx, z: wz, r: 1.7, y0: by - 1, y1: by + 1.2 }); }
     for (const [lx, lz] of [[-GATE - 0.6, S + 1.8], [GATE + 0.6, S + 1.8], [-8, -S + 5.5], [8, -S + 5.5], [-S + 3, 0], [S - 3, 0]]) { const [wx, wz] = toWorld(cx, cz, rot, lx, lz); const t = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 2.6, 5), wood); t.position.set(lx, 1.3, lz); g.add(t); out.glow.push([wx, by + 2.8, wz, 1, 0.55, 0.2, 26]); out.lights.push({ x: wx, y: by + 2.8, z: wz, color: 0xff8a30, int: 6, range: 13, flicker: 0.35 }); }
-    world.grid.mark(cx, cz, S + 8); world.castle = { x: cx, z: cz, rot };
+    world.grid.mark(cx, cz, S + 8); if (big) world.castle = { x: cx, z: cz, rot }; else world.castle2 = { x: cx, z: cz, rot };
   }
   // Fachwerkhäuser entlang der Wege (mittelalterlicher Stil)
   const th = world.theme; let made = 0;
-  if (th) made = placeMany(world, 'klugheim', 12, 9, 3, (x, y, z, r4) => { const w = R(8, 12), d = R(7, 9), h = R(6, 10); world.makeBuilding(x, z, r4, w, d, h, th); const sw = Math.abs(Math.sin(r4)) > 0.5; out.colliders.push({ x, z, hx: sw ? d / 2 : w / 2, hz: sw ? w / 2 : d / 2, rot: 0, y0: 0, y1: h }); out.glow.push([x, 2.2, z, 1, 0.7, 0.35, 18]); });
+  if (th) made = placeMany(world, key, big ? 12 : 8, 9, 3, (x, y, z, r4) => { const w = R(8, 12), d = R(7, 9), h = R(6, 10); world.makeBuilding(x, z, r4, w, d, h, th); });
   // Marktstände mit Stoffdächern und Banner
   const awn = [0xc01a2a, 0x1a5ac0, 0xe0b020, 0x2a9a4a, 0x8a2aa0];
-  placeMany(world, 'klugheim', 8, 5, 3, (x, y, z, rot) => {
+  placeMany(world, key, big ? 8 : 5, 5, 3, (x, y, z, rot) => {
     const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot; G.add(g);
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(g, 0.14, 2.6, 0.14, wood, sx * 1.7, 1.3, sz * 1.2);
     box(g, 3.9, 0.9, 1.1, wood, 0, 0.45, 0.35); const c = awn[Math.floor(world.rng() * awn.length)];
@@ -85,9 +85,9 @@ export function buildMedieval(world) {
     for (const [lx, lz] of [[-1.2, 0.35], [0, 0.35], [1.2, 0.35]]) box(g, 0.5, 0.3, 0.4, std(0xa8703a), lx, 1.05, lz);
     out.colliders.push({ x, z, hx: 2, hz: 1.4, rot, y0: y, y1: y + 2.6 });
   });
-  world.alongPaths('klugheim', 16, (x, y, z, rot) => { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 6.5, 6), wood); p.position.set(x, y + 3.25, z); G.add(p); const b = cloth(awn[Math.floor(world.rng() * awn.length)], 1.5, 3.6); b.position.set(x + 0.8 * Math.cos(rot), y + 4.4, z - 0.8 * Math.sin(rot)); b.rotation.y = rot; G.add(b); out.colliders.push({ x, z, r: 0.2, y0: y, y1: y + 6 }); return true; }, 3);
+  world.alongPaths(key, big ? 16 : 10, (x, y, z, rot) => { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 6.5, 6), wood); p.position.set(x, y + 3.25, z); G.add(p); const b = cloth(awn[Math.floor(world.rng() * awn.length)], 1.5, 3.6); b.position.set(x + 0.8 * Math.cos(rot), y + 4.4, z - 0.8 * Math.sin(rot)); b.rotation.y = rot; G.add(b); out.colliders.push({ x, z, r: 0.2, y0: y, y1: y + 6 }); return true; }, 3);
   // Windmühle mit drehenden Flügeln
-  const mill = findSpot(world, 'klugheim', 9, 3.5);
+  const mill = big ? findSpot(world, key, 9, 3.5) : null;
   if (mill) {
     const [mx, mz, my] = mill, g = new THREE.Group(); g.position.set(mx, my, mz); G.add(g);
     const body = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.6, 11, 12), std(0xffffff, { map: A.tex.stone() })); body.position.y = 5; body.castShadow = true; g.add(body);
@@ -97,7 +97,7 @@ export function buildMedieval(world) {
     world.anims.push(dt => { hub.rotation.z += dt * 0.5; });
     out.colliders.push({ x: mx, z: mz, r: 3.9, y0: my - 1, y1: my + 12 }); world.grid.mark(mx, mz, 10);
   }
-  world.medieval = { castle: !!spot, houses: made };
+  if (big) world.medieval = { castle: !!spot, houses: made };
 }
 
 // ============================================================== Pionierzeit der Fliegerei (Rookburgh)

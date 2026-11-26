@@ -6,9 +6,10 @@ import * as THREE from 'three';
 import { ACHIEVEMENTS, TICKETS, POIS } from './pl_data.js';
 import { ZONES } from './phantasia.js';
 
+let NS = ''; // Namensraum je Konto → mehrere Spieler am selben Browser mischen ihre Spielstände nicht
 const KEY = 'ecs_pl_';
-const lsGet = (k, d) => { try { const v = localStorage.getItem(KEY + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } };
-const lsSet = (k, v) => { try { localStorage.setItem(KEY + k, JSON.stringify(v)); return true; } catch (e) { return false; } };
+const lsGet = (k, d) => { try { const v = localStorage.getItem(KEY + NS + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } };
+const lsSet = (k, v) => { try { localStorage.setItem(KEY + NS + k, JSON.stringify(v)); return true; } catch (e) { return false; } };
 const COASTERS = ['Taron', 'F.L.Y.', 'Black Mamba', 'Colorado Adventure', "Winja's Fear", "Winja's Force", 'Raik', 'Crazy Bats'];
 const ZONE_KEYS = ['klugheim', 'africa', 'rookburgh', 'mexico', 'fantasy', 'china', 'mystery', 'berlin'];
 
@@ -26,16 +27,29 @@ export class PLGame {
     const auto = lsGet('auto', null); this.hasAuto = !!auto;
   }
 
+  switchUser(name) { // beim Anmelden: lokale Daten dieses Kontos laden
+    NS = name ? name.toLowerCase().replace(/[^a-z0-9äöüß_.-]/g, '_') + '_' : '';
+    this.unlocked = new Set(lsGet('ach', [])); this.photos = lsGet('photos', []); this.designs = lsGet('designs', []); this.rides = lsGet('rides', []);
+    const auto = lsGet('auto', null); this.hasAuto = !!auto; this.S = fresh(); if (auto) { this.S = Object.assign(fresh(), auto); this.S.stats = Object.assign(fresh().stats, auto.stats); }
+  }
   // ------------------------------------------------------------------ Speichern / Laden
   slotInfo(i) { const s = lsGet('slot' + i, null); return s ? { savedAt: s.savedAt, name: s.name, wallet: s.wallet, rides: s.stats.rides, km: s.stats.km } : null; }
   autoInfo() { const s = lsGet('auto', null); return s ? { savedAt: s.savedAt, rides: s.stats.rides } : null; }
   snapshot() {
     const a = this.app, S = this.S; S.hour = a.env.hour; S.weather = a.env.weatherName; S.winter = !!(a.park && a.park.winter); S.savedAt = Date.now();
-    if (a.park && a.park.def.name === 'Phantasialand' && a.state === 'park') S.pos = [a.camera.position.x, a.camera.position.z, a.parkMode === 'walk' ? a.walk.yaw : a.free.yaw, a.parkMode]; else S.pos = null;
+    if (a.park && a.park.def.name === 'Phantasialand' && a.state === 'park') S.pos = [a.pp().x, a.pp().z, a.parkMode === 'walk' ? a.walk.yaw : a.free.yaw, a.parkMode]; else S.pos = null;
     return JSON.parse(JSON.stringify(S));
   }
   save(slot, name) { const s = this.snapshot(); if (name) s.name = name; return lsSet(slot === 'auto' ? 'auto' : 'slot' + slot, s); }
-  autosave() { this.save('auto'); this.hasAuto = true; }
+  autosave() { this.save('auto'); this.hasAuto = true; this.app.account && this.app.account.cloudSave(this.cloudData()); }
+  cloudData() { return { S: this.snapshot(), ach: [...this.unlocked], designs: this.designs }; }
+  applyCloud(d) { // Cloud-Stand übernehmen, wenn er neuer ist als der lokale
+    if (!d || !d.S) return; const local = lsGet('auto', null);
+    if (local && (local.savedAt || 0) > (d.S.savedAt || 0) && local.name === d.S.name) return;
+    this.S = Object.assign(fresh(), d.S); this.S.stats = Object.assign(fresh().stats, d.S.stats);
+    this.unlocked = new Set([...(d.ach || []), ...this.unlocked]); lsSet('ach', [...this.unlocked]); if (Array.isArray(d.designs) && d.designs.length >= this.designs.length) { this.designs = d.designs; lsSet('designs', this.designs); }
+    lsSet('auto', this.S); this.hasAuto = true;
+  }
   load(slot) {
     const s = lsGet(slot === 'auto' ? 'auto' : 'slot' + slot, null); if (!s) return false;
     this.S = Object.assign(fresh(), s); this.S.stats = Object.assign(fresh().stats, s.stats);
@@ -80,7 +94,7 @@ export class PLGame {
     if (!w || w.def.name !== 'Phantasialand') return;
     if (a.state !== 'menu') S.stats.playTime = (S.stats.playTime || 0) + dt;
     // Zonenbesuche
-    if (a.state === 'park' || a.state === 'ride') { const k = w.zoneOf(a.camera.position.x, a.camera.position.z); if (k && !S.stats.zones[k]) { S.stats.zones[k] = 1; if (ZONES[k]) a.ui.toast('📍 ' + ZONES[k].name); this.checkAchievements(); } }
+    if (a.state === 'park' || a.state === 'ride') { const k = w.zoneOf(a.pp().x, a.pp().z); if (k && !S.stats.zones[k]) { S.stats.zones[k] = 1; if (ZONES[k]) a.ui.toast('📍 ' + ZONES[k].name); this.checkAchievements(); } }
     // Rundenzähler (nur für die Bahn, in der der Spieler sitzt)
     if (a.state === 'ride' && a.ride) {
       const r = a.ride, l = r.sim.lap, k = r.sim, prev = this.lapSeen.get(k);
@@ -101,7 +115,7 @@ export class PLGame {
     const a = this.app, w = a.park; let best = null, bd = 1e9;
     this.hint = null;
     if (a.state === 'park' && a.parkMode === 'walk' && !this.room) {
-      const c = a.camera.position;
+      const c = a.pp();
       for (const it of w.interactables || []) { const d = Math.hypot(it.x - c.x, it.z - c.z); if (d < it.r + 1 && d < bd) { bd = d; best = it; } }
     } else if (this.room && a.state === 'park' && a.parkMode === 'walk') { best = { type: 'exitroom', name: 'Zimmer verlassen', x: 0, z: 0 }; }
     this.hint = best;
@@ -140,7 +154,8 @@ export class PLGame {
   }
   buy(poi, i) {
     const [name, price] = poi.menu[i]; if (this.S.wallet < price) return this.app.ui.toast('Nicht genug Geld'), false;
-    this.S.wallet -= price; this.S.stats.spent += price; this.S.stats.purchases++; this.S.inventory[name] = (this.S.inventory[name] || 0) + 1; this.checkAchievements();
+    this.S.wallet -= price; this.S.stats.spent += price; this.S.stats.purchases++;
+    const cur = this.S.inventory[name], rec = (cur && typeof cur === 'object') ? cur : { n: cur || 0, kind: poi.kind, price }; rec.n++; rec.kind = poi.kind; rec.price = price; rec.from = poi.name; this.S.inventory[name] = rec; this.checkAchievements();
     this.app.ui.toast('Gekauft: ' + name + ' – ' + this.money(price)); return true;
   }
   book(hotel, ri, nights) {
@@ -148,6 +163,14 @@ export class PLGame {
     this.S.wallet -= total; this.S.stats.spent += total; this.S.stats.bookings++;
     this.S.bookings.push({ id: Date.now(), hotel: hotel.id, hotelName: hotel.name, room, nights, total, date: new Date().toLocaleDateString('de-DE') }); this.checkAchievements(); this.autosave();
     this.app.ui.toast('🛏 Gebucht: ' + hotel.name + ' – ' + room); return true;
+  }
+  inventory() { // normalisierte Liste [{name, n, kind, price, from}]
+    return Object.entries(this.S.inventory || {}).map(([name, v]) => (typeof v === 'object' ? { name, ...v } : { name, n: v, kind: 'shop', price: 0, from: '' })).filter(x => x.n > 0);
+  }
+  consume(name) {
+    const v = this.S.inventory[name]; if (!v) return false; const rec = typeof v === 'object' ? v : (this.S.inventory[name] = { n: v, kind: 'shop' });
+    if (rec.kind === 'shop') { this.app.ui.toast('Souvenirs behältst du – die kann man nicht essen 😉'); return false; }
+    rec.n--; this.S.stats.consumed = (this.S.stats.consumed || 0) + 1; if (rec.n <= 0) delete this.S.inventory[name]; this.app.ui.toast('😋 Guten Appetit: ' + name); return true;
   }
   checkout(id) { const b = this.S.bookings.find(x => x.id === id); if (!b) return; this.S.bookings = this.S.bookings.filter(x => x.id !== id); this.S.wallet += Math.round(b.total * 0.5); this.app.ui.toast('Check-out – 50 % erstattet (virtuell)'); }
   addMoney(n) { this.S.wallet += n; }
@@ -157,7 +180,7 @@ export class PLGame {
     const a = this.app, w = a.park; if (this.room) return;
     if (!this.roomGroup) this.roomGroup = this.buildRoom();
     this.roomGroup.visible = true;
-    this.room = { hotel, back: a.camera.position.clone(), yaw: a.walk.yaw };
+    this.room = { hotel, back: a.pp().clone(), yaw: a.walk.yaw };
     a.walk.pos.set(3000, 1.75, 3000 + 1.2); a.walk.yaw = 0; a.walk.vy = 0; a.camera.position.copy(a.walk.pos); a.ui.closePanel();
     a.ui.toast('Zimmer – E am Ausgang: zurück', 3500);
   }
@@ -189,7 +212,7 @@ export class PLGame {
   stopNav() { this.nav = null; this.app.park?.clearRoute?.(); this.app.ui.setNav(null); }
   updateNav(dt, force) {
     const a = this.app, w = a.park; if (!this.nav || !w || !w.routeTo) return;
-    this.navT -= dt; const c = a.camera.position;
+    this.navT -= dt; const c = a.pp();
     const tx = this.nav.it.ax ?? this.nav.it.x, tz = this.nav.it.az ?? this.nav.it.z;
     if (force || this.navT <= 0) { this.navT = 2.5; const target = this.nav.it.type === 'ride' ? { ride: this.nav.it.ride } : this.nav.it.poi ? this.nav.it.poi : this.nav.it; this.nav.route = w.routeTo(c.x, c.z, target); w.setRoute(this.nav.route.concat([[tx, tz]])); }
     const d = Math.hypot(tx - c.x, tz - c.z);

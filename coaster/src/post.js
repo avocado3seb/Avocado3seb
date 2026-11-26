@@ -8,6 +8,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 
 export class Post {
   constructor(renderer, scene, camera) {
@@ -16,6 +17,7 @@ export class Post {
     this.rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 0 });
     this.composer = new EffectComposer(renderer, this.rt);
     this.composer.addPass(new RenderPass(scene, camera));
+    this.gtao = new GTAOPass(scene, camera, size.x, size.y); this.gtao.output = GTAOPass.OUTPUT.Default; this.gtao.enabled = false; this.gtao.updateGtaoMaterial({ radius: 0.7, distanceExponent: 1.4, thickness: 1.2, scale: 1.1, samples: 12 }); this.composer.addPass(this.gtao);
     this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.32, 0.65, 0.92); this.composer.addPass(this.bloom);
     this.grade = new ShaderPass({
       uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uNight: { value: 0 } },
@@ -33,7 +35,7 @@ export class Post {
     });
     this.composer.addPass(this.grade); this.composer.addPass(new OutputPass());
   }
-  setQuality(q, on) { this.q = q; this.enabled = !!on && q !== 'low'; this.bloom.enabled = q === 'high'; const s = q === 'high' ? 4 : q === 'medium' ? 2 : 0; for (const t of [this.composer.renderTarget1, this.composer.renderTarget2]) { t.samples = s; t.dispose(); } }
+  setQuality(q, on, ao = false) { this.q = q; this.gtao.enabled = !!on && !!ao && q !== 'low'; this.enabled = !!on && q !== 'low'; this.bloom.enabled = q === 'high'; const s = q === 'high' ? 4 : q === 'medium' ? 2 : 0; for (const t of [this.composer.renderTarget1, this.composer.renderTarget2]) { t.samples = s; t.dispose(); } }
   resize(w, h) { this.composer.setPixelRatio(this.renderer.getPixelRatio()); this.composer.setSize(w, h); }
   render(night) { this.grade.uniforms.uTime.value = (performance.now() * 0.001) % 100; this.grade.uniforms.uNight.value = night || 0; this.composer.render(); }
 }

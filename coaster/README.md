@@ -47,6 +47,10 @@ Der Start-Hub bietet **Spielen** (Parkplatz → Ticket → Park, mit Spielgeld) 
 
 - **Grafik „Vice-City-Look“** (Einstellungen, Standard an außer in automatisierten Tests und auf „Niedrig“): Nachbearbeitung mit Bloom (leuchtende Lichter), kräftigeren Farben, Kontrast, warmem Ton, Vignette und Filmkorn; detailliertere Besucherfiguren; runde Symbolknöpfe und runde Minikarte. Felsen haben Kollision und liegen nicht mehr auf Wegen.
 
+- **Konto & Multiplayer**: Anmeldung mit Name + Passwort (Cloudflare-Worker, PBKDF2-Hash, Cloud-Speicherstand); Multiplayer-Räume nutzen den angemeldeten Namen (Token-Prüfung im Relay). Lokale Tests/Entwicklung (localhost) laufen ohne Anmeldung.
+- **Ansicht & Steuerung**: Third-Person-Spielerfigur (Mausrad/Pinch = Abstand), Touch-Steuerung (Joystick, Wischen, Knöpfe; 👆 schaltet um).
+- **Welt**: Brücken über bodennahe Schienen, Eingangsplätze mit Torbogen an jeder Bahn, begehbare Häuser (Tür, Innenraum, Möbel, Licht; Gelände wird unter Häusern eingeebnet), Laternen im Stil des jeweiligen Bereichs, Inventar (`I`) mit gekauftem Essen/Souvenirs, Parkplan im Karten-Look. Bahnschluss an der Station ohne Knick (Bremsstrecke endet vor dem Bahnhof).
+
 **Hinweis zu den Daten**: Namen, Speisekarten, Preise, Zimmertypen, Showzeiten und Ticketpreise der Gastronomie/Hotels/Shops sind **frei ergänzte Beispielangebote** (Spielgeld), keine echten Angaben des Parks. Echt sind nur Bahn-, Themenbereichs- und Hotelnamen.
 
 **Ehrlich gesagt**: Das ist eine stilisierte Nachbildung mit Platzhalter-Geometrie (Low-Poly), keine fotorealistische oder maßstabsgetreue Kopie des Parks. Streckenverläufe sind aus Höhe, Länge, Tempo, Inversionen und typischen Elementen abgeleitet.

@@ -82,7 +82,7 @@ export function buildBerlin(world, rng) {
     const x = side * (22 + rng() * 3), z = 110 + k * 26 + rng() * 4;
     if (!world.grid.free(x, z, 9)) continue;
     const w = 12 + rng() * 6, d = 11 + rng() * 3, h = 8 + rng() * 6, rot = side > 0 ? Math.PI / 2 : -Math.PI / 2;
-    world.makeBuilding(x, z, rot, w, d, h, th); out.colliders.push({ x, z, hx: d / 2, hz: w / 2, rot: 0, y0: 0, y1: h }); world.grid.mark(x, z, 10);
+    world.makeBuilding(x, z, rot, w, d, h, th); world.grid.mark(x, z, 10);
     out.glow.push([x - side * (d / 2 + 0.3), 2.2, z, 1, 0.7, 0.35, 20]);
   }
   // Uhrenturm

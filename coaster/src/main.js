@@ -16,6 +16,8 @@ import { PLGame } from './pl_game.js';
 import { Editor } from './pl_editor.js';
 import { Touch } from './touch.js';
 import { Post } from './post.js';
+import { Player } from './pl_player.js';
+import { Account } from './account.js';
 
 const LS = {
   get(k, d) { try { const v = localStorage.getItem('ecs_' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
@@ -27,7 +29,7 @@ const damp = (k, dt) => 1 - Math.exp(-k * dt);
 class App {
   constructor() {
     this.canvas = document.getElementById('gl');
-    this.settings = Object.assign({ quality: 'medium', shadows: true, fov: 75, sens: 1, vol: 0.6, hour: 15.5, weather: 'clear' }, LS.get('settings', {}));
+    this.settings = Object.assign({ quality: matchMedia('(pointer: coarse)').matches ? 'medium' : 'high', shadows: true, fov: 75, sens: 1, vol: 0.6, hour: 17.6, weather: 'clear', playerColor: '#1e88e5' }, LS.get('settings', {}));
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -57,8 +59,10 @@ class App {
     this.keys = new Set(); this.hudOn = true;
     this.menuOrbit = 0;
     this.camQ = new THREE.Quaternion(); this.camInit = false;
+    this.player = new Player(this.scene, this.settings.playerColor || '#1e88e5'); this.tp = { dist: 5.2 }; this.pface = 0; this.pspeed = 0;
     this.headLight = new THREE.PointLight(0xffe2b0, 0, 24, 1.6); this.scene.add(this.headLight);
     this.net = new Net(this);
+    this.account = new Account();
     this.game = new PLGame(this); this.editor = new Editor(this); this.noKeys = new Set();
     this.ui = new UI(this);
     this.touch = new Touch(this);
@@ -71,12 +75,27 @@ class App {
     // Startpark laden
     const qs = new URLSearchParams(location.search), joining = qs.has('room') || qs.has('peerhost') || qs.has('light'); // beim Beitreten: leichten Park laden, der Host bestimmt den Park
     const startPark = joining ? 'Europa-Park' : LS.get('lastPark', 'Phantasialand');
-    this.loadPark(this.db.parks[startPark] ? startPark : Object.keys(this.db.parks)[0]).then(() => { this.ui.loading(false); this.showMenu(); if (new URLSearchParams(location.search).get('room')) this.ui.tab('online'); });
+    this.loadPark(this.db.parks[startPark] ? startPark : Object.keys(this.db.parks)[0]).then(() => { this.ui.loading(false); this.showMenu(); if (new URLSearchParams(location.search).get('room')) this.ui.tab('online'); this.startLogin(); });
     this.loop();
     window.__app = this; // Debug / Tests
   }
 
+  // ------------------------------------------------------------------ Konto
+  async startLogin() {
+    const acc = this.account;
+    if (!acc.required) { acc.guest = !acc.token; this.settings.name = acc.name || this.settings.name; this.ui.refreshAccount(); return; }
+    if (acc.token && await acc.verify()) { await this.onLogin(); return; }
+    this.ui.showLogin();
+  }
+  async onLogin() {
+    const acc = this.account; this.settings.name = acc.name; this.saveSettings(); this.game.switchUser(acc.name);
+    const cloud = await acc.cloudLoad(); if (cloud) this.game.applyCloud(cloud);
+    this.game.S.name = acc.name; this.ui.hideLogin(); this.ui.refreshAccount(); this.ui.tab(this.ui.curTab === 'db' ? 'db' : 'hub'); this.ui.toast('Willkommen, ' + acc.name + '!');
+  }
+  async logout() { await this.account.logout(); this.game.autosave(); this.ui.showLogin(); }
+
   // ------------------------------------------------------------------ Einstellungen
+  pp() { return this.state === 'park' && this.parkMode === 'walk' ? this.walk.pos : this.camera.position; } // Position der Spielerfigur (nicht der Kamera)
   lookOn() { const q = new URLSearchParams(location.search); if (q.has('look')) return q.get('look') !== '0'; if (this.settings.look !== undefined) return !!this.settings.look; return !navigator.webdriver; } // Standard an (außer in automatisierten Tests)
   saveSettings() { this.settings.hour = this.env.hour; this.settings.weather = this.env.weatherName; LS.set('settings', this.settings); }
   applyQuality() {
@@ -84,7 +103,7 @@ class App {
     this.renderer.setPixelRatio(q === 'low' ? 0.75 : q === 'medium' ? Math.min(dpr, 1.25) : Math.min(dpr, 2));
     this.env.setShadows(this.settings.shadows && q !== 'low', q === 'high' ? 4096 : 2048);
     this.renderer.shadowMap.enabled = this.settings.shadows && q !== 'low';
-    this.post.setQuality(q, this.lookOn());
+    this.post.setQuality(q, this.lookOn(), !!this.settings.ao);
     this.resize();
   }
   resize() {
@@ -177,7 +196,7 @@ class App {
   }
   setParkMode(m) {
     this.parkMode = m; this.camInit = false;
-    if (m === 'walk') { const cp = this.camera.position; this.walk.pos.set(cp.x, (this.park.groundAt ? this.park.groundAt(cp.x, cp.z, 60) : 0) + 1.75 + 0.2, cp.z); this.walk.yaw = this.free.yaw; this.walk.vy = 0; this.walk.pitch = 0; this.ui.toast('Klicken = Maus einfangen · WASD laufen · Leertaste springen · Mausrad zoomen · Esc Menü', 5000); }
+    if (m === 'walk') { const cp = this.camera.position; this.walk.pos.set(cp.x, (this.park.groundAt ? this.park.groundAt(cp.x, cp.z, 60) : 0) + 1.75 + 0.2, cp.z); this.walk.yaw = this.free.yaw; this.walk.vy = 0; this.walk.pitch = 0; this.pface = this.walk.yaw + Math.PI; this.player.yaw = this.pface; this.ui.toast('Klicken = Maus einfangen · WASD laufen · Leertaste springen · Mausrad zoomen · Esc Menü', 5000); }
     if (m === 'fly') { this.free.pos.copy(this.camera.position); const e = new THREE.Euler().setFromQuaternion(this.camera.quaternion, 'YXZ'); this.free.yaw = e.y; this.free.pitch = e.x; }
     if (m === 'bird') this.camInit = false;
     this.ui.toast(m === 'fly' ? 'Flug-Modus · WASD, Q/E, Shift' : m === 'bird' ? 'Vogelperspektive · Mausrad = Abstand, WASD = frei fliegen' : m === 'walk' ? 'Geh-Modus · WASD, Shift = rennen' : 'Besucher beobachten · N = nächster');
@@ -226,7 +245,7 @@ class App {
     c.addEventListener('wheel', e => {
       e.preventDefault();
       if (this.state === 'ride' && this.camMode === 'drone') this.drone.dist = clamp(this.drone.dist * (1 + Math.sign(e.deltaY) * 0.1), 8, 160);
-      else if (this.state === 'park' && this.parkMode === 'walk') this.walkFov = clamp(this.walkFov + Math.sign(e.deltaY) * 4, 28, 95);
+      else if (this.state === 'park' && this.parkMode === 'walk') this.tp.dist = clamp(this.tp.dist * (1 + Math.sign(e.deltaY) * 0.1), 2.2, 14);
       else if (this.state === 'park' && this.parkMode === 'bird') { this.bird.r = clamp(this.bird.r * (1 + Math.sign(e.deltaY) * 0.1), 60, 700); this.bird.h = clamp(this.bird.h * (1 + Math.sign(e.deltaY) * 0.1), 40, 600); }
       else if (this.state === 'park' || this.camMode === 'free') this.free.speed = clamp(this.free.speed * (1 - Math.sign(e.deltaY) * 0.12), 8, 600);
       else this.zoom = clamp((this.zoom || 0) + Math.sign(e.deltaY) * 4, -25, 30);
@@ -249,6 +268,7 @@ class App {
       else if (k === 'm' || k === 'M') this.openMapOrMini();
       else if ((k === 'e' || k === 'E') && this.state === 'park' && this.parkMode === 'walk') this.game.interact();
       else if (k === 'k' || k === 'K') this.game.takePhoto('Foto');
+      else if ((k === 'i' || k === 'I') && this.park && this.park.def.name === 'Phantasialand') this.ui.openPanel('inventory');
       else if ((k === 'g' || k === 'G') && this.state === 'ride') this.departNow();
       else if (k === 'Tab') { e.preventDefault(); if (this.state === 'ride') this.enterPark(); else if (this.state === 'park') { const r = this.park.rides[0]; if (r) this.enterRide(r); } }
       else if (k === 't' || k === 'T') { this.env.setTime(this.env.hour + 3); this.ui.root.querySelectorAll('#mTime,#hTime').forEach(x => x.value = this.env.hour); this.ui.toast('Uhrzeit ' + this.ui.clock(this.env.hour)); this.saveSettings(); }
@@ -361,7 +381,7 @@ class App {
     if (this.state === 'ride' && this.ride) { const st = this.seatSel(); return { k: 'ride', r: this.park.rides.indexOf(this.ride), c: st.car, row: st.row, s: st.s }; }
     if (this.state === 'park') {
       const c = this.camera.position;
-      if (this.parkMode === 'walk') return { k: 'walk', p: [c.x, 0, c.z], yaw: this.walk.yaw + Math.PI };
+      if (this.parkMode === 'walk') { const p = this.walk.pos; return { k: 'walk', p: [p.x, p.y - 1.75, p.z], yaw: this.pface }; }
       return { k: 'fly', p: [c.x, c.y - 1.6, c.z], yaw: this.free.yaw + Math.PI };
     }
     return { k: 'menu' };
@@ -407,6 +427,7 @@ class App {
     const cam = this.camera, K = this.keys;
     const fovBase = this.settings.fov;
     if (this.state === 'menu') {
+      this.player.show(false);
       // Kamerafahrt über den Park
       this.menuOrbit += dt * 0.035;
       const R = Math.max(220, this.park.radius * 0.7);
@@ -414,7 +435,8 @@ class App {
       cam.lookAt(0, 22, 0); cam.fov = 60; cam.updateProjectionMatrix(); this.camInit = false;
       return;
     }
-    if (this.state === 'park') { this.updateParkCam(dt); return; }
+    if (this.state === 'park') { this.updateParkCam(dt); if (this.parkMode !== 'walk') this.player.show(false); return; }
+    this.player.show(false);
     const r = this.ride; if (!r) return;
     const sim = r.sim, mode = this.camMode;
     const W = this._w || (this._w = { p: new THREE.Vector3(), t: new THREE.Vector3(), u: new THREE.Vector3(), r: new THREE.Vector3() });
@@ -528,8 +550,19 @@ class App {
       if (grounded && (f.jump || K.has('Space'))) { f.vy = 6.6; feet += 0.02; }
       f.jump = false;
       const bob = grounded && mv.lengthSq() ? Math.abs(Math.sin(performance.now() / (K.has('ShiftLeft') ? 110 : 170))) * 0.045 : 0;
-      f.pos.y = feet + 1.75; cam.position.set(f.pos.x, f.pos.y + bob, f.pos.z); cam.rotation.set(f.pitch, f.yaw, 0, 'YXZ');
-      fov = this.walkFov;
+      f.pos.y = feet + 1.75;
+      // Third-Person: Figur sichtbar, Kamera kreist hinter ihr (Maus/Wischen), Mausrad = Abstand
+      if (mv.lengthSq() > 1e-6) this.pface = Math.atan2(mv.x, mv.z);
+      this.pspeed = mv.length() / Math.max(dt, 1e-4);
+      this.player.update(dt, f.pos.x, feet, f.pos.z, this.pface, this.pspeed, !grounded); this.player.show(true);
+      const T = this._tpT || (this._tpT = new THREE.Vector3()), e = clamp(0.3 - f.pitch * 0.9, 0.04, 1.3), d = room ? Math.min(this.tp.dist, 2.4) : this.tp.dist;
+      T.set(f.pos.x, feet + 1.45, f.pos.z);
+      let cx = T.x + Math.sin(f.yaw) * Math.cos(e) * d, cz = T.z + Math.cos(f.yaw) * Math.cos(e) * d, cy = T.y + Math.sin(e) * d;
+      if (room) { cx = clamp(cx, 3000 - 3.2, 3000 + 3.2); cz = clamp(cz, 3000 - 2.7, 3000 + 2.7); cy = Math.min(cy, 2.8); }
+      else if (w.collide) { const tmp = this._tpC || (this._tpC = new THREE.Vector3()); tmp.set(cx, cy, cz); w.collide(tmp, 0.4, cy - 1.7); cx = tmp.x; cz = tmp.z; }
+      const gy = room ? 0.1 : (w.groundAt ? w.groundAt(cx, cz, cy + 2) : 0); cy = Math.max(cy, gy + 0.5);
+      cam.position.set(cx, cy, cz); cam.lookAt(T);
+      fov = this.settings.fov;
     } else if (this.parkMode === 'bird') {
       const b = this.bird, zn = (ZONES && ZONES[b.zone]) || { x: 0, z: 0 };
       b.a += dt * 0.07;

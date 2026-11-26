@@ -6,12 +6,18 @@ const T = process.env.CF_API_TOKEN, A = process.env.CF_ACCOUNT_ID, NAME = proces
 if (!T || !A) { console.error('CF_API_TOKEN und CF_ACCOUNT_ID setzen'); process.exit(1); }
 const api = (p, o = {}) => fetch('https://api.cloudflare.com/client/v4' + p, { ...o, headers: { authorization: 'Bearer ' + T, ...(o.headers || {}) } }).then(r => r.json());
 const code = readFileSync(new URL('./worker.js', import.meta.url), 'utf8');
-const meta = { main_module: 'worker.js', compatibility_date: '2025-01-01', bindings: [{ type: 'durable_object_namespace', name: 'ROOM', class_name: 'Room' }], migrations: { new_tag: 'v1', new_sqlite_classes: ['Room'] } };
-const fd = new FormData();
-fd.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
-fd.append('worker.js', new Blob([code], { type: 'application/javascript+module' }), 'worker.js');
-let r = await api(`/accounts/${A}/workers/scripts/${NAME}`, { method: 'PUT', body: fd });
-if (!r.success && JSON.stringify(r.errors).includes('migration')) { delete meta.migrations; const f2 = new FormData(); f2.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' })); f2.append('worker.js', new Blob([code], { type: 'application/javascript+module' }), 'worker.js'); r = await api(`/accounts/${A}/workers/scripts/${NAME}`, { method: 'PUT', body: f2 }); }
+const base = { main_module: 'worker.js', compatibility_date: '2025-01-01', bindings: [{ type: 'durable_object_namespace', name: 'ROOM', class_name: 'Room' }, { type: 'durable_object_namespace', name: 'ACC', class_name: 'Accounts' }] };
+// Migrationen nacheinander probieren: Update eines bestehenden Workers (v1 → v2), frische Installation, ohne Migration
+const attempts = [{ old_tag: 'v1', new_tag: 'v2', new_sqlite_classes: ['Accounts'] }, { new_tag: 'v2', new_sqlite_classes: ['Room', 'Accounts'] }, undefined];
+let r;
+for (const mig of attempts) {
+  const meta = { ...base, ...(mig ? { migrations: mig } : {}) }, fd = new FormData();
+  fd.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
+  fd.append('worker.js', new Blob([code], { type: 'application/javascript+module' }), 'worker.js');
+  r = await api(`/accounts/${A}/workers/scripts/${NAME}`, { method: 'PUT', body: fd });
+  if (r.success) break;
+  console.error('Versuch fehlgeschlagen:', JSON.stringify(r.errors).slice(0, 200));
+}
 if (!r.success) { console.error('Upload fehlgeschlagen', JSON.stringify(r.errors)); process.exit(1); }
 const s = await api(`/accounts/${A}/workers/scripts/${NAME}/subdomain`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enabled: true, previews_enabled: false }) });
 const sd = await api(`/accounts/${A}/workers/subdomain`);

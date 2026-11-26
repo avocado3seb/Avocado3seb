@@ -68,6 +68,19 @@ export class Terrain {
     const H = this.H, a = H[j * N + i], b = H[j * N + i + 1], c = H[(j + 1) * N + i], d = H[(j + 1) * N + i + 1];
     return a + (b - a) * fu + (c - a) * fv + (a - b - c + d) * fu * fv;
   }
+  // Gelände unter einem Gebäude einebnen (OBB cx,cz,hx,hz,rot auf Höhe yT, weicher Übergang 'margin'); mesh danach mit refresh() aktualisieren
+  flatten(cx, cz, hx, hz, rot, yT, margin = 5) {
+    const n = this.n, N = n + 1, size = this.size, step = this.step, c = Math.cos(rot), s = Math.sin(rot), ext = Math.max(hx, hz) + margin + 1;
+    const i0 = Math.max(0, Math.floor((cx - ext + size / 2) / step)), i1 = Math.min(n, Math.ceil((cx + ext + size / 2) / step)), j0 = Math.max(0, Math.floor((cz - ext + size / 2) / step)), j1 = Math.min(n, Math.ceil((cz + ext + size / 2) / step));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const x = -size / 2 + i * step, z = -size / 2 + j * step, dx = x - cx, dz = z - cz, lx = dx * c - dz * s, lz = dx * s + dz * c, d = Math.max(Math.abs(lx) - hx, Math.abs(lz) - hz);
+      if (d >= margin) continue; const k = j * N + i, t = d <= 0 ? 0 : sstep(0, margin, d); this.H[k] = yT * (1 - t) + this.H[k] * t;
+    }
+    this.dirty = true;
+  }
+  refresh(mesh) { // Höhenfeld → Geometrie
+    if (!this.dirty) return; const N = this.n + 1, p = mesh.geometry.attributes.position; for (let k = 0; k < N * N; k++) p.setY(k, this.H[k]); p.needsUpdate = true; mesh.geometry.computeVertexNormals(); mesh.geometry.computeBoundingSphere(); this.dirty = false;
+  }
   recolor(mesh, colorFn) {
     const n = this.n, N = n + 1, size = this.size, step = this.step, col = mesh.geometry.attributes.color;
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {

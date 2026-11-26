@@ -18,6 +18,8 @@ const look = await ev(async () => { const a = __app; a.settings.look = true; a.a
 check('Vice-City-Look (Nachbearbeitung) schaltbar', look[0] === true && look[1] === false, JSON.stringify(look));
 const r2 = await ev(() => { const a = __app, it = a.park.interactables.find(i => i.kind === 'restaurant'); a.camera.position.set(it.x, 3, it.z); a.walk.pos.set(it.x, 3, it.z); a.game.update(0.1); const h = !!a.game.hint; a.game.interact(); const open = !document.querySelector('#panel').classList.contains('hide'); const w0 = a.game.S.wallet; document.querySelector('#pBody [data-i]').click(); return [h, open, w0 - a.game.S.wallet, a.game.S.stats.purchases]; });
 check('E-Interaktion öffnet Speisekarte, Kauf bucht ab', r2[0] && r2[1] && r2[2] > 0 && r2[3] === 1, JSON.stringify(r2));
+const inv = await ev(() => { const a = __app, g = a.game, items = g.inventory(), first = items[0]; const eaten = first && first.kind !== 'shop' ? g.consume(first.name) : null; return [items.length, first && first.name, eaten, a.player.group.visible, a.park.trackBridges]; });
+check('Inventar enthält Kauf, Third-Person-Figur sichtbar, Brücken über Schienen', inv[0] >= 1 && inv[1] && inv[3] === true && inv[4] >= 1, JSON.stringify(inv));
 const r3 = await ev(() => { const a = __app; a.ui.closePanel(); a.ui.openMap(); const M = a.ui.map; const it = M.items.find(i => i.kind === 'ride'); const cv = document.querySelector('#bmC'); a.ui.mapClick(cv.width / 2 + (it.x - M.x) * M.scale, cv.height / 2 + (it.z - M.z) * M.scale); document.querySelector('#miNav').click(); return [M.items.length, !!a.game.nav, a.game.nav && a.game.nav.route && a.game.nav.route.length]; });
 check('Parkkarte: Items, Klick, Navigation mit Route', r3[0] > 20 && r3[1] && r3[2] > 1, JSON.stringify(r3));
 await ev(() => { __app.ui.closeMap(); __app.game.stopNav(); });
@@ -26,6 +28,11 @@ const col = await ev(() => { const a = __app, w = a.park; a.ui.closePanel(); a.u
 await page.keyboard.down('ShiftLeft'); await page.keyboard.down('KeyW'); await page.waitForTimeout(3500); await page.keyboard.up('KeyW'); await page.keyboard.up('ShiftLeft');
 const inside = await ev(c => { const a = __app, p = a.walk.pos, cs = Math.cos(c.rot), sn = Math.sin(c.rot), dx = p.x - c.x, dz = p.z - c.z, lx = dx * cs - dz * sn, lz = dx * sn + dz * cs; return [Math.abs(lx) < c.hx - 0.05 && Math.abs(lz) < c.hz - 0.05, +Math.abs(lx).toFixed(1), +Math.abs(lz).toFixed(1)]; }, col);
 check('Kollision: Rennen durch Wand wird gestoppt', !inside[0], JSON.stringify([col.hx, col.hz, inside]));
+// Haus betreten: vor die Tür stellen, nach vorn laufen → man steht danach im Haus (Tür ist begehbar)
+const hb = await ev(() => { const a = __app, w = a.park, b = w.buildings.find(q => q.hollow && q.d); a.ui.closePanel(); a.ui.closeMap(); const fx = b.x + Math.sin(b.rot) * (b.d / 2 + 3), fz = b.z + Math.cos(b.rot) * (b.d / 2 + 3); a.camera.position.set(fx, 3, fz); a.setParkMode('walk'); a.walk.pos.set(fx, w.groundAt(fx, fz, 60) + 1.9, fz); a.walk.yaw = b.rot; return { x: b.x, z: b.z, d: b.d, w: b.w }; });
+await page.keyboard.down('KeyW'); await page.waitForFunction(b => { const p = __app.walk.pos; return Math.hypot(p.x - b.x, p.z - b.z) < b.d / 2 - 0.5; }, hb, { timeout: 60000 }).catch(() => {}); await page.keyboard.up('KeyW');
+const hin = await ev(b => { const p = __app.walk.pos; return [Math.hypot(p.x - b.x, p.z - b.z), b.d / 2]; }, hb);
+check('Haus betreten: Spieler steht nach dem Laufen durch die Tür im Haus', hin[0] < hin[1] + 0.2, JSON.stringify(hin));
 const exitR = await ev(async () => { const a = __app, r = a.park.rides[0]; a.rideOn(r); const st = a.ride.sim.state, t0 = a.ride.sim.timer; return [st, Math.round(t0)]; });
 check('Einsteigen: Station mit langem Countdown (≥ 20 s)', exitR[0] === 'station' && exitR[1] >= 20, JSON.stringify(exitR));
 await page.keyboard.press('Space'); await page.waitForTimeout(400);

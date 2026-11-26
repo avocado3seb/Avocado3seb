@@ -4,7 +4,7 @@
 //  Fantasy (Winja's Fear/Force, Raik, Crazy Bats). Gelände, Felsen, Wasserfälle, Brücken, Gebäude, Nacht-Beleuchtung.
 // ============================================================================
 import * as THREE from 'three';
-import { ParkWorld, getTrack } from './park.js';
+import { ParkWorld, getTrack, gableGeometry } from './park.js';
 import { Sim } from './physics.js';
 import { createTrain } from './train.js';
 import { railOffsets } from './coasterMesh.js';
@@ -17,6 +17,7 @@ import { EXTRA_ZONES, ZONE_OF_AREA } from './pl_data.js';
 import { placePOIs } from './pl_pois.js';
 import { buildBeauty } from './pl_beauty.js';
 import { buildMedieval, buildAviation } from './pl_themes.js';
+import { buildTrackBridges, buildEntrances } from './pl_bridges.js';
 import { buildChina, buildMystery, buildBerlin, buildParking, buildAirship, buildLightStrings, buildWinterDecor } from './pl_zones2.js';
 
 const TAU = Math.PI * 2;
@@ -39,7 +40,7 @@ const AREA_KEY = ZONE_OF_AREA;
 const PLACE = { // Versatz der Bahn-Mitte zur Zonenmitte
   'Taron': [0, -14], 'Black Mamba': [7, 14], 'F.L.Y.': [0, 0], 'Colorado Adventure': [0, 0],
   "Winja's Fear": [-49, -42], "Winja's Force": [49, -42], 'Raik': [-42, 49], 'Crazy Bats': [56, 56],
-  'Chiapas': [28, 7], 'Talocan': [-21, 56], 'River Quest': [-21, 14], 'Mystery Castle': [42, 28], 'Maus au Chocolat': [-49, 63], 'Wakobato': [-7, -14], 'Feng Ju Palace': [14, -7],
+  'Chiapas': [28, 7], 'Talocan': [-21, 56], 'River Quest': [-21, 14], 'Mystery Castle': [42, 28], 'Maus au Chocolat': [-49, 63], 'Wakobato': [-7, -14], 'Feng Ju Palace': [14, -7], 'Geister Rikscha': [66, -48], 'Hollywood Tour': [-62, -40],
 };
 
 export class PhantasiaWorld extends ParkWorld {
@@ -64,12 +65,13 @@ export class PhantasiaWorld extends ParkWorld {
     this.buildTerrainPL();
     this.buildPathMeshes();
     this.pois = placePOIs(this);
-    buildMedieval(this); buildAviation(this);
+    buildMedieval(this); buildMedieval(this, 'fantasy', false); buildAviation(this);
     this.buildZoneDecor();
     this.buildExtras();
     this.buildEffects();
     this.buildVisitors();
     this.buildMinimapData();
+    this.terrain.refresh(this.terrainMesh);
     this.buildRockColliders();
     this.buildColliderHash();
   }
@@ -160,6 +162,7 @@ export class PhantasiaWorld extends ParkWorld {
       return [(r * (1 - rock) + rr * rock) * n * wet, (g * (1 - rock) + rr * 0.95 * rock) * n * wet, (b * (1 - rock) + rr * 0.9 * rock) * n * wet];
     };
     const mesh = this.terrainMesh = this.terrain.build(this.terrainColor);
+    this.out.flatten = (cx, cz, hx, hz, rot, y) => this.terrain.flatten(cx, cz, hx, hz, rot, y);
     this.group.add(mesh);
     const far = this.farPlane = new THREE.Mesh(new THREE.PlaneGeometry(30000, 30000), new THREE.MeshStandardMaterial({ color: 0x3a5a2c, roughness: 1 }));
     far.rotation.x = -Math.PI / 2; far.position.y = -0.4; far.receiveShadow = true; this.group.add(far);
@@ -335,7 +338,6 @@ export class PhantasiaWorld extends ParkWorld {
       if (z > 150 || !this.grid.free(x, z, 10)) continue;
       const bw = this.R(11, 18), bd = this.R(9, 13), bh = this.R(6, 10), br = -Math.atan2(60 - z, -x) + Math.PI / 2 + Math.PI;
       this.makeBuilding(x, z, br, bw, bd, bh, this.theme);
-      out.colliders.push({ x, z, hx: bw / 2, hz: bd / 2, rot: br, y0: 0, y1: bh });
       this.grid.mark(x, z, 11);
     }
 
@@ -662,8 +664,22 @@ export class PhantasiaWorld extends ParkWorld {
   }
 
   // ------------------------------------------------------------------ Kollision & Boden
+  makeBuilding(x, z, rotY, w, d, h, th) { // begehbares Haus mit Fassade, Dach, Schornstein, Blumenkästen und Innenraum
+    const rng = this.rng, y = Math.max(0.05, this.h(x, z)), wall = th.walls[Math.floor(rng() * th.walls.length)];
+    const wallMat = new THREE.MeshStandardMaterial({ map: textures.facade(wall, th.trim, th.style), roughness: 0.9 });
+    const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rotY;
+    A.hollow(g, x, y, z, rotY, w, d, h, wallMat, { kind: 'home', floor: '#7a5a3a', rug: 0x8a2a2a }, this.env, this.out);
+    const roofCol = th.roof[Math.floor(rng() * th.roof.length)], roofMat = new THREE.MeshStandardMaterial({ map: textures.roofTile(), color: roofCol, roughness: 0.8, side: THREE.DoubleSide });
+    const rh = Math.min(w, d) * this.R(0.34, 0.5), roof = new THREE.Mesh(gableGeometry(w + 1.1, d + 1.0, rh), roofMat); roof.position.y = h; roof.castShadow = true; g.add(roof);
+    A.box(g, 0.9, rh * 0.9, 0.9, new THREE.MeshStandardMaterial({ map: A.tex.stone(), roughness: 1 }), w * 0.28, h + rh * 0.6, -d * 0.12);
+    const win = A.M('fwin2', () => { const m = new THREE.MeshStandardMaterial({ map: A.tex.window(), emissive: 0xffa040, emissiveMap: A.tex.window(), emissiveIntensity: 0.4, roughness: 0.6 }); this.env.registerLamp(m); return m; });
+    const n = Math.max(2, Math.floor(w / 3.6)); for (let r = 0; r < Math.max(1, Math.floor(h / 3.4)); r++) A.windowsOn(g, w, d, h, n, win, 1.9 + r * 3.3);
+    A.flowerBoxes(g, w, d, n, 1.0);
+    this.group.add(g); this.buildings.push({ x, z, rot: rotY, w, d, hollow: true }); return g;
+  }
   buildRockColliders() { // jede Felsen-Instanz bekommt einen Kollisionskreis (aus Position/Skalierung) → kein Durchlaufen; Felsen auf Wegen werden entfernt → Wege bleiben frei
     const m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), zero = new THREE.Vector3(0, 0, 0), segs = this.edges.map(e => ({ A: this.nodes[e[0]], B: this.nodes[e[1]], w: e[2] }));
+    for (const pl of this.plazas || []) segs.push({ A: { x: pl.x, z: pl.z }, B: { x: pl.x, z: pl.z }, w: pl.r * 2 }); // Eingangsplätze frei von Felsen
     const onPath = (x, z, r) => { for (const e of segs) { const vx = e.B.x - e.A.x, vz = e.B.z - e.A.z, L2 = vx * vx + vz * vz || 1, t = Math.max(0, Math.min(1, ((x - e.A.x) * vx + (z - e.A.z) * vz) / L2)), d = Math.hypot(x - (e.A.x + vx * t), z - (e.A.z + vz * t)); if (d < e.w / 2 + 0.8 + r * 0.7) return true; } return false; };
     let n = 0, removed = 0;
     for (const k in this.rocks) {
@@ -788,6 +804,7 @@ export class PhantasiaWorld extends ParkWorld {
     for (const r of this.rides) this.interactables.push({ type: 'ride', ride: r, x: r.entrance.x, z: r.entrance.z, r: 16, name: r.coaster.name, kind: 'ride' });
     this.interactables.push({ type: 'gate', x: 0, z: 352, r: 16, name: 'Ticketscanner / Eingang', kind: 'gate' });
     for (const r of this.rides) this.makeQueueSign(r);
+    buildTrackBridges(this); buildEntrances(this);
     buildBeauty(this);
     this.winter = false; this.hist = { inPark: 0, entered: 0 };
   }

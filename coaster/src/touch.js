@@ -7,13 +7,13 @@ const $ = (s, r = document) => r.querySelector(s);
 export class Touch {
   constructor(app) {
     this.app = app; this.on = false; this.stick = { id: null, x: 0, y: 0 }; this.run = false; this.held = new Set();
-    this.isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+    this.isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window || (navigator.maxTouchPoints || 0) > 0;
     document.getElementById('app').insertAdjacentHTML('beforeend', `
       <div id="tc" class="hide">
         <div id="joy"><i id="joyK"></i></div>
         <div id="tbtns">
           <button data-a="jump">⤒<small>Sprung</small></button><button data-a="use">E<small>Aktion</small></button><button data-a="run">»<small>Rennen</small></button>
-          <button data-a="map">🗺</button><button data-a="photo">📷</button><button data-a="go">▶<small>Start</small></button><button data-a="exit">⏏<small>Aussteigen</small></button><button data-a="cam">🎥</button><button data-a="menu">☰</button>
+          <button data-a="zin">＋<small>Nah</small></button><button data-a="zout">－<small>Fern</small></button><button data-a="map">🗺</button><button data-a="photo">📷</button><button data-a="go">▶<small>Start</small></button><button data-a="exit">⏏<small>Aussteigen</small></button><button data-a="cam">🎥</button><button data-a="menu">☰</button>
         </div></div>`);
     this.el = $('#tc'); const joy = $('#joy'), K = $('#joyK');
     const upd = (e) => {
@@ -40,7 +40,7 @@ export class Touch {
     const a = this.app, show = this.on && a.state !== 'menu';
     this.el.classList.toggle('hide', !show); if (!show) { this.stick.x = this.stick.y = 0; this.applyKeys(); return; }
     const ride = a.state === 'ride', walk = a.state === 'park' && a.parkMode === 'walk', pl = a.park && a.park.def.name === 'Phantasialand';
-    for (const [k, vis] of [['jump', walk], ['use', walk && pl], ['run', a.state === 'park'], ['map', pl], ['photo', pl], ['go', ride], ['exit', ride], ['cam', ride], ['menu', true]]) { const b = this.el.querySelector(`[data-a="${k}"]`); if (b) b.classList.toggle('hide', !vis); }
+    for (const [k, vis] of [['jump', walk], ['use', walk && pl], ['run', a.state === 'park'], ['zin', a.state === 'park' && a.parkMode === 'walk'], ['zout', a.state === 'park' && a.parkMode === 'walk'], ['map', pl], ['photo', pl], ['go', ride], ['exit', ride], ['cam', ride], ['menu', true]]) { const b = this.el.querySelector(`[data-a="${k}"]`); if (b) b.classList.toggle('hide', !vis); }
     $('#joy').classList.toggle('hide', ride);
   }
   applyKeys() {
@@ -52,6 +52,8 @@ export class Touch {
     if (a === 'jump') app.walk.jump = true;
     else if (a === 'use') app.game.interact();
     else if (a === 'run') { this.run = !this.run; b.classList.toggle('on', this.run); this.applyKeys(); }
+    else if (a === 'zin') app.tp.dist = Math.max(2.2, app.tp.dist * 0.8);
+    else if (a === 'zout') app.tp.dist = Math.min(14, app.tp.dist * 1.25);
     else if (a === 'map') app.ui.openMap();
     else if (a === 'photo') app.game.takePhoto('Foto');
     else if (a === 'go') app.departNow();
@@ -61,7 +63,7 @@ export class Touch {
   }
   pinch(delta) { // delta > 0: Finger zusammen → rauszoomen
     const a = this.app;
-    if (a.state === 'park' && a.parkMode === 'walk') a.walkFov = Math.max(28, Math.min(95, a.walkFov + delta * 0.15));
+    if (a.state === 'park' && a.parkMode === 'walk') a.tp.dist = Math.max(2.2, Math.min(14, a.tp.dist * (1 + delta * 0.004)));
     else if (a.state === 'ride' && a.camMode === 'drone') a.drone.dist = Math.max(8, Math.min(160, a.drone.dist * (1 + delta * 0.004)));
     else if (a.state === 'park' && a.parkMode === 'bird') { a.bird.r = Math.max(60, Math.min(700, a.bird.r * (1 + delta * 0.004))); a.bird.h = Math.max(40, Math.min(600, a.bird.h * (1 + delta * 0.004))); }
     else if (a.state === 'park') a.free.speed = Math.max(8, Math.min(600, a.free.speed * (1 - delta * 0.004)));
