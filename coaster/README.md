@@ -45,6 +45,8 @@ Der Start-Hub bietet **Spielen** (Parkplatz → Ticket → Park, mit Spielgeld) 
 - **Steuerung in Bahnen**: Beim Einsteigen läuft ein 30-s-Countdown; `Leertaste` = aussteigen (zurück an den Eingang), `G` = sofort losfahren. Beim Laufen gibt es Kollision (in kleinen Schritten, nichts wird durchlaufen).
 - **Themen**: Klugheim als Mittelalterwelt (Burg mit Ringmauer/Türmen/Bergfried, Fachwerkhäuser, Marktstände, Banner, Windmühle), Rookburgh in Pionierzeit der Fliegerei (Holz-Hangars, Doppeldecker, Gleiter, Windsäcke); F.L.Y. mit roten Schienen und liegenden Fahrgästen, Black Mamba als Floorless-Zug mit 3 Loopings und 2 Korkenziehern.
 
+- **Grafik „Vice-City-Look“** (Einstellungen, Standard an außer in automatisierten Tests und auf „Niedrig“): Nachbearbeitung mit Bloom (leuchtende Lichter), kräftigeren Farben, Kontrast, warmem Ton, Vignette und Filmkorn; detailliertere Besucherfiguren; runde Symbolknöpfe und runde Minikarte. Felsen haben Kollision und liegen nicht mehr auf Wegen.
+
 **Hinweis zu den Daten**: Namen, Speisekarten, Preise, Zimmertypen, Showzeiten und Ticketpreise der Gastronomie/Hotels/Shops sind **frei ergänzte Beispielangebote** (Spielgeld), keine echten Angaben des Parks. Echt sind nur Bahn-, Themenbereichs- und Hotelnamen.
 
 **Ehrlich gesagt**: Das ist eine stilisierte Nachbildung mit Platzhalter-Geometrie (Low-Poly), keine fotorealistische oder maßstabsgetreue Kopie des Parks. Streckenverläufe sind aus Höhe, Länge, Tempo, Inversionen und typischen Elementen abgeleitet.

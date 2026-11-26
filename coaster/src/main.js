@@ -15,6 +15,7 @@ import { PhantasiaWorld, ZONES } from './phantasia.js';
 import { PLGame } from './pl_game.js';
 import { Editor } from './pl_editor.js';
 import { Touch } from './touch.js';
+import { Post } from './post.js';
 
 const LS = {
   get(k, d) { try { const v = localStorage.getItem('ecs_' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
@@ -35,6 +36,7 @@ class App {
     this.camera = new THREE.PerspectiveCamera(75, 1, 0.3, 30000);
     this.scene.add(this.camera);
     this.env = new Environment(this.scene, this.renderer);
+    this.post = new Post(this.renderer, this.scene, this.camera);
     this.env.setTime(this.settings.hour); this.env.setWeather(this.settings.weather); this.env.apply(true);
     this.audio = new AudioFx(); this.audio.vol = this.settings.vol;
     this.env.onThunder = () => this.audio.thunder();
@@ -75,17 +77,19 @@ class App {
   }
 
   // ------------------------------------------------------------------ Einstellungen
+  lookOn() { const q = new URLSearchParams(location.search); if (q.has('look')) return q.get('look') !== '0'; if (this.settings.look !== undefined) return !!this.settings.look; return !navigator.webdriver; } // Standard an (außer in automatisierten Tests)
   saveSettings() { this.settings.hour = this.env.hour; this.settings.weather = this.env.weatherName; LS.set('settings', this.settings); }
   applyQuality() {
     const q = this.settings.quality, dpr = window.devicePixelRatio || 1;
     this.renderer.setPixelRatio(q === 'low' ? 0.75 : q === 'medium' ? Math.min(dpr, 1.25) : Math.min(dpr, 2));
     this.env.setShadows(this.settings.shadows && q !== 'low', q === 'high' ? 4096 : 2048);
     this.renderer.shadowMap.enabled = this.settings.shadows && q !== 'low';
+    this.post.setQuality(q, this.lookOn());
     this.resize();
   }
   resize() {
     const w = window.innerWidth, h = window.innerHeight;
-    this.renderer.setSize(w, h, false); this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
+    this.renderer.setSize(w, h, false); this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); if (this.post) this.post.resize(w, h);
   }
   toggleFav(id) { if (this.favs.has(id)) this.favs.delete(id); else this.favs.add(id); LS.set('favs', [...this.favs]); }
   addCustom(j) {
@@ -573,7 +577,7 @@ class App {
       const e = new THREE.Euler().setFromQuaternion(this.camera.quaternion, 'YXZ');
       this.ui.drawMini(this.park, this.camera.position, -e.y);
     }
-    this.renderer.render(this.scene, this.camera);
+    if (this.post.enabled) this.post.render(this.env.night || 0); else this.renderer.render(this.scene, this.camera);
     if (this.game.photoReq) this.game.capture(this.renderer);
     this.uiT = (this.uiT || 0) - dt; if (this.uiT <= 0) { this.uiT = 0.4; this.ui.updateWallet(); this.touch.refresh(); }
   }
