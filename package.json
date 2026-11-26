@@ -6,13 +6,16 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "coaster:validate": "node coaster/tools/validate.mjs --strict",
+    "coaster:peer": "node coaster/tools/peerserver.mjs 9000"
   },
   "dependencies": {
     "peerjs": "^1.5.4",
     "three": "0.170.0"
   },
   "devDependencies": {
+    "peer": "^1.0.2",
     "vite": "5.4.11"
   }
 }

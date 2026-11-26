@@ -12,6 +12,8 @@ Welt, Fahrzeuge, Figuren, Texturen, Musik und Soundeffekte werden zur Laufzeit e
 
 Empfohlen: aktueller Chrome/Edge/Firefox mit Hardware-Beschleunigung. Grafikqualität (Niedrig–Ultra) lässt sich im Menü einstellen; das Spiel senkt die Qualität automatisch, wenn die Bildrate zu niedrig ist.
 
+> **Neu:** Der **Europa Coaster Simulator** (Achterbahnen, Parks, Datenbank) liegt unter `coaster/` – lokal http://localhost:5173/coaster/ – siehe [coaster/README.md](coaster/README.md).
+
 ## Steuerung
 
 | Taste | Funktion |
