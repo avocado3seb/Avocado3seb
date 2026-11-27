@@ -44,7 +44,9 @@ await A.waitForFunction(() => { const r = [...window.__app.net.remotes.values()]
 await A.evaluate(() => { window.__app.env.setTime(21); window.__app.env.setWeather('rain'); });
 await B.waitForFunction(() => window.__app.env.weatherName === 'rain' && Math.abs(window.__app.env.hour - 21) < 0.5, null, { timeout: 120000 }).then(() => check('Tageszeit/Wetter folgen dem Host', true)).catch(() => check('Tageszeit/Wetter folgen dem Host', false));
 // Gast startet Fahrt per Dispatch
-await B.screenshot({ path: OUT + '/online_guest.png' }); await A.screenshot({ path: OUT + '/online_host.png' });
+// Screenshots sind nur Beweisfotos: auf langsamen CI-Rechnern (software GL) dürfen sie nicht den Test kippen
+await B.screenshot({ path: OUT + '/online_guest.png', timeout: 120000 }).catch(e => console.log('Hinweis: Gast-Screenshot übersprungen (' + String(e.message).split('\n')[0] + ')'));
+await A.screenshot({ path: OUT + '/online_host.png', timeout: 120000 }).catch(e => console.log('Hinweis: Host-Screenshot übersprungen (' + String(e.message).split('\n')[0] + ')'));
 // Verlassen
 await B.evaluate(() => window.__app.net.leave());
 await A.waitForTimeout(1200);
