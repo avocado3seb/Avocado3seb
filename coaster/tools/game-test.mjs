@@ -14,14 +14,21 @@ check('Start-Hub sichtbar', await ev(() => document.querySelectorAll('.tile').le
 const r1 = await ev(async () => { const a = __app; await a.ui.hubAction('free'); return [a.state, a.parkMode, a.park.def.name, a.park.pois.length, a.park.interactables.length]; });
 check('Freie Erkundung startet (Phantasialand, begehbar)', r1[0] === 'park' && r1[1] === 'walk' && r1[2] === 'Phantasialand', JSON.stringify(r1));
 check('POIs platziert (Restaurants/Hotels/Shows …)', r1[3] >= 20, 'n=' + r1[3]);
-// Regression: eine riesige, nicht unterteilte Grundplatte überdeckte wenige Sekunden nach dem Betreten Gelände und Wege (Tiefenwerte zu ungenau)
-await page.setViewportSize({ width: 960, height: 540 }); // bei dieser Größe trat der Fehler reproduzierbar auf
-await page.waitForFunction(() => __app.env.time > 2.6, null, { timeout: 180000, polling: 500 }).catch(() => {}); await page.waitForTimeout(2500);
-const gp = await ev(() => { const f = __app.park.farPlane, p = f && f.geometry.parameters; return [!!f, p && p.widthSegments, Math.round(__app.env.time * 10) / 10]; });
+// Regression: eine riesige, nicht unterteilte Grundplatte überdeckte kurz nach dem Betreten Gelände und Wege (Tiefenwerte zu ungenau).
+// Zeitunabhängig und ohne Screenshot (auf langsamen CI-Rechnern dauert ein Bild Sekunden): Kamera per updateCamera in Laufposition bringen,
+// direkt rendern und Pixel unter der Figur lesen. Bei 960x540 trat der Fehler reproduzierbar auf (alter Stand: einfarbig, Streuung 0,4).
+await page.setViewportSize({ width: 960, height: 540 });
+const gp = await ev(() => { const f = __app.park.farPlane, p = f && f.geometry.parameters; return [!!f, p && p.widthSegments]; });
 check('Grundplatte ist unterteilt (keine riesigen Dreiecke)', gp[0] && gp[1] >= 32, JSON.stringify(gp));
-const shotStd = async clip => { const png = await page.screenshot({ clip }); return ev(async b64 => { const im = new Image(); im.src = 'data:image/png;base64,' + b64; await im.decode(); const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const x = c.getContext('2d'); x.drawImage(im, 0, 0); const d = x.getImageData(0, 0, c.width, c.height).data; let s = 0, s2 = 0, n = d.length / 4; for (let i = 0; i < d.length; i += 4) { const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]; s += l; s2 += l * l; } const m = s / n; return [Math.round(m), +Math.sqrt(Math.max(0, s2 / n - m * m)).toFixed(1)]; }, png.toString('base64')); };
-const gr = await shotStd({ x: 360, y: 375, width: 240, height: 80 });
-check('Boden/Weg unter der Figur bleibt sichtbar (Textur, keine einfarbige Fläche)', gr[1] > 3, 'Helligkeit/Streuung ' + JSON.stringify(gr));
+const gr = await ev(() => {
+  const a = __app; for (let i = 0; i < 24; i++) { a.env.update(0.05, a.camera, a.camera.position); a.updateCamera(0.05); }
+  a.renderer.render(a.scene, a.camera);
+  const gl = a.renderer.getContext(), W = gl.drawingBufferWidth, H = gl.drawingBufferHeight, bw = Math.floor(W * 0.25), bh = Math.floor(H * 0.12), buf = new Uint8Array(bw * bh * 4);
+  gl.readPixels(Math.floor(W * 0.375), Math.floor(H * 0.17), bw, bh, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+  let s = 0, s2 = 0; const n = bw * bh; for (let i = 0; i < buf.length; i += 4) { const l = 0.299 * buf[i] + 0.587 * buf[i + 1] + 0.114 * buf[i + 2]; s += l; s2 += l * l; } const m = s / n;
+  return [Math.round(m), +Math.sqrt(Math.max(0, s2 / n - m * m)).toFixed(1), +a.env.time.toFixed(1), W + 'x' + H];
+});
+check('Boden/Weg unter der Figur bleibt sichtbar (Textur, keine einfarbige Fläche)', gr[1] > 3, 'Helligkeit/Streuung/Spielzeit/Größe ' + JSON.stringify(gr));
 await page.setViewportSize({ width: 1280, height: 720 });
 const look = await ev(async () => { const a = __app; a.settings.look = true; a.settings.ao = true; a.applyQuality(); await new Promise(r => setTimeout(r, 2500)); const on = a.post.enabled, ao = a.post.gtao.enabled; a.settings.look = false; a.settings.ao = false; a.applyQuality(); return [on, ao, a.post.enabled, !!a.env.iblRT]; });
 check('Vice-City-Look, Ambient Occlusion und Himmels-Beleuchtung schaltbar', look[0] === true && look[1] === true && look[2] === false && look[3] === true, JSON.stringify(look));
