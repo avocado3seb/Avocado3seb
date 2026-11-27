@@ -10,6 +10,59 @@
 <body>
 <canvas id="gl"></canvas>
 <div id="app"></div>
+<script>
+/* Sicherheitsnetz – läuft VOR dem Spiel: zeigt Fehler sichtbar an (statt eines leeren/hängenden Bildschirms) und bietet den "Sicheren Modus" an */
+(function () {
+  var seen = {}, count = 0, bar = null, lastMsg = '';
+  function safeMode() {
+    try { var s = JSON.parse(localStorage.getItem('ecs_settings') || '{}') || {}; s.quality = 'low'; s.look = false; s.ao = false; s.shadows = false; s.adaptive = true; localStorage.setItem('ecs_settings', JSON.stringify(s)); } catch (e) { /* */ }
+    location.reload();
+  }
+  function ui() {
+    if (bar || !document.body) return bar;
+    bar = document.createElement('div');
+    bar.style.cssText = 'position:fixed;left:8px;right:8px;top:8px;z-index:99999;background:#3a0f14;color:#fff;border:1px solid #ff6b6b;border-radius:10px;padding:10px 12px;font:13px/1.4 system-ui,sans-serif;box-shadow:0 6px 24px #000a;display:none';
+    bar.innerHTML = '<b>⚠ Problem erkannt</b><div id="sfMsg" style="margin:4px 0 8px;word-break:break-word;opacity:.92"></div>' +
+      '<button id="sfSafe" style="margin-right:6px;padding:6px 10px;border-radius:8px;border:0;background:#ffb020;font-weight:700">Sicherer Modus</button>' +
+      '<button id="sfReload" style="margin-right:6px;padding:6px 10px;border-radius:8px;border:0;background:#2b7fff;color:#fff">Neu laden</button>' +
+      '<button id="sfCopy" style="margin-right:6px;padding:6px 10px;border-radius:8px;border:0;background:#445">Text kopieren</button>' +
+      '<button id="sfX" style="padding:6px 10px;border-radius:8px;border:0;background:#445">✖</button>';
+    document.body.appendChild(bar);
+    bar.querySelector('#sfSafe').onclick = safeMode;
+    bar.querySelector('#sfReload').onclick = function () { location.reload(); };
+    bar.querySelector('#sfX').onclick = function () { bar.style.display = 'none'; };
+    bar.querySelector('#sfCopy').onclick = function () { try { navigator.clipboard.writeText('Europa Coaster Simulator – ' + lastMsg + ' – ' + navigator.userAgent); bar.querySelector('#sfCopy').textContent = 'Kopiert ✔'; } catch (e) { /* */ } };
+    return bar;
+  }
+  function report(msg) {
+    msg = String(msg || '').slice(0, 400); if (!msg || seen[msg] || count >= 3) return; seen[msg] = 1; count++; lastMsg = msg;
+    var b = ui(); if (!b) return; b.querySelector('#sfMsg').textContent = msg; b.style.display = 'block';
+  }
+  window.__safety = { report: report, safeMode: safeMode };
+  window.addEventListener('error', function (e) {
+    try {
+      var t = e.target;
+      if (t && t !== window && (t.src || t.href)) { report('Datei konnte nicht geladen werden: ' + (t.src || t.href).split('/').slice(-2).join('/') + ' – bitte die Seite neu laden (Strg+Shift+R) oder später erneut versuchen.'); return; }
+      if (!e.message || /ResizeObserver|Script error/i.test(e.message)) return;
+      report('Fehler: ' + e.message + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : ''));
+    } catch (x) { /* */ }
+  }, true);
+  window.addEventListener('unhandledrejection', function (e) { try { var r = e.reason; report('Fehler: ' + (r && r.message ? r.message : r)); } catch (x) { /* */ } });
+  var cv = document.getElementById('gl');
+  if (cv) cv.addEventListener('webglcontextlost', function () { report('Die Grafikkarte hat den Grafikkontext verloren (oft zu wenig Grafikspeicher). Tipp: „Sicherer Modus" startet mit weniger Effekten.'); });
+  // Start-Wächter: Spiel nach 90 s noch nicht gestartet?
+  setTimeout(function () { if (!window.__app || !window.__app.park) report('Das Spiel ist nach 90 Sekunden noch nicht gestartet (sehr langsames Gerät oder ein Fehler beim Laden).'); }, 90000);
+  // Langsam-Wächter: dauerhaft unter 4 Bilder/s im Spiel → Hinweis (einmalig)
+  var frames = 0, t0 = performance.now(), slow = 0, warned = false;
+  (function tick() { frames++; requestAnimationFrame(tick); })();
+  setInterval(function () {
+    var now = performance.now(), fps = frames * 1000 / (now - t0); frames = 0; t0 = now;
+    var a = window.__app; if (navigator.webdriver || !a || a.state === 'menu' || document.visibilityState !== 'visible' || warned) { slow = 0; return; } // nicht in automatisierten Tests
+    slow = fps < 4 ? slow + 1 : 0;
+    if (slow >= 8) { warned = true; report('Das Spiel läuft sehr langsam (' + fps.toFixed(1) + ' Bilder/s). „Sicherer Modus" schaltet teure Effekte ab.'); }
+  }, 1000);
+})();
+</script>
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>

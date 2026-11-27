@@ -98,7 +98,7 @@ class App {
 
   // Automatische Qualitätsanpassung: sinkt die Bildrate dauerhaft unter ~20 FPS, werden teure Effekte schrittweise abgeschaltet
   perfGuard(raw) {
-    if (navigator.webdriver || this.settings.adaptive === false || this.state === 'menu' || this.paused || raw > 0.5) return;
+    if (navigator.webdriver || this.settings.adaptive === false || this.state === 'menu' || this.paused || raw > 2.5) return; // > 2,5 s = Tab war im Hintergrund, kein echtes Bild
     const g = this._pg || (this._pg = { t: 0, n: 0, sum: 0, cool: 6 }); g.cool -= raw; if (g.cool > 0) return;
     g.sum += raw; g.n++; g.t += raw; if (g.t < 3) return;
     const avg = g.sum / g.n; g.t = g.sum = g.n = 0; if (avg <= 0.05) return; g.cool = 5; const s = this.settings; let msg = '';
@@ -115,7 +115,7 @@ class App {
   // ------------------------------------------------------------------ Einstellungen
   applyLook() { if (!this.player) return; this.player.setLook(this.game.lookNow()); if (this.net && this.net.active) this.net.lookDirty = true; }
   pp() { return this.state === 'park' && this.parkMode === 'walk' ? this.walk.pos : this.camera.position; } // Position der Spielerfigur (nicht der Kamera)
-  aoOn() { if (this.settings.ao !== undefined) return !!this.settings.ao; return this.settings.quality === 'high' && !matchMedia('(pointer: coarse)').matches && !navigator.webdriver; } // Standard: nur auf großen Geräten
+  aoOn() { return !!this.settings.ao; } // Standard: aus (rechenintensiv); in den Einstellungen zuschaltbar
   lookOn() { const q = new URLSearchParams(location.search); if (q.has('look')) return q.get('look') !== '0'; if (this.settings.look !== undefined) return !!this.settings.look; return !navigator.webdriver; } // Standard an (außer in automatisierten Tests)
   saveSettings() { this.settings.hour = this.env.hour; this.settings.weather = this.env.weatherName; LS.set('settings', this.settings); }
   applyQuality() {

@@ -18,6 +18,16 @@ export class Post {
     this.composer = new EffectComposer(renderer, this.rt);
     this.composer.addPass(new RenderPass(scene, camera));
     this.gtao = new GTAOPass(scene, camera, size.x, size.y); this.gtao.output = GTAOPass.OUTPUT.Default; this.gtao.enabled = false; this.gtao.updateGtaoMaterial({ radius: 0.7, distanceExponent: 1.4, thickness: 1.2, scale: 1.1, samples: 12 }); this.composer.addPass(this.gtao);
+    // Die AO-Vorstufe zeichnet die Szene mit einem Normalen-Material. Sprites (Wolken, Rauch, Nebel) und durchsichtige Flächen ohne Tiefenschreiben
+    // würden dabei als feste, schwarze Flächen erscheinen (schwarze Flecken am Himmel) → in dieser Vorstufe ausblenden.
+    this.gtao.overrideVisibility = function () {
+      const cache = this._visibilityCache;
+      this.scene.traverse(o => {
+        cache.set(o, o.visible);
+        const m = o.material;
+        if (o.isPoints || o.isLine || o.isSprite || (m && !Array.isArray(m) && m.transparent && m.depthWrite === false)) o.visible = false;
+      });
+    };
     this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.32, 0.65, 0.92); this.composer.addPass(this.bloom);
     this.grade = new ShaderPass({
       uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uNight: { value: 0 } },
