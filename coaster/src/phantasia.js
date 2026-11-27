@@ -165,7 +165,9 @@ export class PhantasiaWorld extends ParkWorld {
     const mesh = this.terrainMesh = this.terrain.build(this.terrainColor);
     this.out.flatten = (cx, cz, hx, hz, rot, y) => this.terrain.flatten(cx, cz, hx, hz, rot, y);
     this.group.add(mesh);
-    const far = this.farPlane = new THREE.Mesh(new THREE.PlaneGeometry(30000, 30000), new THREE.MeshStandardMaterial({ color: 0x3a5a2c, roughness: 1 }));
+    // Grundplatte bis zum Horizont. WICHTIG: unterteilt! Eine Fläche aus nur zwei 30-km-Dreiecken hat zu ungenaue Tiefenwerte und überdeckte
+    // je nach Kamerawinkel Gelände und Wege (Boden "verschwand" wenige Sekunden nach dem Betreten des Parks).
+    const far = this.farPlane = new THREE.Mesh(new THREE.PlaneGeometry(24000, 24000, 96, 96), new THREE.MeshStandardMaterial({ color: 0x3a5a2c, roughness: 1 }));
     far.rotation.x = -Math.PI / 2; far.position.y = -0.4; far.receiveShadow = true; this.group.add(far);
   }
   h(x, z) { return this.terrain.at(x, z); }

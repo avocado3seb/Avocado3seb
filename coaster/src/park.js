@@ -273,7 +273,8 @@ export class ParkWorld {
   buildGround() {
     const size = (this.radius + 2400) * 2;
     const tex = textures.grass().clone(); tex.repeat.set(size / 28, size / 28); tex.needsUpdate = true;
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshStandardMaterial({ map: tex, roughness: 1, color: this.def.theme === 'nordic' ? 0xaaccaa : 0xffffff }));
+    // unterteilt (keine riesigen Dreiecke): sonst werden Tiefenwerte ungenau und der Boden kann Wege/Plätze überdecken
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(size, size, 64, 64), new THREE.MeshStandardMaterial({ map: tex, roughness: 1, color: this.def.theme === 'nordic' ? 0xaaccaa : 0xffffff }));
     ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; this.group.add(ground);
     this.ground = ground;
     // Hügel-Ring am Horizont
