@@ -44,8 +44,8 @@ class AICar {
   }
   setLights(on, brake) { if (on === this.lights && brake === this.brakeLight) return; this.lights = on; this.brakeLight = brake; CM.setLights(this.model, on, brake, false, 0); }
   /* Aufprall: Impuls (Ns) in Welt (x,z) */
-  hit(jx, jz, energy) { this.vx += jx / this.mass; this.vz += jz / this.mass; if (this.state === 'drive' || this.state === 'patrol') { if (this.kind === 'traffic' && energy > 1500) this.state = 'hit'; }
-    this.hp -= energy / 2200; if (this.hp <= 0 && this.state !== 'wreck') { this.state = 'wreck'; this.wreckT = 0; } if (energy > 4000 && CM.deform) { const w = new V3(jx, 0, jz).normalize(); const lp = new V3(0, 0.5, 0); const q = new THREE.Quaternion().setFromAxisAngle(new V3(0, 1, 0), this.yaw); const loc = w.clone().applyQuaternion(q.invert()); lp.set(-loc.x * this.Wd * 0.5, 0.5, -loc.z * this.L * 0.5); CM.deform(this.model, lp, loc, 0.9, Math.min(0.28, energy / 40000)); } }
+  hit(jx, jz, energy) { this.vx += jx / this.mass; this.vz += jz / this.mass; if (this.state === 'drive' || this.state === 'patrol') { if (this.kind === 'traffic' && energy > 6000) this.state = 'hit'; }
+    this.hp -= energy / 6000; if (this.hp <= 0 && this.state !== 'wreck') { this.state = 'wreck'; this.wreckT = 0; } if (energy > 20000 && CM.deform) { const w = new V3(jx, 0, jz).normalize(); const lp = new V3(0, 0.5, 0); const q = new THREE.Quaternion().setFromAxisAngle(new V3(0, 1, 0), this.yaw); const loc = w.clone().applyQuaternion(q.invert()); lp.set(-loc.x * this.Wd * 0.5, 0.5, -loc.z * this.L * 0.5); CM.deform(this.model, lp, loc, 0.9, Math.min(0.28, energy / 450000)); } }
   dispose() { CM.dispose(this.model); this.dead = true; }
 }
 function vF0(c) { return c.vx * Math.sin(c.yaw) + c.vz * Math.cos(c.yaw); } function vL0(c) { return c.vx * Math.cos(c.yaw) - c.vz * Math.sin(c.yaw); }

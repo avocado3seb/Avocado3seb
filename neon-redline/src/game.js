@@ -126,13 +126,13 @@ Game.sync = function (dt) {
   if (dt) CM.setLights(m, Game.headOn, v.input.brake > 0.1 && v.fwdSpeed > -0.5 || (v.gear < 0 ? false : false), v.gear < 0, FX.night);
 };
 Game.onPlayerHit = function (P, n, speed, energy, other, soft) {
-  const v = Game.player, m = Game.model; if (!v || energy < 300) return; const diff = Game.settings.difficulty; const k = clamp(energy / 80000, 0, 0.5) * (diff === 0 ? 0.55 : diff === 2 ? 1.25 : 1); const loc = P.clone().sub(v.pos).applyQuaternion(v.quat.clone().invert()); const dirLocal = loc.clone().normalize(); v.applyDamage(dirLocal, k * 0.9);
+  const v = Game.player, m = Game.model; if (!v || energy < 2000) return; const diff = Game.settings.difficulty; const k = clamp(energy / 420000, 0, 0.5) * (diff === 0 ? 0.55 : diff === 2 ? 1.25 : 1); const loc = P.clone().sub(v.pos).applyQuaternion(v.quat.clone().invert()); const dirLocal = loc.clone().normalize(); v.applyDamage(dirLocal, k * 0.9);
   const lp = new V3(loc.x, loc.y + v.cgY * 0.5, loc.z + v.zcg); const inward = dirLocal.clone().multiplyScalar(-1); CM.deform(m, lp, inward, clamp(0.6 + k * 1.4, 0.6, 1.4), clamp(k * 0.9, 0.02, 0.34));
-  Game.shake = Math.max(Game.shake, clamp(speed / 20, 0.1, 1.0)); A.impact(clamp(speed / 22, 0.15, 1), energy > 15000); FX.spark(P, v.vel, Math.min(24, 4 + energy / 4000)); if (energy > 9000) FX.dust(P, v.vel, 6); if (energy > 22000) { Game.flashT = 0.15; }
+  Game.shake = Math.max(Game.shake, clamp(speed / 20, 0.1, 1.0)); A.impact(clamp(speed / 22, 0.15, 1), energy > 80000); FX.spark(P, v.vel, Math.min(24, 4 + energy / 20000)); if (energy > 40000) FX.dust(P, v.vel, 4); if (energy > 150000) { Game.flashT = 0.15; }
   // Scheiben & Lichter & Teile
-  if (energy > 28000 && !v.glassBroken) { v.glassBroken = true; m.glassMat.opacity = Math.max(m.glassMat.opacity, 0.88); m.glassMat.color.set(0x273038); A.glass(); G.UI.toast('Scheibe gebrochen', '#ff4d4d', 1.2); }
-  if (Math.abs(lp.z) > v.e.L * 0.3 && energy > 12000) { if (lp.z > 0 && m.headMat) { v.headBroken = (v.headBroken || 0) + 1; if (v.headBroken > 1) { m.headMat.emissiveIntensity = 0; m.headMat.color.set(0x111111); } } if (lp.z < 0 && m.tailMat) { v.tailBroken = (v.tailBroken || 0) + 1; if (v.tailBroken > 1) { m.tailMat.emissiveIntensity = 0; m.tailMat.color.set(0x111111); } } }
-  if (energy > 18000) Game.detach(lp);
+  if (energy > 160000 && !v.glassBroken) { v.glassBroken = true; m.glassMat.opacity = Math.max(m.glassMat.opacity, 0.88); m.glassMat.color.set(0x273038); A.glass(); G.UI.toast('Scheibe gebrochen', '#ff4d4d', 1.2); }
+  if (Math.abs(lp.z) > v.e.L * 0.3 && energy > 70000) { if (lp.z > 0 && m.headMat) { v.headBroken = (v.headBroken || 0) + 1; if (v.headBroken > 1) { m.headMat.emissiveIntensity = 0; m.headMat.color.set(0x111111); } } if (lp.z < 0 && m.tailMat) { v.tailBroken = (v.tailBroken || 0) + 1; if (v.tailBroken > 1) { m.tailMat.emissiveIntensity = 0; m.tailMat.color.set(0x111111); } } }
+  if (energy > 110000) Game.detach(lp);
   G.Career.onCrash(speed, energy, other, soft);
   if (v.health <= 0.02 && !Game.totaled) { Game.totaled = true; G.UI.toast('Totalschaden', '#ff4d4d', 2); }
 };
@@ -146,7 +146,7 @@ Game.effects = function (dt) {
   const v = Game.player, m = Game.model; if (!v) return; const f = v.forward(_dir); const wet = FX.w.wet; let slipMax = 0; let scrape = v.bodyScrape > 0.03 ? clamp(v.speed / 20, 0, 1) : 0;
   for (let i = 0; i < 4; i++) { const w = v.wheels[i]; if (!w.contact) { FX.skid(i, w.cp, null, f, 0.3, 0); continue; } const sl = w.slide || 0; const speed = v.speed; const hard = (sl > 1.25 && speed > 4) || (w.slipRatio > 0.6 && speed < 20 && v.input.throttle > 0.6) ; slipMax = Math.max(slipMax, hard ? sl : 0);
     const surf = w.surf; const road = surf === 'asphalt' || surf === 'concrete'; _pp.copy(w.cp); const vd = _dir.set(v.vel.x, 0, v.vel.z); if (vd.lengthSq() > 0.5) vd.normalize(); else vd.copy(f);
-    if (hard && road) { FX.skid(i, w.cp, null, vd, 0.26 + 0.02 * (v.e.tw * 10), clamp((sl - 1) * 0.9, 0.2, 1)); Game.smokeAcc = (Game.smokeAcc || 0) + dt * 40 * clamp(sl - 0.9, 0, 1.5); while (Game.smokeAcc >= 1) { FX.smoke(w.cp, v.vel, 1, false); Game.smokeAcc -= 1; } } else FX.skid(i, w.cp, null, vd, 0.26, 0);
+    if (hard && road) { FX.skid(i, w.cp, null, vd, 0.26 + 0.02 * (v.e.tw * 10), clamp((sl - 1) * 0.9, 0.2, 1)); Game.smokeAcc = (Game.smokeAcc || 0) + dt * 15 * clamp(sl - 0.9, 0, 1.5); while (Game.smokeAcc >= 1) { FX.smoke(w.cp, v.vel, 1, false); Game.smokeAcc -= 1; } } else FX.skid(i, w.cp, null, vd, 0.26, 0);
     if (!road && speed > 8 && Math.random() < dt * 30) FX.dust(w.cp, v.vel, 1); if (road && wet > 0.4 && speed > 14 && Math.random() < dt * 26 * wet) FX.spray(w.cp, v.vel, 1); }
   Game.slipMax = slipMax; Game.scrape = scrape; if (scrape > 0 && Math.random() < dt * 40) FX.spark(_pp.copy(v.pos), v.vel, 3);
   // Auspuff: Knallen, Feuer, Nitro

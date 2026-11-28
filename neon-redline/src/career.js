@@ -185,7 +185,7 @@ AI.onEscape = function (lvl) { const bounty = 3000 * lvl * lvl; C.addMoney(bount
 AI.onBusted = function () { const G_ = G.Game, d = C.data; const fine = Math.min(d.money, Math.round(1500 * (AI.heat + 1) + d.money * 0.01 * AI.heat)); d.money -= fine; d.stats.busted++; AI.clearHeat(); AI.reset(); G.UI.bigToast('Gefasst!', 'Strafe: ' + fine.toLocaleString('de-DE') + ' $', '#ff4d4d'); G.Audio.ui('lose'); if (C.active) { C.endEvent({ status: 'abort' }); } const sp = C.garageSpawn(0); const g = d.garages.length ? C.garages.find(x => x.id === d.garages[0]) : null; G_.respawnAt(sp.x, sp.z, sp.yaw); C.save(true); };
 AI.onSpike = function () { G.UI.toast('Reifen durch Nagelband zerstört!', '#ff4d4d', 1.8); G.Audio.impact(0.4, true); };
 AI.onPlayerHit = function (P, n, speed, energy, other) { G.Game.onPlayerHit(P, n, speed, energy, other); };
-C.onCrash = function (speed, energy, other, soft) { const d = C.data; d.stats.crashes++; if (energy > 40000) d.stats.bigCrash++; if (!other && !soft && speed > 9) AI.addHeat(Math.min(12, speed * 0.7), 'Sachbeschädigung'); if (soft && speed > 8) AI.addHeat(3, 'Sachbeschädigung'); };
+C.onCrash = function (speed, energy, other, soft) { const d = C.data; d.stats.crashes++; if (energy > 250000) d.stats.bigCrash++; if (!other && !soft && speed > 9) AI.addHeat(Math.min(12, speed * 0.7), 'Sachbeschädigung'); if (soft && speed > 8) AI.addHeat(3, 'Sachbeschädigung'); };
 C.onWater = function () { if (G.Game.waterT && G.Game.time - G.Game.waterT < 3) return; G.Game.waterT = G.Game.time; G.UI.toast('Im Wasser gelandet – Fahrzeug wird geborgen', '#ff4d4d', 2); G.Game.resetToRoad(); G.Game.player.vel.set(0, 0, 0); };
 
 /* ------------------------------------------------------------------ Story & Erfolge */
