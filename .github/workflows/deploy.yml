@@ -1,4 +1,4 @@
-name: Build, Test & Deploy (Vice City + Europa Coaster Simulator)
+name: Build, Test & Deploy (Vice City + Europa Coaster Simulator + Neon Redline)
 
 on:
   push:
@@ -26,9 +26,31 @@ jobs:
           node-version: 22
       - run: node coaster/tools/validate.mjs --strict
 
+  # Neon Redline (neon-redline/): Welt-, Routen-, Fahrzeug- und Physik-Tests, dann zu einer HTML-Datei bündeln
+  neon-validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: neon-redline
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: neon-redline/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: neon-redline
+          path: neon-redline/dist/index.html
+          retention-days: 7
+
   build:
     runs-on: ubuntu-latest
-    needs: coaster-validate
+    needs: [coaster-validate, neon-validate]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,6 +59,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - name: Neon Redline unter /neon-redline/ einbinden
+        uses: actions/download-artifact@v4
+        with:
+          name: neon-redline
+          path: dist/neon-redline
       - uses: actions/upload-artifact@v4
         with:
           name: dist

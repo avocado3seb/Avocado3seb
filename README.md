@@ -124,3 +124,8 @@ src/
   landmarks2.js    Alpen, Terra Mundi, Savanne, Alcatraz
   audio.js         Synthese-Audio & Radio
 ```
+
+
+## Weitere Projekte
+
+- **Neon Redline** (`neon-redline/`): Open-World-Rennspiel, in Entwicklung. Online unter `/neon-redline/`, siehe `neon-redline/README.md`.
