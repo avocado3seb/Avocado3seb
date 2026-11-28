@@ -1,3 +1,4 @@
 node_modules/
 dist/
 test/out_*.png
+test-ci.png

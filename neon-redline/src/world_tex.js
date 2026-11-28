@@ -144,8 +144,8 @@ M.water = new THREE.MeshStandardMaterial({ color: 0x0b2236, roughness: 0.06, met
 M.glowPoints = new THREE.ShaderMaterial({
   uniforms: { uMap: { value: T.glow }, uScale: { value: 400 }, uNight: { value: 0 }, uTime: { value: 0 } },
   vertexShader: `attribute float size; attribute vec3 color; attribute float phase; varying vec3 vC; varying float vA; uniform float uScale; uniform float uNight; uniform float uTime;
-    void main(){ vC = color; vec4 mv = modelViewMatrix * vec4(position,1.0); float d = -mv.z; vA = clamp(uNight,0.0,1.0); if(phase>0.0){ vA *= 0.5+0.5*step(0.0, sin(uTime*phase*3.0)); } gl_PointSize = size * uScale / max(d,1.0); gl_PointSize = min(gl_PointSize, 220.0); gl_Position = projectionMatrix * mv; if(d > 900.0) gl_PointSize = 0.0; }`,
-  fragmentShader: `uniform sampler2D uMap; varying vec3 vC; varying float vA; void main(){ vec4 t = texture2D(uMap, gl_PointCoord); gl_FragColor = vec4(vC * t.rgb * 1.6, t.a * vA); }`,
+    void main(){ vC = color; vec4 mv = modelViewMatrix * vec4(position,1.0); float d = -mv.z; vA = clamp(uNight,0.0,1.0); if(phase>0.0){ vA *= 0.5+0.5*step(0.0, sin(uTime*phase*3.0)); } gl_PointSize = size * uScale / max(d,1.0); gl_PointSize = min(gl_PointSize, 96.0); vA *= smoothstep(3.0, 22.0, d); gl_Position = projectionMatrix * mv; if(d > 900.0) gl_PointSize = 0.0; }`,
+  fragmentShader: `uniform sampler2D uMap; varying vec3 vC; varying float vA; void main(){ vec4 t = texture2D(uMap, gl_PointCoord); gl_FragColor = vec4(vC * t.rgb * 1.1, t.a * vA); }`,
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
 
 G.Tex = T; G.Mats = M;

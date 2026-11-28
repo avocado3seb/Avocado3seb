@@ -1,14 +1,31 @@
 {
-  "vendor": ["node_modules/three/build/three.min.js",
-             "node_modules/three/examples/js/postprocessing/EffectComposer.js",
-             "node_modules/three/examples/js/postprocessing/RenderPass.js",
-             "node_modules/three/examples/js/postprocessing/ShaderPass.js",
-             "node_modules/three/examples/js/postprocessing/MaskPass.js",
-             "node_modules/three/examples/js/postprocessing/UnrealBloomPass.js",
-             "node_modules/three/examples/js/shaders/CopyShader.js",
-             "node_modules/three/examples/js/shaders/LuminosityHighPassShader.js",
-             "node_modules/three/examples/js/shaders/FXAAShader.js"],
-  "src": ["util.js", "world_data.js", "world_tex.js", "world_gen.js", "world_zones.js", "cars_data.js", "car_model.js", "physics.js"],
+  "vendor": [
+    "node_modules/three/build/three.min.js",
+    "node_modules/three/examples/js/postprocessing/EffectComposer.js",
+    "node_modules/three/examples/js/postprocessing/RenderPass.js",
+    "node_modules/three/examples/js/postprocessing/ShaderPass.js",
+    "node_modules/three/examples/js/postprocessing/MaskPass.js",
+    "node_modules/three/examples/js/postprocessing/UnrealBloomPass.js",
+    "node_modules/three/examples/js/shaders/CopyShader.js",
+    "node_modules/three/examples/js/shaders/LuminosityHighPassShader.js",
+    "node_modules/three/examples/js/shaders/FXAAShader.js"
+  ],
+  "src": [
+    "util.js",
+    "world_data.js",
+    "world_tex.js",
+    "world_gen.js",
+    "world_zones.js",
+    "cars_data.js",
+    "car_model.js",
+    "physics.js",
+    "fx.js",
+    "audio.js",
+    "ai.js",
+    "career.js",
+    "ui.js",
+    "game.js"
+  ],
   "template": "src/index.template.html",
   "out": "dist/index.html"
 }
