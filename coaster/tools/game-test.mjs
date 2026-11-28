@@ -86,7 +86,10 @@ const hin = await ev(b => { const p = __app.walk.pos; return [Math.hypot(p.x - b
 check('Haus betreten: Spieler steht nach dem Laufen durch die Tür im Haus', hin[0] < hin[1] + 0.2, JSON.stringify(hin));
 const exitR = await ev(async () => { const a = __app, r = a.park.rides[0]; a.rideOn(r); const st = a.ride.sim.state, t0 = a.ride.sim.timer; return [st, Math.round(t0)]; });
 check('Einsteigen: Station mit langem Countdown (≥ 20 s)', exitR[0] === 'station' && exitR[1] >= 20, JSON.stringify(exitR));
-const up = await page.waitForFunction(() => __app.ride && __app.ride.train.upgraded === true, null, { timeout: 60000 }).then(() => true).catch(() => false);
+// Die Aufwertung läuft im Bildtakt (alle 0,6 s Spielzeit, je Bild höchstens eine Bildzeit-Scheibe): auf langsamen CI-Rechnern (Software-GL, mehrere Sekunden je Bild)
+// reichten 60 s nicht immer. Den Takt deshalb sofort auslösen und großzügig warten – geprüft wird weiterhin, dass die Fahrgäste wirklich aufgewertet werden.
+await ev(() => { __app.riderT = 0; });
+const up = await page.waitForFunction(() => __app.ride && __app.ride.train.upgraded === true, null, { timeout: 180000 }).then(() => true).catch(() => false);
 check('Fahrgäste im Zug werden zu Vice-City-Figuren (in der Nähe)', up);
 await page.keyboard.press('Space'); await page.waitForTimeout(400);
 const afterExit = await ev(() => [__app.state, __app.parkMode]);
