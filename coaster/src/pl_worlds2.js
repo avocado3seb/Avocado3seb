@@ -37,13 +37,14 @@ export function chinaExtras(world) {
   // Bambushaine
   const stem = new THREE.CylinderGeometry(0.09, 0.12, 1, 6); stem.translate(0, 0.5, 0);
   const bam = new A.Inst(stem, std('#5a9a3a', { roughness: 0.6 }), 420, G, { shadow: true }), cap = new A.Inst(new THREE.IcosahedronGeometry(0.5, 0), std('#4a8a30'), 420, G);
-  around(world, zn.x, zn.z, zn.r * 1.1, Math.round(9 * k) + 3, 5, (x, y, z) => { const n = 14 + Math.floor(world.rng() * 10); for (let i = 0; i < n; i++) { const a = world.R(0, TAU), r = Math.sqrt(world.rng()) * 3.2, bx = x + Math.cos(a) * r, bz = z + Math.sin(a) * r, h = world.R(4, 8); bam.add(bx, world.h(bx, bz), bz, 1, h, 1, 0, null, world.R(-0.05, 0.05), world.R(-0.05, 0.05)); cap.add(bx, world.h(bx, bz) + h, bz, 0.9, 1.6, 0.9, world.R(0, TAU)); } out.colliders.push({ x, z, r: 2.4, y0: y, y1: y + 6 }); });
-  bam.done(); cap.done();
-  // Kirschbäume (rosa Kronen) – nutzen die Baum-Instanzen der Welt
-  if (world.inst && world.inst.crowns) {
-    const { trunks, crowns } = world.inst, pink = ['#f4a8c0', '#f8bcd0', '#ee94b4', '#fad0dc'];
-    around(world, zn.x, zn.z, zn.r * 1.05, Math.round(22 * k) + 4, 3.6, (x, y, z) => { const s = world.R(0.9, 1.5); trunks.add(x, y, z, s * 0.7, 3.2 * s, s * 0.7, 0); for (let q = 0; q < 3; q++) crowns.add(x + world.R(-1, 1) * s, y + (2.6 + q * 0.5) * s, z + world.R(-1, 1) * s, (2.6 - q * 0.3) * s, 2.0 * s, (2.6 - q * 0.3) * s, world.R(0, TAU), pink[(q + Math.floor(x)) & 3]); out.colliders.push({ x, z, r: 0.5, y0: y, y1: y + 4 }); });
-    trunks.done(); crowns.done();
+  around(world, zn.x, zn.z, zn.r * 1.1, Math.round(9 * k) + 3, 5, (x, y, z) => { const n = 14 + Math.floor(world.rng() * 10); for (let i = 0; i < n; i++) { const a = world.R(0, TAU), r = Math.sqrt(world.rng()) * 3.2, bx = x + Math.cos(a) * r, bz = z + Math.sin(a) * r, h = world.R(4, 8); bam.add(bx, world.h(bx, bz), bz, 1, h, 1, 0, null, world.R(-0.05, 0.05), world.R(-0.05, 0.05)); cap.add(bx, world.h(bx, bz) + h, bz, 0.9, 1.6, 0.9, world.R(0, TAU)); } out.colliders.push({ x, z, r: 2.4, y0: y, y1: y + 6 }); }, 0, 40, true);
+  bam.done(); cap.done(); world.bambooCount = bam.mesh.count;
+  // Kirschbäume (rosa Kronen, eigene Instanzen)
+  {
+    const tg = new THREE.CylinderGeometry(0.28, 0.5, 1, 7); tg.translate(0, 0.5, 0); const cg = new THREE.IcosahedronGeometry(1, 1); cg.translate(0, 0.7, 0); const pink = ['#f4a8c0', '#f8bcd0', '#ee94b4', '#fad0dc'];
+    const trunks = new A.Inst(tg, std('#4a3524', { roughness: 1 }), 120, G, { shadow: true }), crowns = new A.Inst(cg, std('#ffffff', { roughness: 0.9 }), 400, G, { shadow: true });
+    around(world, zn.x, zn.z, zn.r * 1.05, Math.round(22 * k) + 4, 3.6, (x, y, z) => { const s = world.R(0.9, 1.5); trunks.add(x, y, z, s * 0.7, 3.2 * s, s * 0.7, 0); for (let q = 0; q < 3; q++) crowns.add(x + world.R(-1, 1) * s, y + (2.6 + q * 0.5) * s, z + world.R(-1, 1) * s, (2.6 - q * 0.3) * s, 2.0 * s, (2.6 - q * 0.3) * s, world.R(0, TAU), pink[(q + Math.floor(Math.abs(x))) & 3]); out.colliders.push({ x, z, r: 0.5, y0: y, y1: y + 4 }); }, 0, 40, true);
+    trunks.done(); crowns.done(); world.cherryCount = trunks.mesh.count;
   }
 }
 

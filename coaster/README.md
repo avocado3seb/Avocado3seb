@@ -77,7 +77,7 @@ Der Park ist nach acht Welten gebaut: die sechs Hauptwelten **Berlin, Fantasy, M
 - **Mitfahr-Attraktionen** (Pferdekarussell, Wellenflug, Tittle Tattle Tree): `E` zum Einsteigen, Spielerfigur fährt mit, `Leertaste` steigt aus.
 - **Adventure Trail** (Deep in Africa, `E` am Holzportal): 5 Wegpunkte mit leuchtenden Kugeln in 7 Minuten, Pfeil-Navigation, Belohnung 60 € (Spielgeld) und Erfolg „Abenteurer“; Navigation beenden = Abbruch.
 - **Leistung**: Die vielen Gebäudeteile (Fenster, Bretter, Zierteile) werden beim Aufbau je Material und 96-m-Kachel zu wenigen Meshes zusammengefasst (`src/pl_merge.js`; animierte Teile wie Zahnräder, Propeller, Mitfahr-Attraktionen und Wegpunkt-Kugeln bleiben einzeln). Ohne das lagen die Draw-Calls je Blick bei über 7000, jetzt bei etwa 2500–3000 (Test in `tools/game-test.mjs`).
-- **Fassaden der Fahrgeschäfte** werden vor der Vegetation platziert und lassen den Warteschlangen-Korridor frei; Hotels haben je einen eigenen Stil.
+- **Fassaden der Fahrgeschäfte** werden vor der Vegetation platziert und lassen den Warteschlangen-Korridor frei; Hotels haben je einen eigenen Stil. Auch die übrigen Themenwelt-Bauten (Kaiserplatz-Ring, Werkhallen, Basaltsäulen, Märkte, Runensteine, China-Garten mit Bambus und Kirschbäumen, Wuze Town) entstehen **vor** der Vegetation – danach sind die Zonen zu 60–97 % von Bäumen und Felsen belegt und von diesen Dekorationen bliebe fast nichts übrig.
 
 Die Fahrgeschäfte Das verrückte Hotel Tartüff, Die 3 Mausketiere, Tikal, Würmling Express und Geister Rikscha sind **stilisierte Familien-/Dunkelfahrten** mit eigener (nicht originalgetreuer) Streckenführung.
 

@@ -74,9 +74,10 @@ const tr = await ev(() => {
   put(p.ax, p.az); g.update(0.1); g.interact(); g.update(p.limit + 5); out.timeout = g.trail === null; return out;
 });
 check('Adventure Trail (Deep in Africa): Wegpunkte, Start per E, Belohnung + Erfolg, Abbruch, Zeitlimit', tr.n >= 4 && tr.zone === 'africa' && tr.hint === 'Adventure Trail' && tr.started && tr.twice && tr.done && tr.reward >= 60 && tr.flag === 1 && tr.ach && tr.orbs && tr.cancel && tr.timeout, JSON.stringify(tr));
-const fw = await ev(() => { const w = __app.park; return { fac: (w.facadeList || []).map(f => f.name), wuze: w.wuzeCount, flats: w.pois.filter(p => p.kind === 'flat').map(p => p.name), hot: w.pois.filter(p => p.kind === 'hotel').length, rides: w.rides.length }; });
+const fw = await ev(() => { const w = __app.park; return { fac: (w.facadeList || []).map(f => f.name), cherry: w.cherryCount, bamboo: w.bambooCount, wuze: w.wuzeCount, flats: w.pois.filter(p => p.kind === 'flat').map(p => p.name), hot: w.pois.filter(p => p.kind === 'hotel').length, rides: w.rides.length }; });
 check('Fassaden der Fahrgeschäfte (Talocan, Tikal, Tartüff, Maus au Chocolat, Mausketiere, Würmling, Rikscha, Feng Ju)', fw.fac.length === 8, JSON.stringify(fw.fac));
 check('Wuze Town (Häuser), 3 Hotels, 3 Mitfahr-Attraktionen, 21 Bahnen', fw.wuze >= 6 && fw.hot === 3 && fw.flats.length === 3 && fw.rides >= 21, JSON.stringify([fw.wuze, fw.hot, fw.flats.length, fw.rides]));
+check('China Town: Garten mit Bambus und Kirschbäumen', fw.cherry >= 8 && fw.bamboo >= 60, JSON.stringify([fw.cherry, fw.bamboo]));
 await ev(() => { __app.game.stopNav(); __app.ui.closePanel(); });
 // Haus betreten: vor die Tür stellen, nach vorn laufen → man steht danach im Haus (Tür ist begehbar)
 const hb = await ev(() => { const a = __app, w = a.park, b = w.buildings.find(q => q.hollow && q.d); a.ui.closePanel(); a.ui.closeMap(); const fx = b.x + Math.sin(b.rot) * (b.d / 2 + 3), fz = b.z + Math.cos(b.rot) * (b.d / 2 + 3); a.camera.position.set(fx, 3, fz); a.setParkMode('walk'); a.walk.pos.set(fx, w.groundAt(fx, fz, 60) + 1.9, fz); a.walk.yaw = b.rot; return { x: b.x, z: b.z, d: b.d, w: b.w }; });

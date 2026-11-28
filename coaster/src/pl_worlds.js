@@ -24,12 +24,12 @@ export function onPath(world, x, z, m = 2) {
   return false;
 }
 // freie Plätze (ohne Gleis-Fußabdrücke) um einen Punkt suchen; fn(x, y, z, rot) → false = ablehnen
-export function around(world, cx, cz, rMax, n, clear, fn, rMin = 0, tries = 40) {
+export function around(world, cx, cz, rMax, n, clear, fn, rMin = 0, tries = 40, low = false) { // low: auch Senken bis -3 m zulassen, fn bekommt dann die echte Bodenhöhe (für Pflanzen)
   let made = 0;
   for (let t = 0; t < n * tries && made < n; t++) {
     const a = world.R(0, TAU), r = rMin + Math.sqrt(world.rng()) * (rMax - rMin), x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-    if (!world.siteOk(x, z, clear)) continue; const y = world.h(x, z); if (y < -0.4) continue;
-    if (fn(x, Math.max(0.05, y), z, Math.atan2(cx - x, cz - z)) !== false) { world.grid.mark(x, z, clear); made++; }
+    if (!world.siteOk(x, z, clear)) continue; const y = world.h(x, z); if (y < (low ? -3 : -0.4)) continue;
+    if (fn(x, low ? y : Math.max(0.05, y), z, Math.atan2(cx - x, cz - z)) !== false) { world.grid.mark(x, z, clear); made++; }
   }
   return made;
 }

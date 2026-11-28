@@ -85,6 +85,9 @@ export class PhantasiaWorld extends ParkWorld {
     this.pois = placePOIs(this);
     rideFacades(this); // Fassaden der Fahrgeschäfte (Pyramiden, Torten, Tore …) bekommen Vorrang vor Vegetation und Streudekor
     buildMedieval(this); buildAviation(this);
+    // Themenwelt-Bauten (Kaiserplatz, Rookburgh-Hallen, Basaltsäulen, Märkte, Runensteine, China-Garten, Wuze Town) VOR der Vegetation: sonst sind die Zonen
+    // bereits von Bäumen/Felsen belegt (Belegung 60–97 %) und von diesen Dekorationen bleibt fast nichts übrig
+    buildWorldExtras(this); buildWorldExtras2(this);
     this.buildZoneDecor();
     this.buildExtras();
     this.buildEffects();
@@ -833,8 +836,6 @@ export class PhantasiaWorld extends ParkWorld {
     this.interactables.push({ type: 'gate', x: 0, z: 352, r: 16, name: 'Ticketscanner / Eingang', kind: 'gate' });
     for (const r of this.rides) this.makeQueueSign(r);
     buildTrackBridges(this); buildEntrances(this);
-    buildWorldExtras(this);
-    buildWorldExtras2(this); // China Town (Ehrentor, Bambus, Kirschbäume), Wuze Town, Fassaden der Fahrgeschäfte
     buildBeauty(this);
     this.mergeStats = bakeStatic(this); // statische Gebäudeteile je Material/Kachel zusammenfassen (Draw-Calls)
     this.winter = false; this.hist = { inPark: 0, entered: 0 };
