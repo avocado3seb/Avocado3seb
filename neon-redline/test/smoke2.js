@@ -1,0 +1,23 @@
+const { chromium } = require('playwright');
+(async () => {
+  const out = 'test/out_s2'; const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--no-sandbox', '--autoplay-policy=no-user-gesture-required'] });
+  const p = await b.newPage({ viewport: { width: 960, height: 540 } }); const errs = [];
+  p.on('console', m => { const t = m.text(); if ((m.type() === 'error' || m.type() === 'warning') && !/GPU stall|GL Driver|Deprecat|RGB format/.test(t)) errs.push(m.type() + ': ' + t.slice(0, 300)); });
+  p.on('pageerror', e => errs.push('PAGEERROR ' + e.message + ' | ' + (e.stack || '').split('\n').slice(1, 4).join(' | ')));
+  await p.goto('file://' + require('path').resolve(__dirname, '../dist/index.html') + '');
+  await p.waitForFunction(() => !document.getElementById('menu').classList.contains('hidden'), { timeout: 280000 });
+  const st = async (tag) => console.log(tag, JSON.stringify(await p.evaluate(() => ({ mode: G.Game.mode, fps: Math.round(G.Game.fps), kmh: Math.round(G.Game.speedKmh), x: Math.round(G.Game.player.pos.x), z: Math.round(G.Game.player.pos.z), gear: G.Game.player.gear, rpm: Math.round(G.Game.player.rpm), cars: G.AI.cars.length, heat: G.AI.heat, hour: G.FX.hour.toFixed(1) }))));
+  await p.evaluate(() => { const b = [...document.querySelectorAll('.mbtn')].find(x => /Freie Fahrt/i.test(x.textContent)); b.click(); });
+  await p.waitForTimeout(2500); await p.evaluate(() => { const b = document.getElementById('ok'); b && b.click(); });
+  await p.keyboard.down('KeyW'); await p.waitForTimeout(14000); await st('drive'); await p.screenshot({ path: out + '_1drive.png' });
+  await p.evaluate(() => { G.FX.hour = 22.3; G.FX.setWeather('clear', true); }); await p.waitForTimeout(5000); await st('night'); await p.screenshot({ path: out + '_2night.png' });
+  await p.evaluate(() => { G.FX.setWeather('rain', true); }); await p.waitForTimeout(5000); await st('night-rain'); await p.screenshot({ path: out + '_2rain.png' });
+  await p.keyboard.up('KeyW'); await p.keyboard.press('KeyC'); await p.keyboard.press('KeyC'); await p.keyboard.press('KeyC'); await p.keyboard.down('KeyW'); await p.waitForTimeout(3500); await p.screenshot({ path: out + '_3cockpit.png' });
+  await p.keyboard.press('KeyC'); await p.keyboard.press('KeyC'); await p.keyboard.press('KeyC'); await p.keyboard.up('KeyW');
+  await p.evaluate(() => { G.AI.addHeat(300, 'Test'); }); await p.waitForTimeout(9000); await st('heat'); await p.screenshot({ path: out + '_4heat.png' });
+  await p.evaluate(() => { G.AI.clearHeat(); G.UI.openGarage(G.Career.garages[0], 'perf'); }); await p.waitForTimeout(3000); await p.screenshot({ path: out + '_5garage.png' });
+  await p.evaluate(() => { G.UI.closeGarage(); }); await p.waitForTimeout(1500);
+  await p.keyboard.press('KeyM'); await p.waitForTimeout(1500); await p.screenshot({ path: out + '_6map.png' }); await p.keyboard.press('KeyM');
+  await p.evaluate(() => { const e = G.Career.events[0]; G.Career.startEvent(e); }); await p.waitForTimeout(9000); await st('event'); await p.screenshot({ path: out + '_7event.png' });
+  console.log(errs.slice(0, 25).join('\n') || 'keine Fehler'); await b.close();
+})();
