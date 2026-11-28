@@ -204,6 +204,7 @@ body.touch #park { max-height: 36vh; width: 230px; }
 #mini { left: 16px; right: auto; bottom: 74px; padding: 0; width: 176px; height: 176px; border-radius: 50%; overflow: hidden; border: 3px solid rgba(255,255,255,.88); box-shadow: 0 0 0 3px rgba(0,0,0,.6), 0 0 26px rgba(0,0,0,.6); background: #123; }
 #mini canvas { width: 100%; height: 100%; border-radius: 50%; }
 body.touch #mini { left: auto; right: 12px; bottom: auto; top: 64px; width: 110px; height: 110px; }
+@media (max-height: 460px) { body.touch #mini { top: 56px; right: 10px; width: 68px; height: 68px; border-width: 2px; } } /* Handy im Querformat: Minikarte kleiner, damit sie nicht über den Touch-Knöpfen (Rennen/Aktion/Sprung) liegt */
 @media (max-width: 900px) { #mini { display: block; width: 120px; height: 120px; bottom: 120px; } }
 
 /* Anmeldung */
