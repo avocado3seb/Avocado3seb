@@ -32,13 +32,13 @@ Eigene, handgebaute und begehbare Welt (stilisiert im Stil des Parks, **keine** 
 Der Start-Hub bietet **Spielen** (Parkplatz → Ticket → Park, mit Spielgeld) und **Freie Erkundung** (ohne Ticket) sowie Achterbahnen, Attraktionen, Parkkarte, Hotels, Gastronomie, Fotoalbum, Statistiken, Editor, Spielstände und Einstellungen. Hintergrund: animierte 3D-Kamerafahrt über den Park.
 
 - **Welten**: Klugheim, Deep in Africa, Rookburgh, Mexico, Fantasy sowie (frei gestaltet) China Town, Mystery, Berlin/Hauptplatz und Parkplatz.
-- **Bahnen & Attraktionen**: 8 Achterbahnen (Taron, F.L.Y., Black Mamba, Colorado Adventure, Winja's Fear/Force, Raik, Crazy Bats) und 7 stilisierte Fahrgeschäfte (Chiapas, River Quest, Mystery Castle, Talocan, Maus au Chocolat, Wakobato, Feng Ju Palace) mit Warteschlangen und Wartezeit-Schildern (Besucher-Simulation).
+- **Bahnen & Attraktionen**: 8 Achterbahnen (Taron, F.L.Y., Black Mamba, Colorado Adventure, Winja's Fear/Force, Raik, Crazy Bats) und 13 stilisierte Fahrgeschäfte (Chiapas, River Quest, Mystery Castle, Talocan, Maus au Chocolat, Wakobato, Geister Rikscha, Hollywood Tour, Feng Ju Palace, Das verrückte Hotel Tartüff, Die 3 Mausketiere, Tikal, Würmling Express) mit Warteschlangen und Wartezeit-Schildern (Besucher-Simulation).
 - **Interaktion (`E`)** an Restaurants, Imbissen, Shops, Hotels, Bühnen, Ticketscanner und Bahn-Eingängen: Speisekarte/Kauf, Hotelbuchung mit begehbarem Zimmer (Check-in/-out), Showzeiten, Ticketkauf (`Tageskarte` …).
 - **Parkkarte (`M`)**: Zoom/Verschieben/Pinch, Suche, Filter, Favoriten, Spielerposition, Klick → Details, **Navigation** (Route über das Wegenetz auf der Karte und als gelbe Punkte im Park, Richtungspfeil im HUD).
 - **Besucher-KI**: Hunger/Durst/Müdigkeit, Gruppen, Familien, Warteschlangen, Shows, Shops, Hotels, Parkplatz/Abreise; Personal an Ständen.
 - **Wintertraum** (Schnee, Lichterketten), **Tageszeit/Wetter** frei einstellbar oder automatischer **Tageszyklus**.
 - **Fotos** (`K`, automatische Onride-Fotos), Fotoalbum, gespeicherte Replays (Zeitlupe, alle Kameras).
-- **Statistiken & 18 Erfolge**, **Spielstände** (3 Slots + Autosave, localStorage).
+- **Statistiken & 22 Erfolge**, **Spielstände** (3 Slots + Autosave, localStorage).
 - **Achterbahn-Editor**: Bausteine (Lift, Launch, Abfahrt, Looping, Korkenzieher, Zero-G-Roll, Helix, Top Hat, Hügel, Kurven, Bremsen …) aneinanderreihen, Parameter, Undo/Redo, Vorschau mit Kennzahlen und Validierung, Testfahrt, Speichern/Laden/Löschen.
 - **Touch** (Tablet/Handy): Joystick, Wischen = Umschauen, Pinch-Zoom, Aktionsknöpfe.
 
@@ -55,6 +55,31 @@ Der Start-Hub bietet **Spielen** (Parkplatz → Ticket → Park, mit Spielgeld) 
 - **Grafik**: Himmels-basiertes Umgebungslicht (IBL aus dem Sky-Shader), Normal Maps aus den prozeduralen Texturen, Gelände-Feinrelief, optional Ambient Occlusion (GTAO, in den Einstellungen zuschaltbar, Standard aus), Bloom/Farbkorrektur („Vice-City-Look“), schärfere Schatten um die Figur, automatische Qualitätsanpassung bei niedriger FPS (auch bei sehr langsamen Bildern). Fotorealismus ist im Browser mit prozeduralen Assets nicht erreichbar – es ist ein stilisierter Look.
 - **Sicherheitsnetz**: Ein kleiner Wächter (`index.html`, läuft vor dem Spiel) zeigt Startfehler, nicht ladbare Dateien, verlorenen Grafikkontext und dauerhaft sehr niedrige Bildraten als Banner mit „Sicherer Modus“ (niedrige Qualität, ohne Nachbearbeitung/AO/Schatten), „Neu laden“ und „Text kopieren“ an – statt eines leeren Bildschirms.
 - **Bekannter Fehler (behoben)**: Die große Grundplatte bis zum Horizont bestand aus nur zwei riesigen Dreiecken. Deren Tiefenwerte waren je nach Kamerawinkel zu ungenau, die Platte „gewann“ gegen Gelände und Wege – der Boden verschwand wenige Sekunden nach dem Betreten des Parks. Jetzt ist sie unterteilt (Regressionstest in `tools/game-test.mjs`). Ebenso bekam die AO-Vorstufe Sprites (Wolken/Rauch) als feste Flächen → schwarze Himmelsflecken; sie werden dort ausgeblendet.
+
+### Themenwelten (acht Welten, stilisiert nach einer Beschreibung)
+
+Der Park ist nach acht Welten gebaut: die sechs Hauptwelten **Berlin, Fantasy, Mystery, China Town, Mexico, Deep in Africa** plus **Rookburgh** (gehört zu Berlin) und **Klugheim** (gehört zu Mystery). Eigene Umsetzung nach Beschreibung – **keine** Originalpläne, keine Original-Assets, Namen von Gastronomie/Shops sind Beispielangebote.
+
+| Welt | Bauweise im Spiel | Besonderes |
+|---|---|---|
+| **Berlin** (1920er) | Stadthäuser mit Stuck, Fenstergiebeln, Eisenbalkonen, Markisen, Mansarddach, Läden mit Schaufenstern | **Kaiserplatz** (Brunnen, Laternen, Bänke, Beete, Café-Schirme), Pferdekarussell, Wellenflug, Maus au Chocolat (Torten-Fassade), Das verrückte Hotel Tartüff (schiefes Hotel), Die 3 Mausketiere |
+| **Rookburgh** | enge Gassen mit Steampunk-Werkhallen aus Metall und Ziegel, Kupferkuppeln, Rohre mit Dampf, Zahnräder, fliegende Maschinen | F.L.Y., Hotel Charles Lindbergh (Kupferkuppel, Propeller, Doppeldecker auf dem Dach) |
+| **Mexico** | bunte Fassaden mit Torbögen und Lauben, Marktstände, Fähnchenketten, sandiger Boden, rote Felsen, Kakteen | Colorado Adventure, Chiapas, **Talocan** und **Tikal** mit Stufenpyramiden und Fackeln |
+| **Mystery** | verwitterte Steinhäuser, Fachwerk, Wehrmauer, leuchtende Runensteine, Wasserspeier, Kapuzenfiguren, blaue Fackeln | Mystery Castle |
+| **Klugheim** | Dorf mit schiefen Dächern, dunklem Fachwerk, Basaltsäulen | Taron, Raik, **Rutmor's Taverne** (Fachwerk, hängendes Schild, Fässer, Schornstein mit Rauch) |
+| **Deep in Africa** | Erdfarben, Holz, Stroh; Hütten mit Wandmustern, Marktstände, Dschungel, Lagune, Wasserfälle | Black Mamba, Hotel Matamba (Lodge mit Strohdach), **Adventure Trail** |
+| **China Town** | rote Säulen, Gittermuster, geschwungene goldene/grüne Dächer, Pagoden, Teich, Bambus, Kirschbäume, Laternen | **Ehrentor (Paifang)**, Hotel Ling Bao (Palast), Geister Rikscha, Feng Ju Palace |
+| **Fantasy** | Pilz- und Zipfelhäuser, runde Neon-Bauten, Riesenpilze, Wuze-Figuren, bunte Laternen, leuchtend grüner Boden | **Wuze Town** (eigener Stadtteil in einer eingeebneten Senke), Würmling Express, Tittle Tattle Tree, Winja's Fear/Force |
+
+- **Boden je Welt**: neutrale Bodentextur, die Farbe kommt aus den Gelände-Vertexfarben (sandig in Mexico, rußig in Rookburgh, dunkel in Mystery/Klugheim, leuchtend in Fantasy …). Die Grundplatte liegt tief genug, damit auch Senken ihre Farbe zeigen.
+- **Einblendung beim Betreten** einer Welt oder eines Unterbereichs (Name, Kurztext, Zugehörigkeit; nach 1 s Aufenthalt, kein Flackern an Grenzen) und Hub-Seite **🌍 Themenwelten** mit Beschreibung, Merkmalen, Musik, zugehörigen Bahnen/Hotels/Gastronomie, **Hinlaufen** (Navigation) und – in der freien Erkundung – **Hinbeamen**.
+- **Musik der Themenwelten** (Einstellungen → 🎼): komplett prozedural erzeugt (WebAudio, eigene Stücke, **keine** Nachbildung echter Musik): Salon-Walzer, Maschinenrhythmus, Fiesta, dunkle Drohnen mit Glocke, Laute, Trommeln mit Vogelrufen, Zupfklänge in Pentatonik, Spieluhr. Sie läuft nur beim Laufen im Park und blendet beim Weltwechsel weich über.
+- **Mitfahr-Attraktionen** (Pferdekarussell, Wellenflug, Tittle Tattle Tree): `E` zum Einsteigen, Spielerfigur fährt mit, `Leertaste` steigt aus.
+- **Adventure Trail** (Deep in Africa, `E` am Holzportal): 5 Wegpunkte mit leuchtenden Kugeln in 7 Minuten, Pfeil-Navigation, Belohnung 60 € (Spielgeld) und Erfolg „Abenteurer“; Navigation beenden = Abbruch.
+- **Leistung**: Die vielen Gebäudeteile (Fenster, Bretter, Zierteile) werden beim Aufbau je Material und 96-m-Kachel zu wenigen Meshes zusammengefasst (`src/pl_merge.js`; animierte Teile wie Zahnräder, Propeller, Mitfahr-Attraktionen und Wegpunkt-Kugeln bleiben einzeln). Ohne das lagen die Draw-Calls je Blick bei über 7000, jetzt bei etwa 2500–3000 (Test in `tools/game-test.mjs`).
+- **Fassaden der Fahrgeschäfte** werden vor der Vegetation platziert und lassen den Warteschlangen-Korridor frei; Hotels haben je einen eigenen Stil.
+
+Die Fahrgeschäfte Das verrückte Hotel Tartüff, Die 3 Mausketiere, Tikal, Würmling Express und Geister Rikscha sind **stilisierte Familien-/Dunkelfahrten** mit eigener (nicht originalgetreuer) Streckenführung.
 
 **Hinweis zu den Daten**: Namen, Speisekarten, Preise, Zimmertypen, Showzeiten und Ticketpreise der Gastronomie/Hotels/Shops sind **frei ergänzte Beispielangebote** (Spielgeld), keine echten Angaben des Parks. Echt sind nur Bahn-, Themenbereichs- und Hotelnamen.
 

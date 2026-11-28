@@ -8,6 +8,7 @@ import { buildDatabase } from './data/index.js';
 import { UI, CAM_LIST } from './ui.js';
 import { poseAt, newPose } from './track.js';
 import { AudioFx } from './audio.js';
+import { ZoneMusic } from './pl_music.js';
 import { CATS } from './specs.js';
 import { seatLayout } from './train.js';
 import { Net } from './net.js';
@@ -30,7 +31,7 @@ const damp = (k, dt) => 1 - Math.exp(-k * dt);
 class App {
   constructor() {
     this.canvas = document.getElementById('gl');
-    this.settings = Object.assign({ quality: matchMedia('(pointer: coarse)').matches ? 'medium' : 'high', shadows: true, fov: 75, sens: 1, vol: 0.6, hour: 17.6, weather: 'clear', playerColor: '#1e88e5' }, LS.get('settings', {}));
+    this.settings = Object.assign({ quality: matchMedia('(pointer: coarse)').matches ? 'medium' : 'high', shadows: true, fov: 75, sens: 1, vol: 0.6, music: 0.5, hour: 17.6, weather: 'clear', playerColor: '#1e88e5' }, LS.get('settings', {}));
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -41,7 +42,7 @@ class App {
     this.env = new Environment(this.scene, this.renderer);
     this.post = new Post(this.renderer, this.scene, this.camera);
     this.env.setTime(this.settings.hour); this.env.setWeather(this.settings.weather); this.env.apply(true);
-    this.audio = new AudioFx(); this.audio.vol = this.settings.vol;
+    this.audio = new AudioFx(); this.audio.vol = this.settings.vol; this.music = new ZoneMusic(this.audio); this.music.setVolume(this.settings.music ?? 0.5);
     this.env.onThunder = () => this.audio.thunder();
     this.custom = LS.get('custom', []);
     this.favs = new Set(LS.get('favs', []));
@@ -216,6 +217,7 @@ class App {
     for (const r of this.park.rides) r.train.showAll();
   }
   setParkMode(m) {
+    if (this.flatRide) this.exitFlat(true);
     this.parkMode = m; this.camInit = false;
     if (m === 'walk') { const cp = this.camera.position; this.walk.pos.set(cp.x, (this.park.groundAt ? this.park.groundAt(cp.x, cp.z, 60) : 0) + 1.75 + 0.2, cp.z); this.walk.yaw = this.free.yaw; this.walk.vy = 0; this.walk.pitch = 0; this.pface = this.walk.yaw + Math.PI; this.player.yaw = this.pface; this.ui.toast('Klicken = Maus einfangen · WASD laufen · Leertaste springen · Mausrad zoomen · Esc Menü', 5000); }
     if (m === 'fly') { this.free.pos.copy(this.camera.position); const e = new THREE.Euler().setFromQuaternion(this.camera.quaternion, 'YXZ'); this.free.yaw = e.y; this.free.pitch = e.x; }
@@ -549,12 +551,45 @@ class App {
     cam.position.copy(f.pos); cam.rotation.set(f.pitch, f.yaw, 0, 'YXZ');
   }
 
+  // Dritte-Person-Kamera hinter der Spielerfigur (noCol: beim Mitfahren keine Kamera-Kollision mit dem Fahrgeschäft)
+  tpCam(f, feet, room, w, noCol) {
+    const cam = this.camera, T = this._tpT || (this._tpT = new THREE.Vector3()), e = clamp(0.3 - f.pitch * 0.9, 0.04, 1.3), d = room ? Math.min(this.tp.dist, 2.4) : this.tp.dist;
+    T.set(f.pos.x, feet + 1.45, f.pos.z);
+    let cx = T.x + Math.sin(f.yaw) * Math.cos(e) * d, cz = T.z + Math.cos(f.yaw) * Math.cos(e) * d, cy = T.y + Math.sin(e) * d;
+    if (room) { cx = clamp(cx, 3000 - 3.2, 3000 + 3.2); cz = clamp(cz, 3000 - 2.7, 3000 + 2.7); cy = Math.min(cy, 2.8); }
+    else if (w.collide && !noCol) { const tmp = this._tpC || (this._tpC = new THREE.Vector3()); tmp.set(cx, cy, cz); w.collide(tmp, 0.4, cy - 1.7); cx = tmp.x; cz = tmp.z; }
+    const gy = room ? 0.1 : (w.groundAt ? w.groundAt(cx, cz, cy + 2) : 0); cy = Math.max(cy, gy + 0.5);
+    cam.position.set(cx, cy, cz); cam.lookAt(T);
+  }
+  // Fahrgeschäft ohne Strecke (Karussell, Wellenflug, Tree): Figur sitzt auf dem Sitz und fährt mit; Leertaste = Absteigen
+  boardFlat(poi) {
+    const f = poi && poi.flatRide; if (!f || this.flatRide || this.state !== 'park' || this.parkMode !== 'walk') return;
+    const p = this.walk.pos, seat = f.pickSeat(p.x, p.z);
+    f.occupied = true; f.start(40); this.flatRide = { f, seat, t: 0, poi }; this.audio.start();
+    this.ui.toast('🎠 ' + poi.name + ' – gute Fahrt! Leertaste = Absteigen', 4500);
+  }
+  flatStep(dt, f, K) {
+    const fr = this.flatRide, P = this._seatP || (this._seatP = { x: 0, y: 0, z: 0, yaw: 0 });
+    fr.t += dt; fr.f.seatPose(fr.seat, P);
+    f.pos.set(P.x, P.y + 1.75, P.z); f.vy = 0; this.pface = P.yaw; this.pspeed = 0;
+    this.player.update(dt, P.x, P.y, P.z, P.yaw, 0, false, true); this.player.show(true);
+    if ((fr.t > 1.5 && (f.jump || K.has('Space'))) || (fr.f.state === 'idle' && fr.t > 6)) { f.jump = false; this.exitFlat(); }
+    return P.y;
+  }
+  exitFlat(silent) {
+    const fr = this.flatRide; if (!fr) return; fr.f.occupied = false; this.flatRide = null;
+    const e = fr.f.exit, gy = this.park && this.park.groundAt ? this.park.groundAt(e.x, e.z, 60) : 0;
+    this.walk.pos.set(e.x, gy + 1.75, e.z); this.walk.vy = 0; this.walk.jump = false; this.pface = Math.atan2(e.x - fr.f.x, e.z - fr.f.z);
+    if (!silent) this.ui.toast('Ausgestiegen – ' + fr.poi.name);
+  }
+
   updateParkCam(dt) {
     const cam = this.camera, K = this.ui.modal ? this.noKeys : this.keys, w = this.park;
     let fov = this.settings.fov * 0.9;
     if (this.parkMode === 'fly') this.moveFree(dt, this.free, true);
     else if (this.parkMode === 'walk') {
       const f = this.walk, sp = (K.has('ShiftLeft') || K.has('ShiftRight') ? 17 : 8) * dt;
+      if (this.flatRide) { const feetR = this.flatStep(dt, f, K); this.tpCam(f, feetR, this.game.room, w, true); fov = this.settings.fov; if (Math.abs(cam.fov - fov) > 0.05) { cam.fov += (fov - cam.fov) * damp(5, dt); cam.updateProjectionMatrix(); } return; }
       const fwd = new THREE.Vector3(-Math.sin(f.yaw), 0, -Math.cos(f.yaw)), right = new THREE.Vector3(Math.cos(f.yaw), 0, -Math.sin(f.yaw));
       const mv = new THREE.Vector3();
       if (K.has('KeyW')) mv.add(fwd); if (K.has('KeyS')) mv.sub(fwd); if (K.has('KeyD')) mv.add(right); if (K.has('KeyA')) mv.sub(right);
@@ -577,13 +612,7 @@ class App {
       if (mv.lengthSq() > 1e-6) this.pface = Math.atan2(mv.x, mv.z);
       this.pspeed = mv.length() / Math.max(dt, 1e-4);
       this.player.update(dt, f.pos.x, feet, f.pos.z, this.pface, this.pspeed, !grounded); this.player.show(true);
-      const T = this._tpT || (this._tpT = new THREE.Vector3()), e = clamp(0.3 - f.pitch * 0.9, 0.04, 1.3), d = room ? Math.min(this.tp.dist, 2.4) : this.tp.dist;
-      T.set(f.pos.x, feet + 1.45, f.pos.z);
-      let cx = T.x + Math.sin(f.yaw) * Math.cos(e) * d, cz = T.z + Math.cos(f.yaw) * Math.cos(e) * d, cy = T.y + Math.sin(e) * d;
-      if (room) { cx = clamp(cx, 3000 - 3.2, 3000 + 3.2); cz = clamp(cz, 3000 - 2.7, 3000 + 2.7); cy = Math.min(cy, 2.8); }
-      else if (w.collide) { const tmp = this._tpC || (this._tpC = new THREE.Vector3()); tmp.set(cx, cy, cz); w.collide(tmp, 0.4, cy - 1.7); cx = tmp.x; cz = tmp.z; }
-      const gy = room ? 0.1 : (w.groundAt ? w.groundAt(cx, cz, cy + 2) : 0); cy = Math.max(cy, gy + 0.5);
-      cam.position.set(cx, cy, cz); cam.lookAt(T);
+      this.tpCam(f, feet, room, w, !!this.flatRide);
       fov = this.settings.fov;
     } else if (this.parkMode === 'bird') {
       const b = this.bird, zn = (ZONES && ZONES[b.zone]) || { x: 0, z: 0 };
@@ -631,6 +660,7 @@ class App {
       const onLift = s.state === 'run' && this.ride.track.zone[Math.floor(((s.s / this.ride.track.ds) % this.ride.track.N + this.ride.track.N) % this.ride.track.N)] === 2;
       this.audio.update(dt, s.state === 'run' ? s.v : 0, 'ride', onLift, this.env.wCur.rain);
     } else this.audio.update(dt, 0, 'other', false, this.env.wCur.rain);
+    this.music.update(dt, this.game ? this.game.zoneNow : null, this.state === 'park' && !!this.park && this.park.def.name === 'Phantasialand'); // Themenwelt-Musik nur beim Laufen im Park
     this.miniT -= dt;
     if (this.miniT <= 0 && this.state !== 'menu') {
       this.miniT = 0.12;

@@ -4,6 +4,7 @@ import { Batch, hex } from './batch.js';
 import { textures } from './textures.js';
 import { gableGeometry } from './park.js';
 import { fbm, noise2 } from './pl_terrain.js';
+import { muralTex } from './pl_tex.js';
 
 const TAU = Math.PI * 2;
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -131,6 +132,7 @@ export function box(parent, w, h, d, mat, x, y, z) { const m = new THREE.Mesh(ne
 function uvScale(geo, sx, sy) { const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * sx, uv.getY(i) * sy); return geo; }
 
 // Wände mit Türöffnung (vorne = +z), Dicke t
+export const doorFronts = []; // je betretbarem Haus [Vorplatz-x, Vorplatz-z, Mitte-x, Mitte-z, Halbmaß] in Weltkoordinaten – Felsen dürfen weder Eingänge zustellen noch Häuser durchstoßen
 export function wallSet(g, w, d, h, t, mat, door = true, cols = null, ox = 0, oz = 0, rot = 0, yb = 0) { // yb = Bodenhöhe → Kollisionshöhen in Weltkoordinaten
   const parts = [];
   const add = (cx, cz, sx, sz, hh = h, y0 = 0) => {
@@ -141,6 +143,7 @@ export function wallSet(g, w, d, h, t, mat, door = true, cols = null, ox = 0, oz
   else add(0, d / 2 - t / 2, w, t);
   if (cols) {
     const c = Math.cos(rot), s = Math.sin(rot);
+    if (door) doorFronts.push([ox + s * (d / 2 + 3.5), oz + c * (d / 2 + 3.5), ox, oz, Math.max(w, d) / 2]);
     for (const [cx, cz, sx, sz, y0, y1] of parts) {
       // lokale -> Welt (Rotation um Y, three: x' = x cos + z sin, z' = -x sin + z cos)
       const wx = ox + cx * c + cz * s, wz = oz - cx * s + cz * c;
@@ -181,6 +184,11 @@ export function hollow(g, x, y, z, rot, w, d, h, wallMat, o, env, out) {
     for (const sx of [-1, 1]) { const st = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.5, 8), wood); st.position.set(-w * 0.2 + sx * 0.5, 0.35, -d * 0.12 + 0.85); g.add(st); }
     box(g, w * 0.55, 1.9, 0.4, wood, w * 0.05, 1.05, -d / 2 + 0.55); for (let k = 0; k < 9; k++) box(g, 0.22, 0.3 + (k % 3) * 0.1, 0.2, new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL((k * 0.17) % 1, 0.5, 0.5) }), w * 0.05 - w * 0.24 + k * w * 0.06, 0.65 + (k % 2) * 0.7, -d / 2 + 0.7); col(w * 0.05, -d / 2 + 0.55, w * 0.28, 0.25, 2);
     box(g, 1.9, 0.4, 1.0, wood, w / 2 - 1.4, 0.35, -d / 2 + 1.0); box(g, 1.8, 0.2, 0.9, new THREE.MeshStandardMaterial({ color: 0xe8e4dc, roughness: 1 }), w / 2 - 1.4, 0.65, -d / 2 + 1.0); box(g, 0.5, 0.15, 0.7, new THREE.MeshStandardMaterial({ color: 0xc8d8e8 }), w / 2 - 0.7, 0.8, -d / 2 + 1.0); col(w / 2 - 1.4, -d / 2 + 1.0, 1, 0.55, 0.9);
+  } else if (kind === 'shop') { // Laden: Theke, Regale mit bunten Waren, Auslagetisch, Teppich
+    box(g, w * 0.42, 0.03, d * 0.3, rugM, 0, 0.14, d * 0.12);
+    box(g, w * 0.7, 1.05, 0.7, wood, 0, 0.55, -d / 2 + 1.2); box(g, w * 0.72, 0.1, 0.92, M('hcounter', () => new THREE.MeshStandardMaterial({ color: 0xe8e0d0, roughness: 0.4 })), 0, 1.12, -d / 2 + 1.2); box(g, 0.5, 0.35, 0.4, new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.5 }), w * 0.2, 1.35, -d / 2 + 1.2); col(0, -d / 2 + 1.2, w * 0.36, 0.45, 1.2);
+    for (const sx of [-1, 1]) { box(g, 0.45, 2.3, d - 3.6, wood, sx * (w / 2 - 0.5), 1.15, 0.4); for (let k = 0; k < 16; k++) box(g, 0.34, 0.34, 0.45, new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL((k * 0.137 + (sx > 0 ? 0.3 : 0)) % 1, 0.55, 0.55), roughness: 0.7 }), sx * (w / 2 - 0.7), 0.45 + (k % 4) * 0.55, -d / 2 + 2.6 + (k >> 2) * 1.1); col(sx * (w / 2 - 0.5), 0.4, 0.3, (d - 3.6) / 2, 2.3); }
+    box(g, 1.8, 0.85, 1.4, wood, 0, 0.45, d * 0.14); for (let k = 0; k < 5; k++) box(g, 0.32, 0.32, 0.32, new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(k * 0.2, 0.65, 0.55) }), -0.6 + k * 0.3, 1.0, d * 0.14); col(0, d * 0.14, 0.95, 0.75, 0.9);
   } else if (kind === 'hall') { // Fabrikhalle
     const metal = M('iron', () => new THREE.MeshStandardMaterial({ color: 0x3a3e44, roughness: 0.55, metalness: 0.7 }));
     for (let k = 0; k < 4; k++) { const mx = -w / 2 + 3 + k * (w - 6) / 3, mz = -d / 2 + 2.4; box(g, 2.6, 2.2, 2.0, metal, mx, 1.2, mz); box(g, 0.5, 0.5, 0.1, new THREE.MeshBasicMaterial({ color: k % 2 ? 0xff7a20 : 0x30ff80 }), mx, 1.8, mz + 1.05); col(mx, mz, 1.4, 1.1, 2.3); }
@@ -211,7 +219,7 @@ export function nordicHouse(rng, x, y, z, rot, opts = {}, env, out) {
   const base = box(g, w + 0.4, 1.0, d + 0.4, stone, 0, 0.1, 0); base.geometry = uvScale(new THREE.BoxGeometry(w + 0.4, 1.4, d + 0.4), (w + d) / 4, 0.5); base.position.y = -0.3;
   if (opts.enter) wallSet(g, w, d, h, 0.3, wood, true, out.colliders, x, z, rot, y); else { box(g, w, h, d, new THREE.MeshStandardMaterial({ map: (() => { const t = tex.planks('#3c2a1c').clone(); t.repeat.set(w / 4, h / 3); t.needsUpdate = true; return t; })(), roughness: 0.95 }), 0, h / 2, 0); out.colliders.push({ x, z, hx: w / 2, hz: d / 2, rot, y0: 0, y1: h }); }
   const rh = Math.min(w, d) * 0.62;
-  const roof = new THREE.Mesh(gableGeometry(w, d, rh), roofMat); roof.position.y = h; roof.castShadow = true; g.add(roof);
+  const roof = new THREE.Mesh(gableGeometry(w, d, rh), roofMat); roof.position.y = h; roof.castShadow = true; roof.rotation.z = (rng() - 0.5) * 0.09; roof.rotation.x = (rng() - 0.5) * 0.06; roof.scale.set(1 + rng() * 0.06, 0.9 + rng() * 0.28, 1 + rng() * 0.06); g.add(roof); // schief und unregelmäßig wie im Vorbild beschrieben
   // Drachenköpfe am Giebel
   for (const sx of [-1, 1]) { const b = new THREE.Mesh(new THREE.ConeGeometry(0.12, 1.4, 5), wood); b.position.set(sx * (w / 2 + 0.4), h + rh + 0.2, 0); b.rotation.z = -sx * 0.5; g.add(b); }
   windowsOn(g, w, d, h, Math.max(2, Math.floor(w / 3.5)), win);
@@ -248,6 +256,7 @@ export function africanHut(rng, x, y, z, rot, opts, env, out) {
   const thatch = M('thatch', () => new THREE.MeshStandardMaterial({ map: tex.thatch(), roughness: 1, side: THREE.DoubleSide }));
   const hs = r * 1.75; hollow(g, x, y, z, rot, hs, hs, h, wall, { kind: 'hut', floor: '#7a5a3a', rug: 0xc07a2a, ceil: false, lamp: 0xff9a40 }, env, out);
   const roof = new THREE.Mesh(new THREE.ConeGeometry(r * 1.55, h * 0.95, 14), thatch); roof.position.y = h + h * 0.4; roof.castShadow = true; g.add(roof);
+  const mv = Math.floor(rng() * 3), band = new THREE.Mesh(new THREE.PlaneGeometry(hs * 0.92, 1.0), M('mural' + mv, () => new THREE.MeshStandardMaterial({ map: muralTex(mv), roughness: 1 }))); band.position.set(0, 1.55, hs / 2 + 0.05); g.add(band); // Wandmuster (Zickzack, Dreiecke)
   const lamp = new THREE.MeshStandardMaterial({ color: 0x331a08, emissive: 0xff8a30, emissiveIntensity: 0 }); env.registerLamp(lamp);
   const w = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), lamp); w.position.set(r * 0.85, 1.4, r * 0.88 + 0.05); w.lookAt(r * 2, 1.4, r * 2.6); g.add(w);
   out.world.add(g);

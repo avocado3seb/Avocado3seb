@@ -1,6 +1,6 @@
 // Gelände für das Phantasialand: Höhenfeld mit Hügeln, Fluss, See, Vulkan, Bergring; Laufkollision
 import * as THREE from 'three';
-import { textures } from './textures.js';
+import { groundTex } from './pl_tex.js';
 
 export function hash2(i, j) { let h = Math.imul(i, 374761393) + Math.imul(j, 668265263); h = Math.imul(h ^ (h >> 13), 1274126177); return ((h ^ (h >> 16)) >>> 0) / 4294967296; }
 export function noise2(x, z) {
@@ -111,7 +111,7 @@ export class Terrain {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     g.setIndex(new THREE.BufferAttribute(idx, 1)); g.computeVertexNormals();
-    const tex = textures.grass().clone(); tex.repeat.set(1, 1); tex.needsUpdate = true;
+    const tex = groundTex().clone(); tex.repeat.set(1, 1); tex.needsUpdate = true;
     const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: tex, vertexColors: true, roughness: 1 }));
     m.receiveShadow = true; return m;
   }

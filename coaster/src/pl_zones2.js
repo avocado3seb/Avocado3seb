@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import * as A from './pl_assets.js';
 import { textures, signTexture } from './textures.js';
 import { glowPoints } from './pl_assets.js';
+import * as H from './pl_houses.js';
+import * as T from './pl_tex.js';
 
 const TAU = Math.PI * 2;
 const mat = (c, e = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, ...e });
@@ -11,13 +13,13 @@ const hsl = (h, s, l) => new THREE.Color().setHSL(h, s, l);
 // ------------------------------------------------------------------ Pagode & chinesische Pavillons
 function pagoda(world, x, y, z, floors = 4, scale = 1) {
   const g = new THREE.Group(); g.position.set(x, y, z); g.scale.setScalar(scale);
-  const red = mat('#a8302a'), roofM = mat('#1f5a48', { side: THREE.DoubleSide }), gold = mat('#d8a82a', { metalness: 0.6, roughness: 0.4 });
+  const red = mat('#a8302a'), roofM = new THREE.MeshStandardMaterial({ map: T.rep(T.glazedTex(), 3, 3), roughness: 0.5, metalness: 0.15, side: THREE.DoubleSide }), gold = mat('#d8a82a', { metalness: 0.6, roughness: 0.4 });
   const win = A.M('cwin', () => { const m = new THREE.MeshStandardMaterial({ color: 0x331a10, emissive: 0xff8a30, emissiveIntensity: 0.3 }); world.env.registerLamp(m); return m; });
   A.box(g, 12, 1.0, 12, mat('#8a8a88', { map: A.tex.stone() }), 0, 0.5, 0);
   for (let f = 0; f < floors; f++) {
     const w = 9 - f * 1.5, yb = 1 + f * 4.2;
     A.box(g, w, 3, w, red, 0, yb + 1.5, 0);
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(w * 0.95, 1.8, 4), roofM); roof.rotation.y = Math.PI / 4; roof.position.y = yb + 3.9; roof.scale.set(1, 1, 1); roof.castShadow = true; g.add(roof);
+    const roof = new THREE.Mesh(T.curvedRoofGeo(w + 3.0, w + 3.0, 2.0, 1.0), roofM); roof.position.y = yb + 3.0; roof.castShadow = true; g.add(roof);
     for (const [dx, dz, ry] of [[0, 1, 0], [0, -1, Math.PI], [1, 0, Math.PI / 2], [-1, 0, -Math.PI / 2]]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.6), win); m.position.set(dx * (w / 2 + 0.03), yb + 1.6, dz * (w / 2 + 0.03)); m.rotation.y = ry; g.add(m); }
   }
   const spire = new THREE.Mesh(new THREE.ConeGeometry(0.4, 3, 6), gold); spire.position.y = 1 + floors * 4.2 + 2; g.add(spire);
@@ -47,7 +49,7 @@ export function buildChina(world, rng) {
   }
   // Bäume (Kirsch/Bambus ähnlich) und Pavillons
   world.scatter('china', 90, 10, zn.r, (x, y, z) => { world.leafyAt(x, y, z, 0.9 + rng() * 0.5); const l = world.inst.crowns; return true; }, 3, 6);
-  world.scatter('china', 6, 20, zn.r * 0.9, (x, y, z, rot) => { A.fairyHouse(world.prng, x, y, z, rot, world.env, out); return true; }, 8);
+  world.scatter('china', 9, 20, zn.r * 1.0, (x, y, z, rot) => { H.chinaHouse(world.prng, x, y, z, rot, world.env, out); return true; }, 9);
 }
 
 // ------------------------------------------------------------------ Mystery: Schloss, Nebel, tote Bäume
@@ -62,7 +64,7 @@ export function buildMystery(world, rng) {
   const kc = new THREE.Mesh(new THREE.ConeGeometry(9.5, 18, 14), roofM); kc.position.set(0, 59, 0); g.add(kc);
   const win = A.M('mwin', () => { const m = new THREE.MeshStandardMaterial({ color: 0x151520, emissive: 0x7aa8ff, emissiveIntensity: 0.3 }); world.env.registerLamp(m); return m; });
   for (let k = 0; k < 14; k++) { const a = k / 14 * TAU, r = 7.1; const m = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 2.4), win); m.position.set(Math.cos(a) * r, 18 + (k % 4) * 8, Math.sin(a) * r); m.rotation.y = -a + Math.PI / 2; g.add(m); out.glow.push([cx + Math.cos(a) * (r + 0.5), cy + 18 + (k % 4) * 8, cz + Math.sin(a) * (r + 0.5), 0.35, 0.55, 1, 30]); }
-  G.add(g); out.colliders.push({ x: cx, z: cz, r: 22, y0: cy, y1: cy + 60 }); world.grid.mark(cx, cz, 34);
+  g.userData.merge = true; G.add(g); out.colliders.push({ x: cx, z: cz, r: 22, y0: cy, y1: cy + 60 }); world.grid.mark(cx, cz, 34);
   out.lights.push({ x: cx, y: cy + 6, z: cz + 16, color: 0x7aa8ff, int: 22, range: 40, flicker: 0.25 });
   out.glow.push([cx, cy + 66, cz, 0.5, 0.7, 1, 90]);
   // Tote Bäume, Grabsteine, Fackeln in Blau
@@ -77,13 +79,12 @@ export function buildMystery(world, rng) {
 // ------------------------------------------------------------------ Berlin: Straßenzüge, Uhrenturm
 export function buildBerlin(world, rng) {
   const out = world.out, th = world.theme;
-  // Häuserzeilen beiderseits der Hauptstraße (Gate -> Hub)
-  for (let side of [-1, 1]) for (let k = 0; k < 7; k++) {
-    const x = side * (22 + rng() * 3), z = 110 + k * 26 + rng() * 4;
-    if (!world.grid.free(x, z, 9)) continue;
-    const w = 12 + rng() * 6, d = 11 + rng() * 3, h = 8 + rng() * 6, rot = side > 0 ? Math.PI / 2 : -Math.PI / 2;
-    world.makeBuilding(x, z, rot, w, d, h, th); world.grid.mark(x, z, 10);
-    out.glow.push([x - side * (d / 2 + 0.3), 2.2, z, 1, 0.7, 0.35, 20]);
+  // Häuserzeilen beiderseits der Hauptstraße (Gate -> Hub): Stadthäuser der 1920er, Tür zur Straße
+  for (const side of [-1, 1]) for (let z = 120 + rng() * 6; z < 318;) {
+    const bays = 3 + Math.floor(rng() * 3), w = bays * 3.4, d = 10.2, x = side * (22.5 + rng() * 1.5), zc = z + w / 2;
+    if (!world.siteOk(x, zc, 8.5)) { z += 8; continue; }
+    const rot = side > 0 ? -Math.PI / 2 : Math.PI / 2, r2 = H.berlinHouse(world.prng, x, Math.max(0.05, world.h(x, zc)), zc, rot, world.env, out, { bays, floors: 3 + Math.floor(rng() * 3) });
+    world.buildings.push({ x, z: zc, rot, w: r2.w, d: r2.d, hollow: true }); world.grid.mark(x, zc, 9); z += w + 1.2;
   }
   // Uhrenturm
   const g = new THREE.Group(); g.position.set(-70, 0, 120);

@@ -17,6 +17,10 @@ import { EXTRA_ZONES, ZONE_OF_AREA } from './pl_data.js';
 import { placePOIs } from './pl_pois.js';
 import { buildBeauty } from './pl_beauty.js';
 import { buildMedieval, buildAviation } from './pl_themes.js';
+import * as H from './pl_houses.js';
+import { buildWorldExtras } from './pl_worlds.js';
+import { buildWorldExtras2, rideFacades } from './pl_worlds2.js';
+import { bakeStatic } from './pl_merge.js';
 import { buildTrackBridges, buildEntrances } from './pl_bridges.js';
 import { CharPool, visitorLooks, staffLook } from './pl_char.js';
 import { buildChina, buildMystery, buildBerlin, buildParking, buildAirship, buildLightStrings, buildWinterDecor } from './pl_zones2.js';
@@ -40,15 +44,18 @@ for (const k in ZONES) { if (k === 'berlin' || k === 'parking') continue; const 
 const AREA_KEY = ZONE_OF_AREA;
 const PLACE = { // Versatz der Bahn-Mitte zur Zonenmitte
   'Taron': [0, -14], 'Black Mamba': [7, 14], 'F.L.Y.': [0, 0], 'Colorado Adventure': [0, 0],
-  "Winja's Fear": [-49, -42], "Winja's Force": [49, -42], 'Raik': [-42, 49], 'Crazy Bats': [56, 56],
-  'Chiapas': [28, 7], 'Talocan': [-21, 56], 'River Quest': [-21, 14], 'Mystery Castle': [42, 28], 'Maus au Chocolat': [-49, 63], 'Wakobato': [-7, -14], 'Feng Ju Palace': [14, -7], 'Geister Rikscha': [66, -48], 'Hollywood Tour': [-62, -40],
+  "Winja's Fear": [-49, -42], "Winja's Force": [49, -42], 'Raik': [-62, 52], 'Crazy Bats': [56, 56],
+  'Chiapas': [28, 7], 'Talocan': [-21, 56], 'River Quest': [-21, 14], 'Mystery Castle': [42, 28], 'Maus au Chocolat': [-49, 63], 'Wakobato': [-7, -14], 'Feng Ju Palace': [14, -7], 'Geister Rikscha': [38, 38], 'Hollywood Tour': [-62, -40],
+  'Das verrückte Hotel Tartüff': [52, 68], 'Die 3 Mausketiere': [66, -48], 'Tikal': [-50, 4], 'Würmling Express': [-104, 104],
 };
 
 export class PhantasiaWorld extends ParkWorld {
   build() {
     const rng = this.prng = mulberry32(hashStr('phantasialand'));
+    A.doorFronts.length = 0;
     this.R = (a = 0, b = 1) => a + (b - a) * rng();
-    const out = this.out = { world: this.group, colliders: [], platforms: [], lights: [], glow: [], smoke: [] };
+    // out.world.add() markiert Gruppen als zusammenfassbar (siehe pl_merge.js); animierte Gruppen setzen userData.noMerge
+    const out = this.out = { world: { add: (...gs) => { for (const g of gs) { if (g.isGroup && !g.userData.noMerge) g.userData.merge = true; this.group.add(g); } return this.group; } }, colliders: [], platforms: [], lights: [], glow: [], smoke: [], spinners: [] };
     this.zones = ZONES; this.radius = 820; this.flats = []; this.waterAnims = []; this.mist = []; this.smokeSprites = []; this.torchPts = [];
     this.gate = new THREE.Vector3(0, 0, 340); this.buildings = [];
     this.quality = this.opts.quality || 'medium';
@@ -61,12 +68,23 @@ export class PhantasiaWorld extends ParkWorld {
       flat: (x, z) => this.flatMask(x, z),
     };
     this.placeRidesPL();
+    { // Belegungsraster für Gebäude: wie 'grid', aber OHNE die Gleis-Fußabdrücke (Strecken sind meist hoch – darunter darf gebaut werden, solange nearTrackFast frei meldet)
+      const g = this.grid, base = g.mark.bind(g), c = g.c, occ = this.occ = new Set(), key = (i, j) => i * 100003 + j;
+      g.mark = (x, z, r) => { base(x, z, r); const i0 = Math.floor((x - r) / c), i1 = Math.floor((x + r) / c), j0 = Math.floor((z - r) / c), j1 = Math.floor((z + r) / c); for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) occ.add(key(i, j)); };
+      this.occFree = (x, z, r) => { const i0 = Math.floor((x - r) / c), i1 = Math.floor((x + r) / c), j0 = Math.floor((z - r) / c), j1 = Math.floor((z + r) / c); for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) if (occ.has(key(i, j))) return false; return true; };
+      this.siteOk = (x, z, r) => this.occFree(x, z, r) && !this.nearTrackFast(x, z, r + 3, 9) && !this.nearTrackFast(x, z, r * 0.55 + 2, 90) && !this.nearStation(x, z);
+      for (const rd of this.rides) g.mark(rd.entrance.x, rd.entrance.z, 22);
+    }
     this.layoutPaths();
     this.markFlatPaths();
     this.buildTerrainPL();
     this.buildPathMeshes();
+    { // Wasserflächen vor der POI-Platzierung im Raster belegen (Teich China Town, Lagune Afrika) – dort darf nichts stehen
+      const zc = this.zones.china, L = this.features.lake; this.grid.mark(zc.x - 20, zc.z + 25, 32); this.grid.mark(L.x, L.z, 78);
+    }
     this.pois = placePOIs(this);
-    buildMedieval(this); buildMedieval(this, 'fantasy', false); buildAviation(this);
+    rideFacades(this); // Fassaden der Fahrgeschäfte (Pyramiden, Torten, Tore …) bekommen Vorrang vor Vegetation und Streudekor
+    buildMedieval(this); buildAviation(this);
     this.buildZoneDecor();
     this.buildExtras();
     this.buildEffects();
@@ -151,14 +169,17 @@ export class PhantasiaWorld extends ParkWorld {
     const q = this.quality, step = q === 'low' ? 8 : 5;
     this.terrain = new Terrain(1900, step, this.features);
     const f = this.features;
+    // Bodenfarbe je Themenwelt (sRGB); die Bodentextur ist neutral grau, der Farbton kommt allein aus diesen Vertexfarben
+    const GK = 1.4, GROUND = Object.fromEntries(Object.entries({ berlin: '#4f8c34', rookburgh: '#4b463d', mexico: '#b98b50', mystery: '#3f4d3f', klugheim: '#55684a', africa: '#5f6e33', china: '#5a9250', fantasy: '#6cc247', parking: '#6b6b68' }).map(([k, c]) => { const t = new THREE.Color(c); return [k, [t.r * GK, t.g * GK, t.b * GK]]; }));
+    const DEF = GROUND.berlin;
     this.terrainColor = (x, z, y, slope) => {
       let r = 0, g = 0, b = 0, wsum = 0;
-      for (const k in ZONES) { const zn = ZONES[k], d = Math.hypot(x - zn.x, z - zn.z), w = Math.exp(-(d * d) / (zn.r * zn.r * 0.55)); r += zn.tint[0] * w; g += zn.tint[1] * w; b += zn.tint[2] * w; wsum += w; }
-      if (wsum < 0.05) { r = 0.3; g = 0.46; b = 0.22; wsum = 1; }
+      for (const k in ZONES) { const zn = ZONES[k], gc = GROUND[k] || DEF, d = Math.hypot(x - zn.x, z - zn.z), w = Math.exp(-(d * d) / (zn.r * zn.r * 0.55)); r += gc[0] * w; g += gc[1] * w; b += gc[2] * w; wsum += w; }
+      if (wsum < 0.05) { r = DEF[0]; g = DEF[1]; b = DEF[2]; wsum = 1; }
       r /= wsum; g /= wsum; b /= wsum;
       const n = 0.82 + 0.3 * fbm(x / 25, z / 25);
       const rock = sstep(0.35, 0.8, slope);
-      const rr = 0.38 + 0.12 * fbm(x / 9, z / 9);
+      const rr = 0.2 + 0.08 * fbm(x / 9, z / 9);
       const wet = y < -0.6 ? 0.55 : 1;
       return [(r * (1 - rock) + rr * rock) * n * wet, (g * (1 - rock) + rr * 0.95 * rock) * n * wet, (b * (1 - rock) + rr * 0.9 * rock) * n * wet];
     };
@@ -168,7 +189,7 @@ export class PhantasiaWorld extends ParkWorld {
     // Grundplatte bis zum Horizont. WICHTIG: unterteilt! Eine Fläche aus nur zwei 30-km-Dreiecken hat zu ungenaue Tiefenwerte und überdeckte
     // je nach Kamerawinkel Gelände und Wege (Boden "verschwand" wenige Sekunden nach dem Betreten des Parks).
     const far = this.farPlane = new THREE.Mesh(new THREE.PlaneGeometry(24000, 24000, 96, 96), new THREE.MeshStandardMaterial({ color: 0x3a5a2c, roughness: 1 }));
-    far.rotation.x = -Math.PI / 2; far.position.y = -0.4; far.receiveShadow = true; this.group.add(far);
+    far.rotation.x = -Math.PI / 2; far.position.y = -7; far.receiveShadow = true; this.group.add(far); // tief genug, damit die Gelände-Farben auch in Mulden (bis ca. -3,4 m) sichtbar sind
   }
   h(x, z) { return this.terrain.at(x, z); }
   nearStation(x, z) { for (const [sx, sz] of this.stations || []) if ((sx - x) ** 2 + (sz - z) ** 2 < 24 * 24) return true; return false; }
@@ -276,8 +297,8 @@ export class PhantasiaWorld extends ParkWorld {
     const zn = ZONES[key]; let made = 0;
     for (let t = 0; t < count * tries && made < count; t++) {
       const a = this.R(0, TAU), r = minR + Math.sqrt(this.rng()) * (maxR - minR), x = zn.x + Math.cos(a) * r, z = zn.z + Math.sin(a) * r;
-      if (!this.grid.free(x, z, clear)) continue;
-      const y = this.h(x, z); if (y < -0.4 || this.nearTrackFast(x, z, clear + 3, 9) || this.nearStation(x, z)) continue;
+      if (!this.occFree(x, z, clear)) continue;
+      const y = this.h(x, z); if (y < -0.4 || this.nearTrackFast(x, z, clear + 3, 9) || this.nearTrackFast(x, z, clear * 0.55 + 2, 90) || this.nearStation(x, z)) continue;
       if (this.flatMask(x, z) < 0.3 && key !== 'africa' && Math.abs(this.h(x + 4, z) - y) > 1.2) continue;
       if (maker(x, y, z, this.R(0, TAU))) { this.grid.mark(x, z, clear); made++; }
     }
@@ -290,7 +311,7 @@ export class PhantasiaWorld extends ParkWorld {
       const e = edges[Math.floor(this.rng() * edges.length)], A_ = this.nodes[e[0]], B_ = this.nodes[e[1]], L = Math.hypot(B_.x - A_.x, B_.z - A_.z);
       const tt = this.R(6, L - 6), side = this.rng() < 0.5 ? -1 : 1, nx = -(B_.z - A_.z) / L, nz = (B_.x - A_.x) / L, off = e[2] / 2 + clear + this.R(0, 6);
       const x = A_.x + (B_.x - A_.x) * tt / L + nx * off * side, z = A_.z + (B_.z - A_.z) * tt / L + nz * off * side;
-      if (!this.grid.free(x, z, clear) || this.nearTrackFast(x, z, clear + 2, 9)) continue;
+      if (!this.occFree(x, z, clear) || this.nearTrackFast(x, z, clear + 2, 9) || this.nearTrackFast(x, z, clear * 0.55 + 2, 90)) continue;
       const y = this.h(x, z); if (y < -0.3) continue;
       const rot = Math.atan2(-(B_.z - A_.z), (B_.x - A_.x)) + (side > 0 ? Math.PI : 0) - Math.PI / 2 + Math.PI;
       if (maker(x, y, z, rot)) { this.grid.mark(x, z, clear); made++; }
@@ -322,6 +343,7 @@ export class PhantasiaWorld extends ParkWorld {
     this.inst = { palm, bigleaf, fern, cactus, trunks, crowns, cones1, cones2 };
     const addRock = (x, y, z, s, col, collide = true, v = null) => {
       if (this.nearStation(x, z) && !(this._rockForce)) return;
+      for (const [fx, fz, hx, hz, hr] of A.doorFronts) if (Math.hypot(x - fx, z - fz) < s * 1.15 + 3 || Math.hypot(x - hx, z - hz) < hr + s * 0.9) return; // keine Felsen vor Türen oder in Häusern
       const k = v ?? Math.floor(this.rng() * 5), ry = this.R(0, TAU);
       this.rocks[k].add(x, y, z, s * this.R(0.9, 1.4), s * this.R(0.7, 1.1), s * this.R(0.9, 1.4), ry, col, this.R(-0.1, 0.1), this.R(-0.1, 0.1));
     };
@@ -335,13 +357,15 @@ export class PhantasiaWorld extends ParkWorld {
     const leafyAt = (x, y, z, s) => { out.colliders.push({ x, z, r: 0.35 * s + 0.3, y0: y - 1, y1: y + 4 }); const col = new THREE.Color().setHSL(0.27 + this.R(-0.05, 0.05), this.R(0.4, 0.6), this.R(0.2, 0.32)); trunks.add(x, y, z, s * 0.7, 3.4 * s, s * 0.7, 0, '#4a3524'); crowns.add(x, y + 2.8 * s, z, 2.8 * s, 2.4 * s, 2.8 * s, this.R(0, TAU), col); const c2 = col.clone().offsetHSL(this.R(-0.02, 0.02), 0.04, 0.05); crowns.add(x + this.R(-1, 1) * s, y + 3.7 * s, z + this.R(-1, 1) * s, 2.0 * s, 1.7 * s, 2.0 * s, this.R(0, TAU), c2); crowns.add(x + this.R(-1.3, 1.3) * s, y + 2.3 * s, z + this.R(-1.3, 1.3) * s, 1.7 * s, 1.5 * s, 1.7 * s, this.R(0, TAU), col.clone().offsetHSL(0, 0, -0.04)); };
     this.pineAt = pineAt; this.leafyAt = leafyAt;
 
-    // ---------- Hauptplatz / Eingang: Fachwerk-Häuser
-    for (let k = 0; k < 12; k++) {
-      const a = (k / 12) * TAU + 0.2, r = 66 + this.R(0, 20), x = Math.cos(a) * r, z = 60 + Math.sin(a) * r * 0.8;
-      if (z > 150 || !this.grid.free(x, z, 10)) continue;
-      const bw = this.R(11, 18), bd = this.R(9, 13), bh = this.R(6, 10), br = -Math.atan2(60 - z, -x) + Math.PI / 2 + Math.PI;
-      this.makeBuilding(x, z, br, bw, bd, bh, this.theme);
-      this.grid.mark(x, z, 11);
+    // ---------- Berlin: Kaiserplatz – repräsentative Stadthäuser der 1920er rund um den Platz (nach Abstand sortiert, Tür zur Platzmitte; nur auf freien Flächen zwischen den Wegen)
+    { const cands = []; for (let r = 66; r <= 156; r += 6) { const n = 120, off = this.R(0, 3); for (let k = 0; k < n; k++) cands.push([r, ((k * 3 + off) % 360) * Math.PI / 180]); }
+      let placed = 0;
+      for (const [r, a] of cands) {
+        if (placed >= 36) break;
+        const px = Math.cos(a) * r, pz = 60 + Math.sin(a) * r * 0.9; if (pz > 178 || !this.siteOk(px, pz, 8.5)) continue;
+        const bays = 3 + Math.floor(this.rng() * 2), rot = Math.atan2(0 - px, 60 - pz), r2 = H.berlinHouse(this.prng, px, Math.max(0.05, this.h(px, pz)), pz, rot, env, out, { bays, floors: r < 100 ? 4 + Math.floor(this.rng() * 2) : 3 + Math.floor(this.rng() * 2) });
+        this.buildings.push({ x: px, z: pz, rot, w: r2.w, d: r2.d, hollow: true }); this.grid.mark(px, pz, 9.5); placed++;
+      }
     }
 
     // ---------- Klugheim
@@ -376,21 +400,20 @@ export class PhantasiaWorld extends ParkWorld {
     for (let k = 0; k < 6; k++) this.scatter('africa', 1, 30, 180, (x, y, z, rot) => { const t = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 4.2, 8), new THREE.MeshStandardMaterial({ map: A.tex.planks('#5a3a22') })); t.position.set(x, y + 2.1, z); t.castShadow = true; G.add(t); const m = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.35, 0.5), new THREE.MeshStandardMaterial({ color: 0xb8402a })); m.position.set(x, y + 3.4, z); G.add(m); out.colliders.push({ x, z, r: 0.6, y0: y, y1: y + 4 }); return true; }, 3);
 
     // ---------- Rookburgh
-    this.alongPaths('rookburgh', Math.round(11 * mult + 4), (x, y, z, rot) => { A.industrial(this.prng, x, y, z, rot, env, out); return true; }, 14);
-    this.scatter('rookburgh', Math.round(6 * mult), 40, 190, (x, y, z, rot) => { A.industrial(this.prng, x, y, z, rot, env, out, { w: 14, d: 10 }); return true; }, 14);
+    this.alongPaths('rookburgh', Math.round(8 * mult + 3), (x, y, z, rot) => { H.steamHouse(this.prng, x, y, z, rot, env, out); return true; }, 9);
     this.scatter('rookburgh', 10, 20, 180, (x, y, z) => { this.pipeTower(x, y, z); return true; }, 5);
     this.scatterRocks('rookburgh', 40, rockCol.g, 1.2, 3.5);
     this.scatter('rookburgh', Math.round(120 * mult), 10, 240, (x, y, z) => { leafyAt(x, y, z, this.R(0.8, 1.3)); return true; }, 3, 5);
     this.addTorches('rookburgh', 26, 0xffc880);
 
     // ---------- Mexico
-    this.alongPaths('mexico', Math.round(11 * mult + 3), (x, y, z, rot) => { A.adobe(this.prng, x, y, z, rot, env, out); return true; }, 8);
+    this.alongPaths('mexico', Math.round(15 * mult + 4), (x, y, z, rot) => { H.mexicoHouse(this.prng, x, y, z, rot, env, out); return true; }, 8);
     this.scatterRocks('mexico', Math.round(240 * mult), rockCol.m, 3, 12, true);
     this.scatter('mexico', 80, 10, 190, (x, y, z) => { cactus.add(x, y, z, this.R(0.8, 1.6), this.R(0.8, 1.6), this.R(0.8, 1.6), this.R(0, TAU)); out.colliders.push({ x, z, r: 0.5, y0: y, y1: y + 3 }); return true; }, 2.5);
     this.addTorches('mexico', 16, 0xffb060);
 
     // ---------- Fantasy
-    this.alongPaths('fantasy', Math.round(12 * mult + 4), (x, y, z, rot) => { A.fairyHouse(this.prng, x, y, z, rot, env, out); return true; }, 8);
+    this.alongPaths('fantasy', Math.round(12 * mult + 4), (x, y, z, rot) => { H.toyHouse(this.prng, x, y, z, rot, env, out); return true; }, 8);
     this.scatter('fantasy', Math.round(160 * mult), 10, 200, (x, y, z) => { leafyAt(x, y, z, this.R(0.8, 1.4)); out.colliders.push({ x, z, r: 0.5, y0: y, y1: y + 4 }); return true; }, 2.5, 5);
     this.addTorches('fantasy', 20, 0xffd8a0);
 
@@ -419,7 +442,7 @@ export class PhantasiaWorld extends ParkWorld {
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 5, 8), new THREE.MeshStandardMaterial({ map: A.tex.planks('#4a3322') })); post.position.y = 2.5; g.add(post);
     const s = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.5), new THREE.MeshBasicMaterial({ map: signTexture(zn.name, '#3a2a1c', '#ffe0a0') })); s.position.set(0, 4.6, 0.3); g.add(s);
     const s2 = s.clone(); s2.rotation.y = Math.PI; s2.position.z = -0.3; g.add(s2);
-    g.position.set(x, this.h(x, z), z); this.group.add(g);
+    g.position.set(x, this.h(x, z), z); g.userData.merge = true; this.group.add(g);
   }
 
   slopeRocks(zn, kind, cols, count) {
@@ -441,7 +464,7 @@ export class PhantasiaWorld extends ParkWorld {
     for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.28, 16, 6), iron); l.position.set(sx * 2.2, 8, sz * 2.2); l.castShadow = true; g.add(l); }
     const tank = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.6, 5, 14), iron); tank.position.y = 18.5; tank.castShadow = true; g.add(tank);
     const cap = new THREE.Mesh(new THREE.ConeGeometry(3.8, 2, 14), iron); cap.position.y = 22; g.add(cap);
-    this.group.add(g); this.out.colliders.push({ x, z, r: 3.6, y0: y, y1: y + 18 });
+    g.userData.merge = true; this.group.add(g); this.out.colliders.push({ x, z, r: 3.6, y0: y, y1: y + 18 });
   }
 
   addTorches(key, count, color = 0xff8a30) {
@@ -476,8 +499,8 @@ export class PhantasiaWorld extends ParkWorld {
     this.smoke(v.x, cy + 2, v.z, 'volcano');
   }
   smoke(x, y, z, kind) {
-    const mat = new THREE.SpriteMaterial({ map: textures.cloud(), color: kind === 'volcano' ? 0x55504c : 0x8a8680, transparent: true, depthWrite: false, opacity: 0.0, fog: true });
-    const n = kind === 'volcano' ? 22 : 7;
+    const mat = new THREE.SpriteMaterial({ map: textures.cloud(), color: kind === 'volcano' ? 0x55504c : kind === 'steam' ? 0xf2f2f0 : 0x8a8680, transparent: true, depthWrite: false, opacity: 0.0, fog: true });
+    const n = kind === 'volcano' ? 22 : kind === 'steam' ? 5 : 7;
     for (let k = 0; k < n; k++) { const s = new THREE.Sprite(mat.clone()); s.userData = { x, y, z, t: this.R(0, 1), kind, sp: this.R(0.5, 1) }; this.group.add(s); this.smokeSprites.push(s); }
   }
 
@@ -496,7 +519,7 @@ export class PhantasiaWorld extends ParkWorld {
       for (const sz of [-1, 1]) { const wall = new THREE.Mesh(new THREE.BoxGeometry(L, 1.2, 0.5), stone); wall.position.set(0, yTop + 0.3, sz * (w / 2 + 0.1)); g.add(wall); }
       for (const sx of [-1, 1]) { const pier = new THREE.Mesh(new THREE.BoxGeometry(2.5, 6, w + 0.6), stone); pier.position.set(sx * (L / 2 - 1), yTop - 3, 0); g.add(pier); }
     } else for (const sx of [-1, 1]) { const pier = new THREE.Mesh(new THREE.BoxGeometry(0.5, 6, 0.5), rail); pier.position.set(sx * (L / 2 - 2), yTop - 3, 0); g.add(pier); }
-    this.group.add(g);
+    g.userData.merge = true; this.group.add(g);
     this.out.platforms.push({ ax: a[0], az: a[1], bx: b[0], bz: b[1], hw: w / 2, yTop });
     // seitliche Geländer als Kollision
     for (const sz of [-1, 1]) { const nx = -Math.sin(ang) * sz * (w / 2), nz = Math.cos(ang) * sz * (w / 2); this.out.colliders.push({ x: (a[0] + b[0]) / 2 + nx, z: (a[1] + b[1]) / 2 + nz, hx: L / 2, hz: 0.1, rot: -ang, y0: yTop, y1: yTop + 1.1 }); }
@@ -663,7 +686,7 @@ export class PhantasiaWorld extends ParkWorld {
     for (let k = 0; k < N; k++) { const l = new THREE.PointLight(0xffa050, 0, 20, 1.6); l.castShadow = false; G.add(l); this.pool.push(l); }
     this.poolT = 0; this.time = 0;
     // Rauch für Industrie-Schlote
-    for (const s of out.smoke) this.smoke(s.x, s.y, s.z, 'smoke');
+    for (const s of out.smoke) this.smoke(s.x, s.y, s.z, s.kind || 'smoke');
   }
 
   // ------------------------------------------------------------------ Kollision & Boden
@@ -678,7 +701,7 @@ export class PhantasiaWorld extends ParkWorld {
     const win = A.M('fwin2', () => { const m = new THREE.MeshStandardMaterial({ map: A.tex.window(), emissive: 0xffa040, emissiveMap: A.tex.window(), emissiveIntensity: 0.4, roughness: 0.6 }); this.env.registerLamp(m); return m; });
     const n = Math.max(2, Math.floor(w / 3.6)); for (let r = 0; r < Math.max(1, Math.floor(h / 3.4)); r++) A.windowsOn(g, w, d, h, n, win, 1.9 + r * 3.3);
     A.flowerBoxes(g, w, d, n, 1.0);
-    this.group.add(g); this.buildings.push({ x, z, rot: rotY, w, d, hollow: true }); return g;
+    g.userData.merge = true; this.group.add(g); this.buildings.push({ x, z, rot: rotY, w, d, hollow: true }); return g;
   }
   buildRockColliders() { // jede Felsen-Instanz bekommt einen Kollisionskreis (aus Position/Skalierung) → kein Durchlaufen; Felsen auf Wegen werden entfernt → Wege bleiben frei
     const m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), zero = new THREE.Vector3(0, 0, 0), segs = this.edges.map(e => ({ A: this.nodes[e[0]], B: this.nodes[e[1]], w: e[2] }));
@@ -751,6 +774,7 @@ export class PhantasiaWorld extends ParkWorld {
       for (const s of r.sets) { if (r.replayHook && s.sim === r.sim) r.replayHook(); else s.sim.step(simDt); s.train.update(s.sim); }
     }
     for (const a of this.anims) a(dt);
+    for (const s of this.out.spinners) s.obj.rotation[s.axis] += s.speed * dt; // Zahnräder & Co.
     this.updateVisitors(dt);
     // Wasser / Wasserfälle
     for (const t of this.waterAnims) t.offset.y -= dt * 0.04;
@@ -760,10 +784,10 @@ export class PhantasiaWorld extends ParkWorld {
     for (const s of this.mist) { const u = s.userData; if (u.base) { s.position.x = u.base.x + Math.sin(this.time * 0.1 + (u.ph || 0)) * 4; s.material.opacity = (u.ph !== undefined ? 0.2 : 0.3) * (1 - night * 0.55); } }
     for (const s of this.smokeSprites) {
       const u = s.userData; u.t += dt * 0.12 * u.sp; if (u.t > 1) u.t = 0;
-      const k = u.t, vol = u.kind === 'volcano';
-      s.position.set(u.x + k * (vol ? 30 : 10) + Math.sin(k * 6 + u.sp * 9) * 3, u.y + k * (vol ? 120 : 34), u.z + k * 6);
-      const sz = (vol ? 16 : 6) + k * (vol ? 70 : 20); s.scale.set(sz, sz, 1);
-      s.material.opacity = Math.sin(k * Math.PI) * (vol ? 0.5 : 0.4);
+      const k = u.t, vol = u.kind === 'volcano', stm = u.kind === 'steam';
+      s.position.set(u.x + k * (vol ? 30 : stm ? 5 : 10) + Math.sin(k * 6 + u.sp * 9) * (stm ? 1.2 : 3), u.y + k * (vol ? 120 : stm ? 15 : 34), u.z + k * (stm ? 2 : 6));
+      const sz = (vol ? 16 : stm ? 2.5 : 6) + k * (vol ? 70 : stm ? 7 : 20); s.scale.set(sz, sz, 1);
+      s.material.opacity = Math.sin(k * Math.PI) * (vol ? 0.5 : stm ? 0.55 : 0.4);
     }
     // Lichtpool + Zonen-Atmosphäre
     const cp = this.camPos;
@@ -803,12 +827,15 @@ export class PhantasiaWorld extends ParkWorld {
     for (const k of ['china', 'mystery']) this.zoneSign(k);
     // Interaktionspunkte
     this.interactables = [];
-    for (const p of this.pois) this.interactables.push({ type: 'poi', poi: p, x: p.ax, z: p.az, r: p.kind === 'hotel' ? 9 : p.kind === 'stage' ? 10 : p.kind === 'restaurant' || p.kind === 'shop' ? 6 : 4.5, name: p.name, kind: p.kind });
+    for (const p of this.pois) this.interactables.push({ type: 'poi', poi: p, x: p.ax, z: p.az, r: p.kind === 'hotel' ? 9 : p.kind === 'stage' ? 10 : p.kind === 'flat' ? 7 : p.kind === 'restaurant' || p.kind === 'shop' ? 6 : 4.5, name: p.name, kind: p.kind });
     for (const r of this.rides) this.interactables.push({ type: 'ride', ride: r, x: r.entrance.x, z: r.entrance.z, r: 16, name: r.coaster.name, kind: 'ride' });
     this.interactables.push({ type: 'gate', x: 0, z: 352, r: 16, name: 'Ticketscanner / Eingang', kind: 'gate' });
     for (const r of this.rides) this.makeQueueSign(r);
     buildTrackBridges(this); buildEntrances(this);
+    buildWorldExtras(this);
+    buildWorldExtras2(this); // China Town (Ehrentor, Bambus, Kirschbäume), Wuze Town, Fassaden der Fahrgeschäfte
     buildBeauty(this);
+    this.mergeStats = bakeStatic(this); // statische Gebäudeteile je Material/Kachel zusammenfassen (Draw-Calls)
     this.winter = false; this.hist = { inPark: 0, entered: 0 };
   }
   spurMesh(spur) {

@@ -22,7 +22,7 @@ export default [
     ['Colorado Adventure', 'minetrain', 'Vekoma', 1996, 21, 850, 65, 180, 0, { tc: '#8a5a2a', sc: '#5a3d22', area: 'Mexico' }],
     ['Winja\'s Fear', 'sitdown', 'Vekoma', 2002, 24, 500, 60, 80, 2, { tc: '#2c6a3a', sc: '#2a2a2a', area: 'Fantasy' }],
     ['Winja\'s Force', 'sitdown', 'Vekoma', 2002, 24, 500, 60, 80, 2, { tc: '#6a2c2c', sc: '#2a2a2a', area: 'Fantasy' }],
-    ['Raik', 'family', 'Vekoma', 2012, 14, 560, 55, 100, 0, { tc: '#8a3a2a', sc: '#4a3a2a', area: 'Fantasy' }],
+    ['Raik', 'family', 'Vekoma', 2012, 14, 560, 55, 100, 0, { tc: '#8a3a2a', sc: '#4a3a2a', area: 'Klugheim' }],
     ['Crazy Bats', 'family', 'k. A.', 0, 9, 380, 40, 90, 0, { tc: '#6a2c8a', sc: '#2a2a3a', area: 'Fantasy' }],
   ] },
   { park: 'Holiday Park', cc: 'DE', rows: [
