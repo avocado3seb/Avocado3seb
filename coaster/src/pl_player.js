@@ -9,10 +9,10 @@ export class Player {
   }
   setLook(look) { this.view.setLook(look); }
   // x,y,z = Füße; speed in m/s (tatsächliche Geschwindigkeit); air = in der Luft
-  update(dt, x, y, z, faceYaw, speed, air) {
+  update(dt, x, y, z, faceYaw, speed, air, sit) {
     const g = this.group; g.position.set(x, y, z);
     let d = faceYaw - this.yaw; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; this.yaw += d * Math.min(1, dt * 12); g.rotation.y = this.yaw;
-    this.view.update(dt, { speed: Math.min(5.6, speed * 0.62), jump: !!air });
+    this.view.update(dt, { speed: Math.min(5.6, speed * 0.62), jump: !!air, sit: !!sit });
   }
   show(v) { this.group.visible = v; }
 }

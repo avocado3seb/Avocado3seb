@@ -29,7 +29,7 @@ export function buildTrackBridges(world) {
       if (Math.abs(h0 - h1) > 1.2) continue;
       if (spans.some(s => Math.hypot(s[0] - (A_.x + ux * (t0 + t1) / 2), s[1] - (A_.z + uz * (t0 + t1) / 2)) < 26)) continue;
       spans.push([A_.x + ux * (t0 + t1) / 2, A_.z + uz * (t0 + t1) / 2]);
-      const yTop = Math.max(h0, h1, hMid) + CLEAR, rot = Math.atan2(-uz, ux), g = new THREE.Group(); G.add(g);
+      const yTop = Math.max(h0, h1, hMid) + CLEAR, rot = Math.atan2(-uz, ux), g = new THREE.Group(); g.userData.merge = true; G.add(g);
       const place = (s0, s1, top, mat, thick) => { // Segment von s0..s1 (entlang des Wegs), Oberkante top
         const len = s1 - s0, cx = A_.x + ux * (t0 + (s0 + s1) / 2), cz = A_.z + uz * (t0 + (s0 + s1) / 2), base = Math.min(h0, h1) - 0.6, hh = top - base;
         const m = new THREE.Mesh(new THREE.BoxGeometry(len, thick ?? hh, w), mat); m.position.set(cx, thick ? top - thick / 2 : base + hh / 2, cz); m.rotation.y = rot; m.castShadow = m.receiveShadow = true; g.add(m);
@@ -68,7 +68,7 @@ export function buildEntrances(world) {
     world.plazas.push({ x: px, z: pz, r: 9 });
     const col = trim[r.zone] || 0x5a4a3a, m = new THREE.MeshStandardMaterial({ color: col, roughness: 0.7 }), rot = Math.atan2(dx, dz);
     // Torbogen am Beginn der Schlange (zwei Pfosten + Balken + Schild)
-    const gx = e.x + dx * 3, gz = e.z + dz * 3, gy = world.h(gx, gz), g = new THREE.Group(); g.position.set(gx, gy, gz); g.rotation.y = rot; G.add(g);
+    const gx = e.x + dx * 3, gz = e.z + dz * 3, gy = world.h(gx, gz), g = new THREE.Group(); g.position.set(gx, gy, gz); g.rotation.y = rot; g.userData.merge = true; G.add(g);
     for (const s of [-1, 1]) { A.box(g, 0.7, 5.2, 0.7, m, s * 3.2, 2.6, 0); const wx = gx + s * 3.2 * Math.cos(rot), wz = gz - s * 3.2 * Math.sin(rot); out.colliders.push({ x: wx, z: wz, r: 0.5, y0: gy - 1, y1: gy + 5 }); out.glow.push([wx, gy + 4.6, wz, 1, 0.7, 0.35, 20]); out.lights.push({ x: wx, y: gy + 4.4, z: wz, color: 0xffa050, int: 4, range: 11, flicker: 0.25 }); }
     A.box(g, 7.6, 0.8, 0.8, m, 0, 5.4, 0);
     const cv = document.createElement('canvas'); cv.width = 512; cv.height = 96; const c = cv.getContext('2d'); c.fillStyle = '#' + col.toString(16).padStart(6, '0'); c.fillRect(0, 0, 512, 96); c.strokeStyle = '#f0e0b0'; c.lineWidth = 5; c.strokeRect(5, 5, 502, 86); c.fillStyle = '#fff4d0'; c.font = '700 44px Georgia, serif'; c.textAlign = 'center'; c.fillText(r.coaster.name.slice(0, 22), 256, 62);

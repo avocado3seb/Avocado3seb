@@ -204,6 +204,7 @@ body.touch #park { max-height: 36vh; width: 230px; }
 #mini { left: 16px; right: auto; bottom: 74px; padding: 0; width: 176px; height: 176px; border-radius: 50%; overflow: hidden; border: 3px solid rgba(255,255,255,.88); box-shadow: 0 0 0 3px rgba(0,0,0,.6), 0 0 26px rgba(0,0,0,.6); background: #123; }
 #mini canvas { width: 100%; height: 100%; border-radius: 50%; }
 body.touch #mini { left: auto; right: 12px; bottom: auto; top: 64px; width: 110px; height: 110px; }
+@media (max-height: 460px) { body.touch #mini { top: 56px; right: 10px; width: 68px; height: 68px; border-width: 2px; } } /* Handy im Querformat: Minikarte kleiner, damit sie nicht über den Touch-Knöpfen (Rennen/Aktion/Sprung) liegt */
 @media (max-width: 900px) { #mini { display: block; width: 120px; height: 120px; bottom: 120px; } }
 
 /* Anmeldung */
@@ -219,3 +220,11 @@ body.touch #mini { left: auto; right: 12px; bottom: auto; top: 64px; width: 110p
 .wsec { margin-bottom: 12px; } .chips2 { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; } .swatches { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
 .sw { width: 24px; height: 24px; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); padding: 0; } .sw.on { border-color: #fff; box-shadow: 0 0 0 2px var(--acc); }
 @media (max-width: 900px) { .wdgrid { grid-template-columns: 1fr; } .wdprev { position: static; } }
+
+/* Themenwelt-Einblendung beim Betreten einer Welt */
+#worldBanner { position: fixed; left: 50%; top: 92px; transform: translateX(-50%); z-index: 11; text-align: center; pointer-events: none; opacity: 0; transition: opacity .9s ease; text-shadow: 0 2px 14px rgba(0,0,0,.85), 0 0 2px #000; max-width: 92vw; }
+#worldBanner.on { opacity: 1; }
+#worldBanner .wbk { font-size: 12px; letter-spacing: .28em; text-transform: uppercase; color: var(--wc, #ffd890); min-height: 14px; }
+#worldBanner .wbn { font-size: 38px; font-weight: 800; letter-spacing: .04em; color: #fff; line-height: 1.1; border-bottom: 2px solid var(--wc, #ffd890); display: inline-block; padding: 0 10px 4px; }
+#worldBanner .wbt { margin-top: 6px; font-size: 15px; font-style: italic; color: #eef3fa; }
+@media (max-width: 900px) { #worldBanner { top: 120px; } #worldBanner .wbn { font-size: 26px; } #worldBanner .wbt { font-size: 13px; } }

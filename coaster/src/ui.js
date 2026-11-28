@@ -119,7 +119,7 @@ export class UI {
     this.root.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x.dataset.t === t));
     this.curTab = t;
     const body = $('#mbody');
-    if (['hub', 'attr', 'skins', 'hotels', 'food', 'photos', 'stats', 'saves', 'editor'].includes(t)) this.plTab(t, body);
+    if (['hub', 'attr', 'worlds', 'skins', 'hotels', 'food', 'photos', 'stats', 'saves', 'editor'].includes(t)) this.plTab(t, body);
     else if (t === 'custom') this.buildCustom(body);
     else if (t === 'db') this.buildDb(body);
     else if (t === 'parks') this.buildParks(body);
@@ -431,6 +431,7 @@ Am Ende wird die Strecke automatisch zur Station zurückgeführt.</pre>
         <label>Sichtfeld (FOV) <span id="sFovV">${s.fov}</span>°<br><input id="sFov" type="range" min="55" max="100" value="${s.fov}"></label>
         <label>Mausempfindlichkeit<br><input id="sSens" type="range" min="0.3" max="2.5" step="0.1" value="${s.sens}"></label>
         <label>Lautstärke<br><input id="sVol" type="range" min="0" max="1" step="0.05" value="${s.vol}"></label>
+        <label>🎼 Musik der Themenwelten (Phantasialand, beim Laufen)<br><input id="sMus" type="range" min="0" max="1" step="0.05" value="${s.music ?? 0.5}"></label>
         <label>Tageszyklus (automatisch)<br><select id="sAuto"><option value="0">Aus</option><option value="1">An (1 Spielstunde = 1 Minute)</option></select></label>
         <label>Onride-Fotos<br><select id="sPhoto"><option value="1">Automatisch</option><option value="0">Aus</option></select></label>
         <label>Grafikstil „Vice-City-Look“ (Bloom, Farbkorrektur)<br><select id="sLook"><option value="1">An</option><option value="0">Aus (schneller)</option></select></label>
@@ -452,6 +453,7 @@ Am Ende wird die Strecke automatisch zur Station zurückgeführt.</pre>
     $('#sFov').addEventListener('input', e => { s.fov = +e.target.value; $('#sFovV').textContent = s.fov; a.saveSettings(); });
     $('#sSens').addEventListener('input', e => { s.sens = +e.target.value; a.saveSettings(); });
     $('#sVol').addEventListener('input', e => { s.vol = +e.target.value; a.audio.setVolume(s.vol); a.saveSettings(); });
+    $('#sMus').addEventListener('input', e => { s.music = +e.target.value; a.music.setVolume(s.music); a.saveSettings(); });
   }
   toggleHelp() { const h = $('#help'); if (h.classList.contains('hide')) { h.innerHTML = `<h3 style="margin-top:0;color:var(--acc)">Steuerung</h3>${this.helpHtml()}<div style="margin-top:14px"><button class="btn" id="hClose">Schließen</button></div>`; h.classList.remove('hide'); $('#hClose').addEventListener('click', () => h.classList.add('hide')); } else h.classList.add('hide'); }
 

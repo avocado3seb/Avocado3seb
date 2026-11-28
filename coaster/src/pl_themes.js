@@ -47,7 +47,7 @@ export function buildMedieval(world, key = 'klugheim', big = true) {
   const S = big ? 21 : 15, spot = findSpot(world, key, S + 8, 4.5) || findSpot(world, key, S + 4, 7);
   if (spot) {
     const [cx, cz, by] = spot, hub = { x: 0, z: 60 }, rot = Math.round(Math.atan2(hub.x - cx, hub.z - cz) / (Math.PI / 2)) * (Math.PI / 2);
-    const g = new THREE.Group(); g.position.set(cx, by, cz); g.rotation.y = rot; G.add(g);
+    const g = new THREE.Group(); g.position.set(cx, by, cz); g.rotation.y = rot; g.userData.merge = true; G.add(g);
     const col = (lx, lz, hx, hz, y1) => { const [wx, wz] = toWorld(cx, cz, rot, lx, lz); out.colliders.push({ x: wx, z: wz, hx, hz, rot, y0: by - 6, y1: by + y1 }); };
     const T = 2.4, WH = 10, GATE = 3.6;
     // Ringmauer (Vorderseite mit Tor)
@@ -78,7 +78,7 @@ export function buildMedieval(world, key = 'klugheim', big = true) {
   // Marktstände mit Stoffdächern und Banner
   const awn = [0xc01a2a, 0x1a5ac0, 0xe0b020, 0x2a9a4a, 0x8a2aa0];
   placeMany(world, key, big ? 8 : 5, 5, 3, (x, y, z, rot) => {
-    const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot; G.add(g);
+    const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot; g.userData.merge = true; G.add(g);
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(g, 0.14, 2.6, 0.14, wood, sx * 1.7, 1.3, sz * 1.2);
     box(g, 3.9, 0.9, 1.1, wood, 0, 0.45, 0.35); const c = awn[Math.floor(world.rng() * awn.length)];
     for (let i = 0; i < 6; i++) { const s = box(g, 0.66, 0.08, 3.0, std(i % 2 ? c : 0xf2ecd8), -1.65 + i * 0.66, 2.75, 0); s.rotation.x = 0.12; }
@@ -116,7 +116,7 @@ export function buildAviation(world) {
   const plank = std(0xffffff, { map: A.tex.planks('#7a5a3a') }), tin = std(0x8a8f96, { metalness: 0.4, roughness: 0.6 });
   // Holz-Hangars mit Tonnendach
   const hangar = (x, y, z, rot) => {
-    const w = 13, d = 20, h = 6, g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot; G.add(g);
+    const w = 13, d = 20, h = 6, g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot; g.userData.merge = true; G.add(g);
     box(g, 0.5, h, d, plank, -w / 2, h / 2, 0); box(g, 0.5, h, d, plank, w / 2, h / 2, 0); box(g, w, h, 0.5, plank, 0, h / 2, -d / 2);
     const roof = new THREE.Mesh(new THREE.CylinderGeometry(w / 2 + 0.3, w / 2 + 0.3, d + 0.6, 14, 1, true, Math.PI / 2, Math.PI), tin); roof.rotation.set(Math.PI / 2, 0, 0); roof.position.y = h; roof.scale.set(1, 1, 0.55); roof.material.side = THREE.DoubleSide; roof.castShadow = true; g.add(roof);
     box(g, 3.4, h - 0.5, 0.3, plank, -w / 2 + 1.7, (h - 0.5) / 2, d / 2); box(g, 3.4, h - 0.5, 0.3, plank, w / 2 - 1.7, (h - 0.5) / 2, d / 2);   // halboffene Tore

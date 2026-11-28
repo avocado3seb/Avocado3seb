@@ -4,6 +4,7 @@
 // ============================================================================
 import * as THREE from 'three';
 import * as A from './pl_assets.js';
+import * as H from './pl_houses.js';
 import { ZONES } from './phantasia.js';
 import { textures } from './textures.js';
 
@@ -94,12 +95,13 @@ export function buildBeauty(world) {
   if (world.leafyAt) for (const k of ['berlin', 'fantasy', 'china', 'mystery', 'mexico']) world.scatter(k, Math.round(26 * mult), 18, ZONES[k].r * 1.05, (x, y, z) => { world.leafyAt(x, y, z, R(1.4, 2.6)); out.colliders.push({ x, z, r: 0.5, y0: y, y1: y + 6 }); return true; }, 4, 8);
   const env = world.env, pr = world.prng;
   const dens = (key, n, f, clear) => world.alongPaths(key, Math.round(n * mult), (x, y, z, rot) => { f(pr, x, y, z, rot, env, out); return true; }, clear);
-  dens('berlin', 22, (r, x, y, z, rot, e, o) => A.nordicHouse(r, x, y, z, rot, { w: 9, d: 7 }, e, o), 9);
+  dens('berlin', 22, (r, x, y, z, rot, e, o) => H.berlinHouse(r, x, y, z, rot, e, o), 9);
   dens('klugheim', 14, (r, x, y, z, rot, e, o) => A.nordicHouse(r, x, y, z, rot, { turf: rng() < 0.5 }, e, o), 9);
-  dens('mexico', 10, (r, x, y, z, rot, e, o) => A.adobe(r, x, y, z, rot, e, o), 8);
-  dens('fantasy', 12, (r, x, y, z, rot, e, o) => A.fairyHouse(r, x, y, z, rot, e, o), 8);
-  dens('china', 8, (r, x, y, z, rot, e, o) => A.fairyHouse(r, x, y, z, rot, e, o), 8);
-  dens('rookburgh', 8, (r, x, y, z, rot, e, o) => A.industrial(r, x, y, z, rot, e, o), 14);
+  dens('mexico', 10, (r, x, y, z, rot, e, o) => H.mexicoHouse(r, x, y, z, rot, e, o), 8);
+  dens('fantasy', 12, (r, x, y, z, rot, e, o) => H.toyHouse(r, x, y, z, rot, e, o), 8);
+  dens('china', 8, (r, x, y, z, rot, e, o) => H.chinaHouse(r, x, y, z, rot, e, o), 8);
+  dens('mystery', 8, (r, x, y, z, rot, e, o) => H.mysteryHouse(r, x, y, z, rot, e, o), 8);
+  dens('rookburgh', 10, (r, x, y, z, rot, e, o) => H.steamHouse(r, x, y, z, rot, e, o), 9);
   dens('africa', 12, (r, x, y, z, rot, e, o) => A.africanHut(r, x, y, z, rot, {}, e, o), 6);
   world.beautyCount = { lamps: lampN };
 }

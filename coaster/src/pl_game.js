@@ -3,7 +3,7 @@
 //  Statistik, Erfolge, Speicherstände, Fotos, Navigation, Interaktion
 // ============================================================================
 import * as THREE from 'three';
-import { ACHIEVEMENTS, TICKETS, POIS } from './pl_data.js';
+import { ACHIEVEMENTS, TICKETS, POIS, WORLDS, SUBAREAS } from './pl_data.js';
 import { ZONES } from './phantasia.js';
 import { SKIN_SHOP, skinById, PART_PRICE, EXTRA_PRICE, defaultWardrobe } from './pl_skins.js';
 
@@ -16,7 +16,7 @@ const ZONE_KEYS = ['klugheim', 'africa', 'rookburgh', 'mexico', 'fantasy', 'chin
 
 const fresh = () => ({
   v: 1, wallet: 300, ticket: null, mode: 'free',
-  stats: { rides: 0, rideBy: {}, km: 0, time: 0, zones: {}, rests: {}, hotels: {}, purchases: 0, bookings: 0, designs: 0, flags: {}, spent: 0, entered: 0 },
+  stats: { rides: 0, rideBy: {}, km: 0, time: 0, zones: {}, rests: {}, hotels: {}, purchases: 0, bookings: 0, designs: 0, flags: {}, spent: 0, entered: 0, flats: {} },
   bookings: [], inventory: {}, wardrobe: defaultWardrobe(), daily: '', pos: null, hour: 15.5, weather: 'clear', winter: false, savedAt: 0, name: '',
 });
 
@@ -78,7 +78,7 @@ export class PLGame {
   derived() {
     const s = this.S.stats;
     return { rides: s.rides, rideBy: s.rideBy, coasterCount: COASTERS.filter(n => s.rideBy[n]).length, zoneCount: ZONE_KEYS.filter(k => s.zones[k]).length,
-      restCount: Object.keys(s.rests).length, hotelCount: Object.keys(s.hotels).length, photos: this.photos.length, purchases: s.purchases, bookings: s.bookings,
+      restCount: Object.keys(s.rests).length, hotelCount: Object.keys(s.hotels).length, flatCount: Object.keys(s.flats || {}).length, photos: this.photos.length, purchases: s.purchases, bookings: s.bookings,
       designs: this.designs.length, km: s.km, flags: s.flags, skins: Object.keys(this.wardrobe().skins).length };
   }
   checkAchievements(silent) {
@@ -91,12 +91,28 @@ export class PLGame {
     const s = this.S.stats, st = r.sim.lastLapStats; s.rides++; s.rideBy[r.coaster.name] = (s.rideBy[r.coaster.name] || 0) + 1; s.km += r.track.L / 1000; s.time += st ? st.time : 0;
     this.checkAchievements();
   }
+  // Einblendung beim Betreten einer Themenwelt bzw. eines Unterbereichs (Namen/Kurztexte aus WORLDS und SUBAREAS)
+  announceWorld(key) {
+    const sub = SUBAREAS.find(q => q.key === key), wd = WORLDS.find(q => q.key === (sub ? sub.zone : key)); if (!sub && !wd) return;
+    const parentName = sub ? (WORLDS.find(q => q.key === sub.zone) || {}).name : wd.parent;
+    this.app.ui.worldBanner({ name: sub ? sub.name : wd.name, tag: sub ? sub.tag : wd.tag, part: parentName ? 'Teil von ' + parentName : (wd.main ? 'Themenwelt' : ''), key });
+  }
   update(dt) {
     const a = this.app, S = this.S, w = a.park;
     if (!w || w.def.name !== 'Phantasialand') return;
     if (a.state !== 'menu') S.stats.playTime = (S.stats.playTime || 0) + dt;
     // Zonenbesuche
-    if (a.state === 'park' || a.state === 'ride') { const k = w.zoneOf(a.pp().x, a.pp().z); if (k && !S.stats.zones[k]) { S.stats.zones[k] = 1; if (ZONES[k]) a.ui.toast('📍 ' + ZONES[k].name); this.checkAchievements(); } }
+    if (a.state === 'park' || a.state === 'ride') {
+      const p = a.pp(), k = w.zoneOf(p.x, p.z);
+      if (k && !S.stats.zones[k]) { S.stats.zones[k] = 1; this.checkAchievements(); }
+      // Themenwelt-Banner (bei jedem Wechsel, nach 1 s Aufenthalt) – Unterbereiche wie Kaiserplatz und Wuze Town zählen eigens
+      const sub = SUBAREAS.find(q => Math.hypot(p.x - q.x, p.z - q.z) < q.r), wk = sub ? sub.key : k;
+      if (wk && wk !== this.worldNow) {
+        if (wk !== this.worldCand) { this.worldCand = wk; this.worldT = 0; }
+        this.worldT += dt;
+        if (this.worldT > 1 || !this.worldNow) { this.worldNow = wk; this.zoneNow = k; this.announceWorld(wk); }
+      } else { this.worldCand = null; this.worldT = 0; if (k) this.zoneNow = k; }
+    }
     // Rundenzähler (nur für die Bahn, in der der Spieler sitzt)
     if (a.state === 'ride' && a.ride) {
       const r = a.ride, l = r.sim.lap, k = r.sim, prev = this.lapSeen.get(k);
@@ -110,7 +126,7 @@ export class PLGame {
     if (!this._daily && a.state !== 'menu') { this._daily = true; this.dailyBonus(); }
     this.achT -= dt; if (this.achT <= 0) { this.achT = 3; this.checkAchievements(); }
     this.autoT -= dt; if (this.autoT <= 0) { this.autoT = 30; if (a.state !== 'menu') this.autosave(); }
-    this.updateInteraction(dt); this.updateNav(dt);
+    this.updateInteraction(dt); this.updateTrail(dt); this.updateNav(dt);
   }
 
   // ------------------------------------------------------------------ Kleiderschrank & Skin-Shop
@@ -136,7 +152,7 @@ export class PLGame {
   updateInteraction(dt) {
     const a = this.app, w = a.park; let best = null, bd = 1e9;
     this.hint = null;
-    if (a.state === 'park' && a.parkMode === 'walk' && !this.room) {
+    if (a.state === 'park' && a.parkMode === 'walk' && !this.room && !a.flatRide) {
       const c = a.pp();
       for (const it of w.interactables || []) { const d = Math.hypot(it.x - c.x, it.z - c.z); if (d < it.r + 1 && d < bd) { bd = d; best = it; } }
     } else if (this.room && a.state === 'park' && a.parkMode === 'walk') { best = { type: 'exitroom', name: 'Zimmer verlassen', x: 0, z: 0 }; }
@@ -144,7 +160,7 @@ export class PLGame {
     a.ui.setHint(best ? this.hintText(best) : '');
   }
   hintText(it) {
-    const t = { restaurant: 'Speisekarte ansehen', stand: 'Speisekarte ansehen', shop: 'Shop ansehen', hotel: 'Rezeption', stage: 'Showzeiten', wc: 'Toiletten', ride: 'Einsteigen', gate: 'Eintritt / Ticket', exitroom: 'Zimmer verlassen' }[it.kind] || 'Interagieren';
+    const t = { restaurant: 'Speisekarte ansehen', stand: 'Speisekarte ansehen', shop: 'Shop ansehen', hotel: 'Rezeption', stage: 'Showzeiten', wc: 'Toiletten', ride: 'Einsteigen', gate: 'Eintritt / Ticket', exitroom: 'Zimmer verlassen', flat: 'Mitfahren', trail: 'Abenteuer starten' }[it.kind] || 'Interagieren';
     let extra = ''; if (it.kind === 'ride') extra = ` · Wartezeit ${this.app.park.waitMinutes(it.ride)} Min.`;
     return `E – ${t}: ${it.name}${extra}`;
   }
@@ -158,6 +174,11 @@ export class PLGame {
     }
     if (it.type === 'gate') { a.ui.openPanel('gate'); return; }
     const p = it.poi; if (!p) return;
+    if (p.kind === 'trail') return this.trailStart(p);
+    if (p.kind === 'flat') { // Fahrgeschäft zum Mitfahren (Karussell, Wellenflug, Tree)
+      if (S.mode === 'play' && !this.ticketOk()) { a.ui.toast('Fahrten sind kostenlos – du brauchst nur das Eintrittsticket (Ticketscanner am Eingang, E)', 4500); return; }
+      (S.stats.flats || (S.stats.flats = {}))[p.id] = 1; this.checkAchievements(); a.boardFlat(p); return;
+    }
     if (p.kind === 'restaurant' && !S.stats.rests[p.id]) { S.stats.rests[p.id] = 1; this.checkAchievements(); }
     if (p.kind === 'hotel' && !S.stats.hotels[p.id]) { S.stats.hotels[p.id] = 1; this.checkAchievements(); }
     a.ui.openPanel('poi', p);
@@ -225,11 +246,44 @@ export class PLGame {
     return g;
   }
 
+  // ------------------------------------------------------------------ Adventure Trail (Deep in Africa): Wegpunkt-Tour mit Zeitlimit, Pfeil-Navigation und Belohnung
+  trailStart(p) {
+    const a = this.app, S = this.S;
+    if (!p.cpsList || p.cpsList.length < 2) { a.ui.toast('Der Adventure Trail ist gerade gesperrt.'); return; }
+    if (this.trail) { a.ui.toast('Der Adventure Trail läuft schon – folge dem Pfeil zum nächsten Wegpunkt', 3500); return; }
+    if (S.mode === 'play' && !this.ticketOk()) { a.ui.toast('Du brauchst das Eintrittsticket (Ticketscanner am Eingang, E)', 4500); return; }
+    for (const c of p.cpsList) { c.done = false; c.orb.material.color.setHex(0xffb030); c.orb.material.emissive.setHex(0xffb030); }
+    this.trail = { poi: p, i: 0, t: 0, limit: p.limit || 420 };
+    a.ui.toast(`🧗 Adventure Trail gestartet: ${p.cpsList.length} Wegpunkte in ${Math.round(this.trail.limit / 60)} Min. – folge dem Pfeil`, 5000);
+    this.trailTarget();
+  }
+  trailTarget() {
+    const T = this.trail, c = T.poi.cpsList[T.i], w = this.app.park; let b = 0, bd = 1e9; w.nodes.forEach((n, k) => { const d = Math.hypot(n.x - c.x, n.z - c.z); if (d < bd) { bd = d; b = k; } });
+    this.navigateTo({ type: 'zone', x: c.x, z: c.z, node: b, name: 'Adventure Trail', noArrive: true, trailCp: true }); this.trailLabel();
+  }
+  trailLabel() { const T = this.trail; if (!T || !this.nav) return; const left = Math.max(0, T.limit - T.t); this.nav.it.name = `Adventure Trail · Wegpunkt ${T.i + 1}/${T.poi.cpsList.length} · ⏱ ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`; }
+  updateTrail(dt) {
+    const T = this.trail, a = this.app, S = this.S; if (!T) return;
+    if (!this.nav || !this.nav.it.trailCp) { this.trail = null; a.ui.toast('Adventure Trail abgebrochen', 2500); return; } // Navigation beendet oder durch ein anderes Ziel ersetzt = Tour abgebrochen
+    if (a.state !== 'park' || a.parkMode !== 'walk') return; // die Uhr läuft nur beim Laufen (nicht in der Bahn, nicht im Zimmer)
+    T.t += dt; const c = T.poi.cpsList[T.i], p = a.pp();
+    if (Math.hypot(c.x - p.x, c.z - p.z) < 6) {
+      c.done = true; c.orb.material.color.setHex(0x40e070); c.orb.material.emissive.setHex(0x40e070); T.i++;
+      if (T.i >= T.poi.cpsList.length) {
+        const reward = T.poi.reward || 60; S.wallet += reward; S.stats.trailBest = S.stats.trailBest ? Math.min(S.stats.trailBest, T.t) : T.t; S.stats.flags.trail = 1; this.stopNav(); this.trail = null;
+        a.ui.toast(`🏆 Adventure Trail geschafft in ${Math.floor(T.t / 60)}:${String(Math.floor(T.t % 60)).padStart(2, '0')} (+${reward} €)`, 5500); this.checkAchievements(); this.autosave(); return;
+      }
+      a.ui.toast(`✔ Wegpunkt ${T.i}/${T.poi.cpsList.length}`, 1800); this.trailTarget(); return;
+    }
+    if (T.t > T.limit) { this.stopNav(); this.trail = null; a.ui.toast('⏱ Zeit abgelaufen – am Portal (E) neu starten', 4500); return; }
+    this.trailLabel();
+  }
+
   // ------------------------------------------------------------------ Navigation
   navigateTo(it) {
     const a = this.app, w = a.park; if (!w || !w.routeTo) return;
     this.nav = { it, route: null }; this.navT = 0; this.updateNav(0, true);
-    a.ui.toast('🧭 Navigation zu: ' + it.name);
+    if (!it.trailCp) a.ui.toast('🧭 Navigation zu: ' + it.name);
   }
   stopNav() { this.nav = null; this.app.park?.clearRoute?.(); this.app.ui.setNav(null); }
   updateNav(dt, force) {
@@ -238,7 +292,7 @@ export class PLGame {
     const tx = this.nav.it.ax ?? this.nav.it.x, tz = this.nav.it.az ?? this.nav.it.z;
     if (force || this.navT <= 0) { this.navT = 2.5; const target = this.nav.it.type === 'ride' ? { ride: this.nav.it.ride } : this.nav.it.poi ? this.nav.it.poi : this.nav.it; this.nav.route = w.routeTo(c.x, c.z, target); w.setRoute(this.nav.route.concat([[tx, tz]])); }
     const d = Math.hypot(tx - c.x, tz - c.z);
-    if (d < 7) { this.app.ui.toast('🎯 Ziel erreicht: ' + this.nav.it.name); this.stopNav(); return; }
+    if (d < 7 && !this.nav.it.noArrive) { this.app.ui.toast('🎯 Ziel erreicht: ' + this.nav.it.name); this.stopNav(); return; }
     let wp = [tx, tz]; if (this.nav.route) for (const p of this.nav.route) if (Math.hypot(p[0] - c.x, p[1] - c.z) > 8) { wp = p; break; }
     const ang = Math.atan2(wp[0] - c.x, wp[1] - c.z); const e = new THREE.Euler().setFromQuaternion(a.camera.quaternion, 'YXZ'); const fwd = Math.atan2(-Math.sin(e.y), -Math.cos(e.y));
     let rel = ang - fwd; while (rel > Math.PI) rel -= 2 * Math.PI; while (rel < -Math.PI) rel += 2 * Math.PI;

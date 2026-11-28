@@ -3,7 +3,7 @@
 //  Hotels, Gastronomie, Attraktionen, Fotoalbum, Statistiken, Spielstände)
 //  Wird als Mixin in die UI-Klasse eingehängt.
 // ============================================================================
-import { POIS, TICKETS, ACHIEVEMENTS } from './pl_data.js';
+import { POIS, TICKETS, ACHIEVEMENTS, WORLDS, SUBAREAS, ZONE_OF_AREA } from './pl_data.js';
 import { ZONES } from './phantasia.js';
 import { getTrack } from './park.js';
 import { Preview, EXTRAS } from './pl_char.js';
@@ -12,8 +12,8 @@ import { SKIN_SHOP, PART_KINDS, EXTRA_PRICE, COLORABLE, HAIR, SKIN_TONES, PALETT
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const eur = n => n.toFixed(2).replace('.', ',') + ' €';
-const ICON = { restaurant: '🍽', stand: '🥨', shop: '🛍', hotel: '🏨', stage: '🎭', wc: '🚻', ride: '🎢', gate: '🎟', attr: '🎡' };
-const KIND_LABEL = { restaurant: 'Restaurant', stand: 'Imbiss', shop: 'Shop', hotel: 'Hotel', stage: 'Show', wc: 'Toiletten', ride: 'Achterbahn', attr: 'Attraktion' };
+const ICON = { restaurant: '🍽', stand: '🥨', shop: '🛍', hotel: '🏨', stage: '🎭', wc: '🚻', ride: '🎢', gate: '🎟', attr: '🎡', flat: '🎠', trail: '🧗' };
+const KIND_LABEL = { restaurant: 'Restaurant', stand: 'Imbiss', shop: 'Shop', hotel: 'Hotel', stage: 'Show', wc: 'Toiletten', ride: 'Achterbahn', attr: 'Attraktion', flat: 'Mitfahr-Attraktion', trail: 'Abenteuerpfad' };
 const FREE_NOTE = 'Beispielangebot – Speisekarte, Preise und Zimmertypen sind frei ergänzt und keine echten Angaben des Parks.';
 const clock = h => { const hh = Math.floor(h) % 24, mm = Math.floor((h % 1) * 60); return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`; };
 
@@ -23,6 +23,7 @@ export const plUi = {
     const root = this.root;
     root.insertAdjacentHTML('beforeend', `
       <div id="hint" class="hide"></div>
+      <div id="worldBanner"></div>
       <div id="navhud" class="hudbox hide"><div id="navArrow">➤</div><div><b id="navName"></b><div class="note" id="navDist"></div></div><button class="btn sm" id="navStop">✖</button></div>
       <div id="wallet" class="hudbox hide"></div>
       <div id="flash"></div>
@@ -137,6 +138,7 @@ export const plUi = {
     const wire = () => body.querySelectorAll('[data-home]').forEach(b => b.addEventListener('click', () => this.tab('hub')));
     if (t === 'hub') return this.buildHub(body);
     if (t === 'attr') this.buildAttr(body, back);
+    else if (t === 'worlds') this.buildWorlds(body, back);
     else if (t === 'skins') this.buildWardrobe(body, back);
     else if (t === 'hotels') this.buildHotels(body, back);
     else if (t === 'food') this.buildFood(body, back);
@@ -150,7 +152,7 @@ export const plUi = {
     const a = this.app, g = a.game, S = g.S, au = g.autoInfo();
     const tiles = [
       ['play', '▶', 'Spielen', 'Parkbetrieb: Parkplatz, Ticket, Geld, Hotels, Essen'], ['free', '🚶', 'Freie Erkundung', 'Ohne Ticket durch alle Welten laufen'],
-      ['pl', '🎢', 'Achterbahnen', 'Taron, F.L.Y., Black Mamba, Colorado Adventure …'], ['attr', '🎡', 'Attraktionen', 'Alle Fahrgeschäfte mit Wartezeiten'],
+      ['pl', '🎢', 'Achterbahnen', 'Taron, F.L.Y., Black Mamba, Colorado Adventure …'], ['attr', '🎡', 'Attraktionen', 'Alle Fahrgeschäfte mit Wartezeiten'], ['worlds', '🌍', 'Themenwelten', 'Berlin, Mexico, Mystery, Africa, China Town, Fantasy – Rundgang'],
       ['map', '🗺', 'Parkkarte', 'Zoom, Suche, Filter, Navigation'], ['hotels', '🏨', 'Hotels', 'Lobby, Zimmer, Buchung'],
       ['food', '🍽', 'Gastronomie', 'Restaurants, Imbisse, Shops'], ['photos', '📷', 'Fotoalbum', 'Fotos, gespeicherte Fahrten'],
       ['stats', '📊', 'Statistiken', 'Fahrten, Erfolge, Fortschritt'], ['editor', '🛠', 'Achterbahn-Editor', 'Eigene Bahn bauen und testen'],
@@ -179,7 +181,7 @@ export const plUi = {
   async hubAction(k) {
     const a = this.app, g = a.game;
     if (k === 'inv') return this.openPanel('inventory');
-    if (['pl', 'attr', 'skins', 'hotels', 'food', 'photos', 'stats', 'saves', 'editor', 'help', 'db', 'online', 'custom'].includes(k)) return this.tab(k);
+    if (['pl', 'attr', 'worlds', 'skins', 'hotels', 'food', 'photos', 'stats', 'saves', 'editor', 'help', 'db', 'online', 'custom'].includes(k)) return this.tab(k);
     a.audio.start();
     if (k === 'play') { g.S.mode = 'play'; if (!g.S.stats.flags.started) { g.S.stats.flags.started = 1; } await a.phantasiaPlay(); }
     else if (k === 'free') { g.S.mode = 'free'; await a.phantasia('walk'); }
@@ -207,6 +209,44 @@ export const plUi = {
       }
     };
     render(); $('#aQ').addEventListener('input', render); $('#aFav').addEventListener('change', render);
+  },
+  // Einblendung beim Betreten einer Themenwelt (Name, Kurztext, Zugehörigkeit)
+  worldBanner(o) {
+    const el = $('#worldBanner'); if (!el) return;
+    const COL = { berlin: '#e6c27a', kaiserplatz: '#f0d28a', rookburgh: '#e0903f', mexico: '#ffb02e', mystery: '#9ab4ff', klugheim: '#aab4c0', africa: '#7ad672', china: '#ff6a58', fantasy: '#ff82d8', wuze: '#7aeaff' };
+    el.style.setProperty('--wc', COL[o.key] || '#ffd890');
+    el.innerHTML = `<div class="wbk">${esc(o.part || '')}</div><div class="wbn">${esc(o.name)}</div><div class="wbt">${esc(o.tag || '')}</div>`; el.dataset.k = o.key;
+    el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); clearTimeout(this._wb); this._wb = setTimeout(() => el.classList.remove('on'), 5200);
+  },
+  // Themenwelten-Rundgang: Beschreibung, Merkmale, Musik, zugehörige Fahrgeschäfte/Hotels/Gastronomie, Hinlaufen und Hinbeamen
+  buildWorlds(body, back) {
+    const a = this.app, g = a.game, db = a.db.parks['Phantasialand'], free = g.S.mode === 'free';
+    const COL = { berlin: '#e6c27a', rookburgh: '#e0903f', mexico: '#ffb02e', mystery: '#9ab4ff', klugheim: '#aab4c0', africa: '#7ad672', china: '#ff6a58', fantasy: '#ff82d8' };
+    const ICN = { berlin: '🏛', rookburgh: '⚙', mexico: '🌮', mystery: '🏰', klugheim: '🛖', africa: '🦁', china: '🏮', fantasy: '🍄' };
+    body.innerHTML = `<div class="card page"><div class="pghead">${back}<h3>🌍 Themenwelten</h3></div>
+      <div class="note">Sechs Hauptwelten – Berlin, Fantasy, Mystery, China Town, Mexico und Deep in Africa. Rookburgh gehört zu Berlin, Klugheim zu Mystery, Wuze Town liegt in Fantasy. Alle Bauten, Farben und Klänge sind eigene, stilisierte Umsetzungen nach einer Beschreibung – keine offiziellen Pläne und keine echte Musik.</div>
+      <div class="pgrid" id="wGrid"></div></div>`;
+    const grid = $('#wGrid');
+    const nearestNode = w => (key) => { const z = ZONES[key]; let b = 0, bd = 1e9; w.nodes.forEach((n, i) => { const d = Math.hypot(n.x - z.x, n.z - z.z); if (d < bd) { bd = d; b = i; } }); return b; };
+    for (const wd of WORLDS) {
+      const rides = db.coasters.filter(c => ZONE_OF_AREA[c.area] === wd.key), ppl = k => POIS.filter(p => p.zone === wd.key && k.includes(p.kind));
+      const subs = SUBAREAS.filter(q => q.zone === wd.key), el = document.createElement('div'); el.className = 'card pcard'; el.style.borderLeft = `5px solid ${COL[wd.key] || '#888'}`;
+      const chips = (arr, kind, mk) => arr.length ? `<div class="note" style="margin-top:6px"><b>${kind}</b> ${arr.map(mk).join(' ')}</div>` : '';
+      el.innerHTML = `<h3>${ICN[wd.key] || '🎡'} ${esc(wd.name)} <span class="note" style="font-weight:400">· ${wd.main ? 'Hauptwelt' : 'Teil von ' + esc(wd.parent)}</span></h3>
+        <div class="note"><i>${esc(wd.tag)}</i> · ${esc(wd.mood)}</div><p style="margin:6px 0">${esc(wd.desc)}</p>
+        <ul style="margin:4px 0 4px 18px;padding:0;font-size:12px;color:var(--mut)">${wd.look.map(l => `<li>${esc(l)}</li>`).join('')}</ul>
+        <div class="note">🎵 Musik: ${esc(wd.sound)}${subs.length ? ' · 📍 ' + subs.map(q => esc(q.name)).join(', ') : ''}</div>
+        ${chips(rides, '🎢', c => `<button class="btn sm" data-ride="${c.id}">${esc(c.name)}</button>`)}
+        ${chips(ppl(['hotel']), '🏨', p => `<button class="btn sm" data-poi="${p.id}">${esc(p.name)}</button>`)}
+        ${chips(ppl(['restaurant', 'stand', 'shop', 'stage', 'flat']), '🍽', p => `<button class="btn sm" data-poi="${p.id}">${esc(p.name)}</button>`)}
+        <div class="acts"><button class="btn blue" data-go>🧭 Hinlaufen</button>${free ? '<button class="btn pri" data-tp>✨ Hinbeamen</button>' : ''}</div>`;
+      const nav = async (mk) => { await a.phantasia('walk'); const w = a.park; if (w) mk(w); };
+      el.querySelector('[data-go]').addEventListener('click', () => nav(w => { const n = nearestNode(w)(wd.key), nd = w.nodes[n]; g.navigateTo({ type: 'zone', x: nd.x, z: nd.z, node: n, name: wd.name }); }));
+      const tp = el.querySelector('[data-tp]'); if (tp) tp.addEventListener('click', () => nav(w => { const n = nearestNode(w)(wd.key), nd = w.nodes[n], gy = w.groundAt ? w.groundAt(nd.x, nd.z, 60) : 0; a.walk.pos.set(nd.x, gy + 1.75, nd.z); a.walk.vy = 0; this.closePanel?.(); this.toast('✨ ' + wd.name); }));
+      el.querySelectorAll('[data-ride]').forEach(b => b.addEventListener('click', () => nav(w => { const r = w.rides.find(x => x.coaster.id === b.dataset.ride); if (r) g.navigateTo({ type: 'ride', ride: r, x: r.entrance.x, z: r.entrance.z, name: r.coaster.name }); })));
+      el.querySelectorAll('[data-poi]').forEach(b => b.addEventListener('click', () => nav(w => { const p = w.pois.find(x => x.id === b.dataset.poi); if (p) g.navigateTo({ type: 'poi', poi: p, x: p.ax, z: p.az, name: p.name }); })));
+      grid.appendChild(el);
+    }
   },
   poiNav(poi) { const a = this.app; return a.phantasia('walk').then(() => a.game.navigateTo({ type: 'poi', poi, x: poi.ax, z: poi.az, name: poi.name })); },
   buildHotels(body, back) {
