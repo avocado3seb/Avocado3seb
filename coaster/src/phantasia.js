@@ -588,7 +588,8 @@ export class PhantasiaWorld extends ParkWorld {
       const low = hAbove(k) < (r.spec.rider === 'inv' || r.spec.rider === 'fly' ? 7 : 4.8) && Math.abs(r.wu[k] - 1) < 0.2;
       if (low && st < 0) st = k; if ((!low || k === endSkip - 1) && st >= 0) { if (k - st >= 18) tunnels.push([st, k]); st = -1; }
     }
-    const maxTun = rocky || jungle ? 3 : 1;
+    const civic = zone === 'berlin' || zone === 'fantasy' || zone === 'china'; // Stadt-/Märchen-/Gartenwelten: keine Felstunnel und Felssäulen (wirkten wie schwarze Findlinge rund um den Kaiserplatz)
+    const maxTun = civic ? 0 : rocky || jungle ? 3 : 1;
     const chosen = tunnels.sort((a, b) => (b[1] - b[0]) - (a[1] - a[0])).slice(0, maxTun);
     const inv = r.spec.rider === 'inv' || r.spec.rider === 'fly';
     for (const [k0, k1] of chosen) {
@@ -626,7 +627,7 @@ export class PhantasiaWorld extends ParkWorld {
     }
     // Beinahe-Treffer: Säulen/Stämme knapp neben der Bahn
     const spots = []; for (let k = skip + 6; k < endSkip - 6; k += 1) if (!inTunnel(k) && hAbove(k) > 2.5 && hAbove(k) < 14 && Math.abs(r.wu[k] - 1) < 0.15 && this.rng() < 0.012) spots.push(k);
-    for (const k of spots.slice(0, 7)) {
+    for (const k of (civic ? [] : spots).slice(0, 7)) {
       const x = wp[k * 3], y = wp[k * 3 + 1], z = wp[k * 3 + 2], gy = this.h(x, z), sd = this.rng() < 0.5 ? -1 : 1, o = 3.1;
       const px = x + r.wr[k * 2] * o * sd, pz = z + r.wr[k * 2 + 1] * o * sd, hh = y - gy + 3;
       if (jungle) { const t = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.8, hh, 8), new THREE.MeshStandardMaterial({ map: A.tex.planks('#3a2a1c') })); t.position.set(px, gy + hh / 2, pz); t.castShadow = true; this.group.add(t); }
